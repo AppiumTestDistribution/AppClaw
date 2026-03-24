@@ -1237,10 +1237,89 @@
       color: var(--text-secondary);
       cursor: pointer;
       padding: 8px;
+      border-radius: 8px;
+      transition: background 0.15s, color 0.15s;
     }
+
+    .mobile-menu-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+    .mobile-menu-btn svg { display: block; }
 
     @media (max-width: 768px) {
       .mobile-menu-btn { display: block; }
+    }
+
+    /* ===== MOBILE NAV DROPDOWN ===== */
+    .mobile-nav {
+      display: none;
+      position: fixed;
+      top: 64px;
+      left: 0;
+      right: 0;
+      z-index: 99;
+      background: rgba(9,9,11,0.97);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px 20px;
+    }
+
+    .mobile-nav.open { display: block; }
+
+    .mobile-nav a {
+      display: block;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 12px 8px;
+      border-radius: 8px;
+      transition: all 0.15s;
+    }
+
+    .mobile-nav a:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+
+    .mobile-nav .mobile-nav-cta {
+      display: block;
+      margin-top: 12px;
+      padding: 13px;
+      text-align: center;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 10px;
+    }
+
+    .mobile-nav .mobile-nav-cta:hover { background: var(--accent-hover); }
+
+    /* ===== NAV ACTIVE STATE ===== */
+    .nav-links a.active {
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.05);
+    }
+
+    /* ===== COPY FEEDBACK ===== */
+    .copy-toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 100px;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 999;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .copy-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
   </style>
 </head>
@@ -1262,15 +1341,36 @@
         <li><a href="#quickstart">Get Started</a></li>
       </ul>
       <div class="nav-right">
-        <a href="#quickstart" class="btn-nav btn-nav-ghost">Docs</a>
+        <a href="#quickstart" class="btn-nav btn-nav-ghost">Quickstart</a>
         <a class="gh-star" href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">
           <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           Star on GitHub
         </a>
         <a href="#quickstart" class="btn-nav btn-nav-primary">Get Started</a>
+        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
+          <svg id="hamburger-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+          <svg id="close-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none;">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
     </div>
   </nav>
+
+  <!-- MOBILE NAV -->
+  <div class="mobile-nav" id="mobile-nav" role="navigation" aria-label="Mobile navigation">
+    <a href="#features" class="mobile-nav-link">Features</a>
+    <a href="#how-it-works" class="mobile-nav-link">How It Works</a>
+    <a href="#architecture" class="mobile-nav-link">Architecture</a>
+    <a href="#quickstart" class="mobile-nav-link">Quickstart</a>
+    <a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener" class="mobile-nav-link">GitHub</a>
+    <a href="#quickstart" class="mobile-nav-cta">Get Started &rarr;</a>
+  </div>
 
   <!-- HERO -->
   <section class="hero">
@@ -1284,10 +1384,10 @@
             </div>
           </div>
           <div class="animate-in delay-1">
-            <div class="hero-badge">
+            <a class="hero-badge" href="https://github.com/AppiumTestDistribution/appclaw/blob/main/LICENSE" target="_blank" rel="noopener" style="text-decoration:none;">
               <span class="hero-badge-dot"></span>
               Open Source &middot; MIT License
-            </div>
+            </a>
           </div>
           <h1 class="animate-in delay-2">
             Tell your phone<br>
@@ -1322,7 +1422,7 @@
           <span style="width: 36px"></span>
         </div>
         <div class="terminal-body">
-          <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">npm start</span> <span class="t-string">"Send a WhatsApp message to Mom saying good morning"</span></span>
+          <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">appclaw</span> <span class="t-string">"Send a WhatsApp message to Mom saying good morning"</span></span>
           <span class="t-line">&nbsp;</span>
           <span class="t-line indent"><span class="t-info">1/30</span>  <span class="t-step">launch &rarr;</span> <span class="t-string">"com.whatsapp"</span> <span class="t-dim">(Open WhatsApp)</span></span>
           <span class="t-line indent"><span class="t-info">2/30</span>  <span class="t-step">find_and_tap &rarr;</span> <span class="t-string">"Mom"</span> <span class="t-dim">(Find Mom in chat list)</span></span>
@@ -1366,13 +1466,13 @@
         </div>
         <div class="provider-item">
           <div class="provider-icon" style="background:rgba(245,158,11,0.1);">
-            <span style="color:var(--orange);">G</span>
+            <span style="color:var(--orange); font-size:12px; font-weight:900;">GQ</span>
           </div>
           Groq
         </div>
         <div class="provider-item">
           <div class="provider-icon" style="background:rgba(255,255,255,0.05);">
-            <span style="color:var(--text-secondary);">O</span>
+            <span style="color:var(--text-secondary); font-size:15px;">🦙</span>
           </div>
           Ollama
         </div>
@@ -1787,19 +1887,22 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2025 AppClaw. Open source under MIT License.</p>
+        <p>&copy; 2026 AppClaw. Open source under MIT License.</p>
         <div class="footer-socials">
           <a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">GitHub</a>
-          <a href="#">Twitter</a>
-          <a href="#">Discord</a>
+          <a href="https://github.com/AppiumTestDistribution/appclaw/discussions" target="_blank" rel="noopener">Discussions</a>
+          <a href="https://github.com/AppiumTestDistribution/appclaw/issues" target="_blank" rel="noopener">Issues</a>
         </div>
       </div>
     </div>
   </footer>
 
+  <!-- Copy toast notification -->
+  <div class="copy-toast" id="copy-toast">Copied to clipboard!</div>
+
   <script>
-    // Intersection Observer for scroll animations
-    const observer = new IntersectionObserver((entries) => {
+    // ── Scroll animations ──────────────────────────────────────
+    const animObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           entry.target.style.opacity = '1';
@@ -1812,28 +1915,99 @@
       el.style.opacity = '0';
       el.style.transform = 'translateY(20px)';
       el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-      observer.observe(el);
+      animObserver.observe(el);
     });
 
-    // Copy install command
-    document.querySelector('.install-cmd')?.addEventListener('click', function() {
-      navigator.clipboard.writeText('npm install -g appclaw').then(() => {
-        const original = this.innerHTML;
-        this.style.borderColor = 'rgba(34,197,94,0.3)';
-        setTimeout(() => { this.style.borderColor = ''; }, 1500);
+    // ── Copy install command (all instances) ──────────────────
+    function showCopyToast() {
+      const toast = document.getElementById('copy-toast');
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    document.querySelectorAll('.install-cmd').forEach(el => {
+      el.addEventListener('click', function() {
+        navigator.clipboard.writeText('npm install -g appclaw').then(() => {
+          this.style.borderColor = 'rgba(34,197,94,0.3)';
+          setTimeout(() => { this.style.borderColor = ''; }, 1500);
+          showCopyToast();
+        }).catch(() => {
+          // Fallback for browsers without clipboard API
+          const ta = document.createElement('textarea');
+          ta.value = 'npm install -g appclaw';
+          ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select(); document.execCommand('copy');
+          document.body.removeChild(ta);
+          showCopyToast();
+        });
       });
     });
 
-    // Smooth scroll for nav links
+    // ── Smooth scroll for nav links ───────────────────────────
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
       anchor.addEventListener('click', function(e) {
-        const target = document.querySelector(this.getAttribute('href'));
+        const href = this.getAttribute('href');
+        if (href === '#') return;
+        const target = document.querySelector(href);
         if (target) {
           e.preventDefault();
+          // Close mobile menu if open
+          closeMobileMenu();
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       });
     });
+
+    // ── Mobile nav toggle ─────────────────────────────────────
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileNav = document.getElementById('mobile-nav');
+    const hamburgerIcon = document.getElementById('hamburger-icon');
+    const closeIcon = document.getElementById('close-icon');
+
+    function openMobileMenu() {
+      mobileNav.classList.add('open');
+      mobileMenuBtn.setAttribute('aria-expanded', 'true');
+      mobileMenuBtn.setAttribute('aria-label', 'Close navigation menu');
+      hamburgerIcon.style.display = 'none';
+      closeIcon.style.display = 'block';
+    }
+
+    function closeMobileMenu() {
+      mobileNav.classList.remove('open');
+      mobileMenuBtn.setAttribute('aria-expanded', 'false');
+      mobileMenuBtn.setAttribute('aria-label', 'Open navigation menu');
+      hamburgerIcon.style.display = 'block';
+      closeIcon.style.display = 'none';
+    }
+
+    mobileMenuBtn.addEventListener('click', () => {
+      mobileNav.classList.contains('open') ? closeMobileMenu() : openMobileMenu();
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!mobileMenuBtn.contains(e.target) && !mobileNav.contains(e.target)) {
+        closeMobileMenu();
+      }
+    });
+
+    // ── Scroll-spy: highlight active nav link ─────────────────
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+
+    const spyObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.getAttribute('id');
+          navLinks.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+          });
+        }
+      });
+    }, { threshold: 0.3, rootMargin: '-64px 0px 0px 0px' });
+
+    sections.forEach(section => spyObserver.observe(section));
   </script>
 
 </body>
