@@ -1265,7 +1265,7 @@
         <a href="#quickstart" class="btn-nav btn-nav-ghost">Docs</a>
         <a class="gh-star" href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">
           <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          GitHub
+          Star on GitHub
         </a>
         <a href="#quickstart" class="btn-nav btn-nav-primary">Get Started</a>
       </div>
@@ -1667,8 +1667,8 @@
           <div class="qs-step">
             <div class="qs-step-num">1</div>
             <div class="qs-step-content">
-              <h4>Clone and install</h4>
-              <p>Requires Node.js 18+. Clone the repo, install dependencies, and set up Appium with the driver for your platform.</p>
+              <h4>Install</h4>
+              <p>Requires Node.js 18+. Install AppClaw globally from npm.</p>
             </div>
           </div>
           <div class="qs-step">
@@ -1700,10 +1700,8 @@
             <span class="terminal-dot dot-green"></span>
           </div>
           <div class="qs-terminal-body">
-            <span class="t-line"><span class="t-dim"># Clone, install, and set up Appium</span></span>
-            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">git clone https://github.com/AppiumTestDistribution/appclaw</span></span>
-            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">cd appclaw && npm install</span></span>
-            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">npm i -g appium && appium driver install uiautomator2</span></span>
+            <span class="t-line"><span class="t-dim"># Install AppClaw</span></span>
+            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">npm install -g appclaw</span></span>
             <span class="t-line">&nbsp;</span>
             <span class="t-line"><span class="t-dim"># Create .env with your LLM provider</span></span>
             <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">echo</span> <span class="t-string">"LLM_PROVIDER=gemini"</span> <span class="t-cmd">&gt; .env</span></span>
@@ -1713,15 +1711,15 @@
             <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">adb devices</span></span>
             <span class="t-line">&nbsp;</span>
             <span class="t-line"><span class="t-dim"># Run a goal in plain English</span></span>
-            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">npm start</span> <span class="t-string">"Open Settings and turn on WiFi"</span></span>
+            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">appclaw</span> <span class="t-string">"Open Settings and turn on WiFi"</span></span>
             <span class="t-line">&nbsp;</span>
             <span class="t-line"><span class="t-dim"># Or run a declarative YAML flow (no LLM needed)</span></span>
-            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">npm start -- --flow</span> <span class="t-step">examples/flows/google-search.yaml</span></span>
+            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">appclaw --flow</span> <span class="t-step">examples/flows/google-search.yaml</span></span>
             <span class="t-line">&nbsp;</span>
             <span class="t-line"><span class="t-dim"># Record, replay, or decompose complex goals</span></span>
-            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">npm start -- --record</span> <span class="t-string">"Send hello on WhatsApp"</span></span>
-            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">npm start -- --replay</span> <span class="t-step">recordings/rec-*.json</span></span>
-            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">npm start -- --plan</span> <span class="t-string">"Copy weather and send on Slack"</span><span class="typing-cursor"></span></span>
+            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">appclaw --record</span> <span class="t-string">"Send hello on WhatsApp"</span></span>
+            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">appclaw --replay</span> <span class="t-step">recordings/rec-*.json</span></span>
+            <span class="t-line"><span class="t-prompt">$</span> <span class="t-cmd">appclaw --plan</span> <span class="t-string">"Copy weather and send on Slack"</span><span class="typing-cursor"></span></span>
           </div>
         </div>
       </div>
@@ -1741,7 +1739,7 @@
         </a>
         <div class="install-cmd">
           <span class="dollar">$</span>
-          <code>git clone https://github.com/AppiumTestDistribution/appclaw</code>
+          <code>npm install -g appclaw</code>
         </div>
       </div>
       <p style="font-size: 13px; color: var(--text-tertiary); margin-top: 16px;">MIT License &middot; Free forever &middot; Community driven</p>
@@ -1819,7 +1817,7 @@
 
     // Copy install command
     document.querySelector('.install-cmd')?.addEventListener('click', function() {
-      navigator.clipboard.writeText('git clone https://github.com/AppiumTestDistribution/appclaw').then(() => {
+      navigator.clipboard.writeText('npm install -g appclaw').then(() => {
         const original = this.innerHTML;
         this.style.borderColor = 'rgba(34,197,94,0.3)';
         setTimeout(() => { this.style.borderColor = ''; }, 1500);
