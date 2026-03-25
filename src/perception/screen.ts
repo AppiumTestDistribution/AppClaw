@@ -23,7 +23,9 @@ export async function getScreenState(
   maxElements: number,
   captureScreenshot: boolean = false,
   /** Skip page source fetch — for vision mode where DOM is not needed */
-  skipPageSource: boolean = false
+  skipPageSource: boolean = false,
+  /** Parse legacy UIElement/CompactUIElement arrays (only needed for recorder) */
+  parseLegacyElements: boolean = false
 ): Promise<ScreenState> {
   // Kick off page source and screenshot in parallel when both are needed
   const pageSourcePromise = !skipPageSource ? getPageSource(mcp) : Promise.resolve("");
@@ -36,18 +38,27 @@ export async function getScreenState(
   let elements: import("./types.js").UIElement[] = [];
   let filtered: import("./types.js").CompactUIElement[] = [];
   let dom = "";
+  let elementCount = 0;
+  let editableCount = 0;
   let platform: "android" | "ios" = "android";
 
   if (!skipPageSource && raw) {
     platform = detectPlatform(raw);
 
-    elements = platform === "android"
-      ? parseAndroidPageSource(raw)
-      : parseIOSPageSource(raw);
+    const trimResult = trimDOM(raw, platform, maxElements);
+    dom = trimResult.xml;
+    elementCount = trimResult.elementCount;
+    editableCount = trimResult.editableCount;
 
-    filtered = filterElements(elements, maxElements);
-    dom = trimDOM(raw, platform, maxElements);
+    // Legacy element parsing — only when recorder needs CompactUIElement[]
+    if (parseLegacyElements) {
+      elements = platform === "android"
+        ? parseAndroidPageSource(raw)
+        : parseIOSPageSource(raw);
+
+      filtered = filterElements(elements, maxElements);
+    }
   }
 
-  return { elements, filtered, dom, screenshot: screenshotData ?? undefined, platform, raw };
+  return { elements, filtered, dom, elementCount, editableCount, screenshot: screenshotData ?? undefined, platform, raw };
 }

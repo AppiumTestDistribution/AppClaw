@@ -16,15 +16,25 @@ interface TrimmedNode {
   score: number;
 }
 
+/** Result of trimDOM — compact XML plus pre-computed element counts. */
+export interface TrimDOMResult {
+  xml: string;
+  /** Total elements in the trimmed output */
+  elementCount: number;
+  /** Number of editable fields in the trimmed output */
+  editableCount: number;
+}
+
 /**
  * Trim a raw Appium page source XML into compact, flat XML.
- * Returns a <screen> element containing only meaningful elements.
+ * Returns a <screen> element containing only meaningful elements,
+ * plus pre-computed element counts for downstream use.
  */
 export function trimDOM(
   xmlContent: string,
   platform: "android" | "ios",
   maxElements: number = 80
-): string {
+): TrimDOMResult {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
@@ -35,7 +45,7 @@ export function trimDOM(
   try {
     parsed = parser.parse(xmlContent);
   } catch {
-    return "<screen><!-- Failed to parse page source --></screen>";
+    return { xml: "<screen><!-- Failed to parse page source --></screen>", elementCount: 0, editableCount: 0 };
   }
 
   const nodes: TrimmedNode[] = [];
@@ -50,6 +60,14 @@ export function trimDOM(
   nodes.sort((a, b) => b.score - a.score);
   const top = nodes.slice(0, maxElements);
 
+  // Count element types for the screen summary annotation.
+  // This gives the LLM instant awareness of screen complexity (~15 tokens)
+  // without an extra LLM call — a lightweight "room label".
+  const interactiveCount = top.filter(
+    n => n.attrs.clickable === "true" || n.attrs.editable === "true" || n.attrs.scrollable === "true"
+  ).length;
+  const editableCount = top.filter(n => n.attrs.editable === "true").length;
+
   // Build compact XML with element numbering
   const lines = top.map((node, i) => {
     const attrs = Object.entries(node.attrs)
@@ -58,7 +76,11 @@ export function trimDOM(
     return `<${node.tag} idx="${i + 1}" ${attrs}/>`;
   });
 
-  return `<screen>\n${lines.join("\n")}\n</screen>`;
+  return {
+    xml: `<screen elements="${top.length}" interactive="${interactiveCount}" editable="${editableCount}">\n${lines.join("\n")}\n</screen>`,
+    elementCount: top.length,
+    editableCount,
+  };
 }
 
 /**

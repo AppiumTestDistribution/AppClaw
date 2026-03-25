@@ -114,7 +114,13 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   let lastResult = "";
   let detectedPlatform: "android" | "ios" = "android";
   let postActionScreenshot: string | undefined; // Screenshot captured after previous action
+  let cachedPostScreen: import("../perception/types.js").ScreenState | undefined; // Reuse post-action screen as next step's perception
   const triedSelectors: string[] = []; // Track selectors the LLM has tried (for stuck recovery)
+
+  // ── Proactive negative cache ──────────────────────────
+  // Tracks which selectors failed on which screen (by hash).
+  // Injected into every LLM call so the model avoids repeating known-bad actions.
+  const screenFailures = new Map<string, Array<{ selector: string; action: string; error: string }>>();
 
   // Detect device UDID for keyboard input (ADB-based typing on Android)
   const deviceUdid = await detectDeviceUdid();
@@ -153,13 +159,23 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     const skipPageSource = Config.AGENT_MODE === "vision";
 
     let screen;
-    try {
-      screen = await getScreenState(mcp, maxElements, captureScreenshot, skipPageSource);
-    } catch (err) {
-      ui.stopSpinner();
-      ui.printError(`Step ${step + 1}: Failed to get screen state`, String(err));
-      lastResult = `Screen capture failed: ${err}`;
-      continue;
+    // Reuse the post-action screen from the previous step when available.
+    // This eliminates a redundant getPageSource MCP call (~200-800ms).
+    // Only reuse when the cached screen has DOM (not vision-only) or when
+    // we're in vision mode (DOM not needed). Always fetch fresh on step 0.
+    if (cachedPostScreen && step > 0) {
+      screen = cachedPostScreen;
+      cachedPostScreen = undefined;
+    } else {
+      try {
+        screen = await getScreenState(mcp, maxElements, captureScreenshot, skipPageSource, !!recorder);
+      } catch (err) {
+        ui.stopSpinner();
+        ui.printError(`Step ${step + 1}: Failed to get screen state`, String(err));
+        lastResult = `Screen capture failed: ${err}`;
+        cachedPostScreen = undefined; // Invalidate cache on failure
+        continue;
+      }
     }
 
     recorder?.setPlatform(screen.platform);
@@ -261,6 +277,18 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     const screenshotForLLM = postActionScreenshot ?? (captureScreenshot ? screen.screenshot : undefined);
     postActionScreenshot = undefined; // Reset — will be set again after this step's action
 
+    // ── Build proactive negative cache for this screen ──
+    const failures = screenFailures.get(screenHash);
+    let failedOnScreen: string | undefined;
+    if (failures && failures.length > 0) {
+      const failLines = failures
+        .slice(-10) // Cap at 10 most recent failures on this screen
+        .map(f => `  ✗ ${f.action}("${f.selector}") → ${f.error}`)
+        .join("\n");
+      failedOnScreen =
+        `FAILED ON THIS SCREEN (do NOT repeat these — they will fail again):\n${failLines}`;
+    }
+
     const context: AgentContext = {
       goal,
       step,
@@ -272,6 +300,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       stuckHint,
       installedApps: step === 0 ? appResolver?.getAppListForContext() : undefined,
       platform: screen.platform,
+      editableCount: screen.editableCount,
+      failedOnScreen,
     };
 
     let decision: ToolCallDecision;
@@ -403,6 +433,27 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
     lastResult = `${decision.toolName} → ${result.success ? "OK" : "FAILED"}: ${result.message}`;
 
+    // ── Record failure in negative cache ──────────────────
+    // Only track failures with a selector — these are the ones the LLM
+    // would otherwise retry. Keyed by screen hash so failures are
+    // scoped to the screen where they occurred.
+    if (!result.success && decision.args.selector) {
+      const sel = String(decision.args.selector);
+      const existing = screenFailures.get(screenHash) ?? [];
+      // Avoid duplicate entries for the same selector+action on this screen
+      const isDuplicate = existing.some(
+        f => f.selector === sel && f.action === decision.toolName
+      );
+      if (!isDuplicate) {
+        existing.push({
+          selector: sel,
+          action: decision.toolName,
+          error: result.message.slice(0, 80),
+        });
+        screenFailures.set(screenHash, existing);
+      }
+    }
+
     // When find_element succeeds, extract the UUID and make it prominent
     if (decision.toolName === "appium_find_element" && result.success) {
       // Check for ai-element synthetic UUID first
@@ -427,7 +478,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     // visually verify the result and handle unexpected states.
     await sleep(stepDelay); // Wait for UI to settle
     try {
-      const postScreen = await getScreenState(mcp, maxElements, llm.supportsVision || skipPageSource, skipPageSource);
+      const postScreen = await getScreenState(mcp, maxElements, captureScreenshot, skipPageSource, !!recorder);
 
       // Store screenshot for the next LLM turn — the LLM will SEE
       // the visual result of its action before deciding the next move
@@ -477,8 +528,12 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
           lastResult += `\n>> SCREEN_AFTER_ACTION: No visible change — your action may have had no effect or succeeded silently.`;
         }
       }
+      // Cache post-action screen for reuse as next step's perception.
+      // Saves one getPageSource MCP round-trip (~200-800ms) per step.
+      cachedPostScreen = postScreen;
     } catch {
-      // Post-action capture failed — continue without it
+      // Post-action capture failed — continue without cached screen
+      cachedPostScreen = undefined;
     }
 
     // Feed tool result back into action history
@@ -500,9 +555,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
     recorder?.record(step, decision as any, screen.filtered, lastResult);
 
-    onStep?.({ step, decision, result, elementsCount: screen.filtered.length });
-
-    await sleep(stepDelay);
+    onStep?.({ step, decision, result, elementsCount: screen.elementCount });
   }
 
   ui.printGoalFailed(`Max steps (${maxSteps}) reached`);

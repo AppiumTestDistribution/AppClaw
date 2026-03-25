@@ -227,7 +227,7 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
     },
 
     getStuckCount(): number {
-      return unchangedCount;
+      return stuckCount;
     },
 
     reset() {

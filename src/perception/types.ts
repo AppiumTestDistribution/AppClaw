@@ -52,10 +52,16 @@ export interface CompactUIElement {
 
 /** Full screen state from perception */
 export interface ScreenState {
+  /** @deprecated Legacy parsed elements — only populated when recorder is active */
   elements: UIElement[];
+  /** @deprecated Legacy filtered elements — only populated when recorder is active */
   filtered: CompactUIElement[];
   /** Trimmed DOM XML — compact representation sent directly to LLM */
   dom: string;
+  /** Total elements in the trimmed DOM */
+  elementCount: number;
+  /** Number of editable fields in the trimmed DOM (pre-computed by trimmer) */
+  editableCount: number;
   screenshot?: string;
   platform: "android" | "ios";
   raw: string;

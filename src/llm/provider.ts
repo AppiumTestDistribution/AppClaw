@@ -35,6 +35,10 @@ export interface AgentContext {
   stuckHint?: string;
   platform: "android" | "ios";
   installedApps?: string;
+  /** Number of editable fields on the current screen (pre-computed by trimmer) */
+  editableCount?: number;
+  /** Proactive negative cache: selectors that failed on the current screen */
+  failedOnScreen?: string;
 }
 
 /** Token usage for a single LLM call */
@@ -332,80 +336,65 @@ export function createLLMProvider(
       ];
 
       // Use streaming when callbacks are provided for live reasoning display.
-      // Two-phase approach: most models (Gemini, etc.) don't stream text before
-      // tool calls. So we first stream a reasoning-only call (no tools), then
-      // make the actual tool call with the reasoning as context.
+      // Single streamText call with tools — streams any reasoning text the model
+      // emits before its tool call, then extracts the tool call from the final result.
+      // This replaces the previous two-phase approach that doubled token cost.
       if (callbacks) {
-        // ── Phase 1: Stream reasoning (no tools, short response) ──
-        callbacks.onTextStart?.();
-        const reasoningPrompt =
-          `You are analyzing a mobile screen to decide the next action.\n\n` +
-          `${userMessage}\n\n` +
-          `Describe in 2-3 sentences: What do you see on screen? What is the current state? What action should be taken next and why?`;
-
-        const reasonStream = streamText({
-          model: model as any,
-          system: systemPrompt,
-          maxOutputTokens: 200,
-          // No tools — forces pure text output that can be streamed
-          messages: [
-            {
-              role: "user" as const,
-              content: hasValidScreenshot
-                ? [
-                    { type: "text" as const, text: reasoningPrompt },
-                    { type: "image" as const, image: imageForLlm! },
-                  ]
-                : reasoningPrompt,
-            },
-          ],
-        });
-
-        let reasoningText = "";
-        for await (const chunk of reasonStream.textStream) {
-          reasoningText += chunk;
-          callbacks.onTextChunk?.(chunk);
-        }
-        callbacks.onDone?.();
-
-        const reasonUsage = await reasonStream.usage;
-
-        // ── Phase 2: Tool call (non-streaming, fast) ──
-        // Inject reasoning so the model has its own analysis as context
-        const enrichedMessage = `ANALYSIS:\n${reasoningText}\n\n${userMessage}\n\nBased on your analysis above, call the appropriate tool now.`;
-
-        const result = await generateText({
+        const stream = streamText({
           model: model as any,
           system: systemPrompt,
           tools: allTools,
           toolChoice: "required" as const,
           ...(thinkingOptions ? { providerOptions: thinkingOptions } : {}),
-          messages: [
-            {
-              role: "user" as const,
-              content: hasValidScreenshot
-                ? [
-                    { type: "text" as const, text: enrichedMessage },
-                    { type: "image" as const, image: imageForLlm! },
-                  ]
-                : enrichedMessage,
-            },
-          ],
+          messages,
         });
 
-        const extracted = extractUsageFromGenerateTextResult(result);
+        // Stream any reasoning text the model emits before the tool call.
+        // Defer onTextStart until the first non-empty chunk arrives — avoids
+        // a brief "Reasoning..." flicker for providers (Gemini, GPT-4o) that
+        // go straight to tool calls with no text prefix.
+        let reasoningText = "";
+        let streamingStarted = false;
+        for await (const chunk of stream.textStream) {
+          if (!chunk) continue; // Skip empty keep-alive frames from providers
+          if (!streamingStarted) {
+            callbacks.onTextStart?.();
+            streamingStarted = true;
+          }
+          reasoningText += chunk;
+          callbacks.onTextChunk?.(chunk);
+        }
+        if (streamingStarted) callbacks.onDone?.();
+
+        // Await final results after stream completes
+        const [streamUsage, streamTotalUsage, toolCalls, text, providerMeta, response] =
+          await Promise.all([
+            stream.usage,
+            stream.totalUsage,
+            stream.toolCalls,
+            stream.text,
+            stream.providerMetadata,
+            stream.response,
+          ]);
+
+        const extracted = extractUsageFromGenerateTextResult({
+          usage: streamUsage,
+          totalUsage: streamTotalUsage,
+          providerMetadata: providerMeta,
+          response: { body: (response as any)?.body },
+        });
         const usage: TokenUsage = {
-          inputTokens: extracted.inputTokens + (reasonUsage?.inputTokens ?? 0),
-          outputTokens: extracted.outputTokens + (reasonUsage?.outputTokens ?? 0),
-          totalTokens: extracted.totalTokens + ((reasonUsage?.inputTokens ?? 0) + (reasonUsage?.outputTokens ?? 0)),
+          inputTokens: extracted.inputTokens,
+          outputTokens: extracted.outputTokens,
+          totalTokens: extracted.totalTokens,
         };
 
-        const toolCall = result.toolCalls?.[0];
+        const toolCall = toolCalls?.[0];
         if (!toolCall) {
           return {
             toolName: "done",
-            args: { reason: result.text || reasoningText || "No action decided" },
-            reasoning: reasoningText,
+            args: { reason: text || reasoningText || "No action decided" },
+            reasoning: reasoningText || undefined,
             usage,
           };
         }

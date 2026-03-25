@@ -177,6 +177,21 @@ export function buildUserMessage(context: AgentContext): string {
     parts.push(`\n⚠️ ${context.stuckHint}`);
   }
 
+  // ── Proactive negative cache ──────────────────────────
+  // Inject failed selectors for the current screen BEFORE the DOM,
+  // so the LLM sees what NOT to try before reading available elements.
+  if (context.failedOnScreen) {
+    parts.push(`\n${context.failedOnScreen}`);
+  }
+
+  // ── Contextual hints ──────────────────────────────────
+  // Targeted micro-reminders based on current state. Additive only —
+  // these reinforce existing rules when they matter most.
+  const hints = buildContextualHints(context);
+  if (hints) {
+    parts.push(`\n${hints}`);
+  }
+
   if (context.installedApps) {
     parts.push(`\nINSTALLED_APPS (use exact package names for "launch_app"):\n${context.installedApps}`);
   }
@@ -191,4 +206,34 @@ export function buildUserMessage(context: AgentContext): string {
   );
 
   return parts.join("\n");
+}
+
+/**
+ * Build contextual micro-hints based on current agent state.
+ *
+ * These are small, targeted reminders (1-2 lines) injected only when
+ * specific conditions are met. They reinforce existing system prompt rules
+ * at the exact moment they're most relevant — never remove or replace rules.
+ */
+function buildContextualHints(context: AgentContext): string {
+  const hints: string[] = [];
+
+  // Low on steps — push toward decisive action
+  const stepRatio = (context.step + 1) / context.maxSteps;
+  if (stepRatio > 0.7) {
+    const remaining = context.maxSteps - context.step - 1;
+    hints.push(
+      `⏳ LOW ON STEPS (${remaining} left) — prioritize direct actions. If the goal looks achieved, call "done" now.`
+    );
+  }
+
+  // Multiple editable fields on screen — reinforce field targeting
+  // Uses pre-computed count from dom-trimmer (no redundant regex scan)
+  if (context.editableCount && context.editableCount >= 3) {
+    hints.push(
+      `📝 MULTIPLE INPUT FIELDS (${context.editableCount}) — target each by its specific label, hint, or rid. Do not type into the wrong field.`
+    );
+  }
+
+  return hints.join("\n");
 }
