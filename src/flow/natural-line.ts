@@ -41,6 +41,12 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   if (typeMatch) {
     return { kind: "type", text: typeMatch[1], verbatim };
   }
+  // "Enter X in the search bar" / "Enter X in the text field" / "Type X in ..."
+  const typeInMatch = t.match(/^(?:type|enter|input)\s+["']?(.+?)["']?\s+(?:in|into)\s+(?:the\s+)?(?:search\s+bar|text\s*field|input\s*field|field|box|area).*$/i);
+  if (typeInMatch) {
+    const text = trimPunct(typeInMatch[1].trim());
+    if (text) return { kind: "type", text, verbatim };
+  }
   const typeBare = t.match(/^(?:type|input)\s+(.+)$/i);
   if (typeBare && !t.match(/^type\s*:/i)) {
     const text = trimPunct(typeBare[1].trim());
@@ -76,8 +82,26 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   const homeMatch = t.match(/^(?:go\s+)?home$/i);
   if (homeMatch) return { kind: "home", verbatim };
 
-  const enterMatch = t.match(/^press\s+enter|hit\s+enter|send\s+enter$/i);
+  const enterMatch = t.match(/^(?:press\s+enter|hit\s+enter|send\s+enter|pe[r]?form\s+search|submit|submit\s+search|search)$/i);
   if (enterMatch) return { kind: "enter", verbatim };
+
+  // scroll down until "X" is visible / scroll down 3 times to find "X"
+  const scrollAssertMatch = t.match(
+    /^scroll\s+(up|down|left|right)\s+(?:(\d+)\s+times?\s+)?(?:until|to\s+(?:find|see|check|verify))\s+["']?(.+?)["']?\s*(?:is\s+(?:visible|present|shown|displayed))?$/i
+  );
+  if (scrollAssertMatch) {
+    const direction = scrollAssertMatch[1].toLowerCase() as "up" | "down" | "left" | "right";
+    const maxScrolls = scrollAssertMatch[2] ? Number(scrollAssertMatch[2]) : 3;
+    const text = trimPunct(scrollAssertMatch[3].trim());
+    if (text) return { kind: "scrollAssert", text, direction, maxScrolls, verbatim };
+  }
+
+  const assertMatch = t.match(/^(?:assert|verify|check)\s+(?:that\s+)?["']?(.+?)["']?\s+is\s+(?:visible|present|shown|displayed)$/i)
+    ?? t.match(/^(?:assert|verify|check)\s+(?:that\s+)?["']?(.+?)["']?$/i);
+  if (assertMatch) {
+    const text = trimPunct(assertMatch[1].trim());
+    if (text) return { kind: "assert", text, verbatim };
+  }
 
   const doneMatch = t.match(/^done(?:\s*[:\-]\s*|\s+)(.+)$/i);
   if (doneMatch) {

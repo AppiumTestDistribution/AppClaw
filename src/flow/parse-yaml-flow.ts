@@ -35,6 +35,28 @@ function normalizeStep(raw: unknown, index: number): FlowStep {
   if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
     const o = raw as Record<string, unknown>;
     const keys = Object.keys(o);
+
+    // ── Multi-key: scrollAssert ──
+    // e.g. { scrollAssert: "TestMu AI", direction: "down", maxScrolls: 3 }
+    if (keys.includes("scrollAssert") || keys.includes("scrollVerify") || keys.includes("scrollCheck")) {
+      const textKey = keys.find(k => k === "scrollAssert" || k === "scrollVerify" || k === "scrollCheck")!;
+      const text = String(o[textKey]);
+      const dir = String(o.direction ?? "down").toLowerCase();
+      if (!["up", "down", "left", "right"].includes(dir)) {
+        throw new Error(`Step ${index + 1}: scrollAssert direction must be up/down/left/right, got "${dir}"`);
+      }
+      const maxScrolls = Number(o.maxScrolls ?? 3);
+      if (!Number.isFinite(maxScrolls) || maxScrolls < 1) {
+        throw new Error(`Step ${index + 1}: scrollAssert maxScrolls must be a positive number`);
+      }
+      return {
+        kind: "scrollAssert",
+        text,
+        direction: dir as "up" | "down" | "left" | "right",
+        maxScrolls,
+      };
+    }
+
     if (keys.length !== 1) {
       throw new Error(`Step ${index + 1}: expected a single key per object (e.g. tap: "Label"), got: ${keys.join(", ")}`);
     }
@@ -50,6 +72,9 @@ function normalizeStep(raw: unknown, index: number): FlowStep {
     }
     if (k === "tap") return { kind: "tap", label: String(v) };
     if (k === "type") return { kind: "type", text: String(v) };
+    if (k === "assert" || k === "verify" || k === "check") {
+      return { kind: "assert", text: String(v) };
+    }
     if (k === "done") {
       return { kind: "done", message: v == null || v === "" ? undefined : String(v) };
     }

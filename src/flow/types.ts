@@ -17,6 +17,8 @@ export type FlowStep =
   | ({ kind: "back" } & Verbatim)
   | ({ kind: "home" } & Verbatim)
   | ({ kind: "swipe"; direction: "up" | "down" | "left" | "right" } & Verbatim)
+  | ({ kind: "assert"; text: string } & Verbatim)
+  | ({ kind: "scrollAssert"; text: string; direction: "up" | "down" | "left" | "right"; maxScrolls: number } & Verbatim)
   | ({ kind: "done"; message?: string } & Verbatim);
 
 export interface ParsedFlow {

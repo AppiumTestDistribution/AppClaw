@@ -1,6 +1,9 @@
 /**
  * Execute a declarative YAML flow (structured and/or natural-language steps).
- * No LLM — DOM text matching, optional vision fallback when enabled.
+ * No LLM required. Uses DOM or vision depending on AGENT_MODE:
+ * - dom (default): DOM text matching with optional vision fallback.
+ * - vision (AGENT_MODE=vision + VISION_LOCATE_PROVIDER=stark): full vision mode,
+ *   skips DOM entirely and uses screenshots + AI vision for all interactions.
  */
 
 import type { MCPClient } from "../mcp/types.js";
@@ -18,11 +21,18 @@ import {
   parseAIElementCoords,
   tapAtCoordinates,
 } from "../agent/element-finder.js";
-import { isVisionLocateEnabled } from "../vision/locate-enabled.js";
+import { isVisionLocateEnabled, getStarkVisionApiKey, getStarkVisionModel } from "../vision/locate-enabled.js";
+import { Config } from "../config.js";
+import { screenshot } from "../mcp/tools.js";
+import { exec } from "child_process";
+import { promisify } from "util";
 import type { ActionResult } from "../llm/schemas.js";
+
+const execAsync = promisify(exec);
 import type { FlowMeta, FlowStep } from "./types.js";
 import type { AppResolver } from "../agent/app-resolver.js";
 import { resolveAppId } from "../agent/preprocessor.js";
+import chalk from "chalk";
 import * as ui from "../ui/terminal.js";
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -76,6 +86,10 @@ function stepLabel(step: FlowStep): string {
       return "goHome";
     case "swipe":
       return `swipe ${step.direction}`;
+    case "assert":
+      return `assert "${step.text}"`;
+    case "scrollAssert":
+      return `scroll ${step.direction} until "${step.text}"`;
     case "done":
       return step.message ? `done (${step.message})` : "done";
   }
@@ -97,6 +111,66 @@ function scoreTapMatch(el: UIElement, needle: string): number {
     if (f.includes(n)) return 1;
   }
   return -1;
+}
+
+/**
+ * Press Enter/Return key — tries multiple strategies:
+ * 1. appium_execute_script with mobile: shell (Android keyevent 66)
+ * 2. ADB keyevent fallback
+ */
+async function pressEnterKey(mcp: MCPClient): Promise<ActionResult> {
+  // Strategy 1: mobile: shell via appium_execute_script (Android)
+  try {
+    await mcp.callTool("appium_execute_script", {
+      script: "mobile: shell",
+      args: [{ command: "input", args: ["keyevent", "66"] }],
+    });
+    return { success: true, message: "Pressed Enter" };
+  } catch { /* try next strategy */ }
+
+  // Strategy 2: ADB fallback
+  try {
+    const udid = await detectDeviceUdid();
+    const androidHome =
+      process.env.ANDROID_HOME ||
+      process.env.ANDROID_SDK_ROOT ||
+      `${process.env.HOME}/Library/Android/sdk`;
+    const adbPath = `${androidHome}/platform-tools/adb`;
+    const deviceFlag = udid ? `-s ${udid}` : "";
+    await execAsync(`${adbPath} ${deviceFlag} shell input keyevent 66`, { timeout: 5000 });
+    return { success: true, message: "Pressed Enter" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, message: `Failed to press Enter: ${msg}` };
+  }
+}
+
+/** Whether the flow should operate in full-vision mode (skip DOM). */
+function isVisionMode(): boolean {
+  return Config.AGENT_MODE === "vision" && isVisionLocateEnabled();
+}
+
+/** Try to tap an element using vision locate. Returns null if vision can't find it. */
+async function tryTapByVision(mcp: MCPClient, label: string): Promise<ActionResult | null> {
+  const uuid = await findByVision(mcp, `UI element labeled or showing "${label}"`);
+  if (!uuid) return null;
+
+  if (isAIElement(uuid)) {
+    const coords = parseAIElementCoords(uuid);
+    if (coords) {
+      const tapped = await tapAtCoordinates(mcp, coords.x, coords.y);
+      if (tapped) {
+        return {
+          success: true,
+          message: `Tapped "${label}" via vision at [${coords.x}, ${coords.y}]`,
+        };
+      }
+    }
+    return null;
+  }
+
+  await mcp.callTool("appium_click", { elementUUID: uuid });
+  return { success: true, message: `Tapped "${label}" via vision` };
 }
 
 /** One DOM snapshot: find label and click. Returns null if no match / no UUID (caller may retry). */
@@ -130,6 +204,17 @@ async function tapByLabel(
   label: string,
   poll: FlowTapPollOptions
 ): Promise<ActionResult> {
+  // ── Vision-first mode: skip DOM entirely ──
+  if (isVisionMode()) {
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      const visionTap = await tryTapByVision(mcp, label);
+      if (visionTap) return visionTap;
+      if (attempt < 2) await sleep(poll.intervalMs);
+    }
+    return { success: false, message: `No matching element for "${label}" (vision mode)` };
+  }
+
+  // ── DOM mode: DOM-first with vision fallback ──
   for (let attempt = 0; attempt < poll.maxAttempts; attempt++) {
     const domTap = await tryTapByLabelOnDom(mcp, label);
     if (domTap) return domTap;
@@ -139,30 +224,46 @@ async function tapByLabel(
   }
 
   if (isVisionLocateEnabled()) {
-    const uuid = await findByVision(mcp, `UI element labeled or showing "${label}"`);
-    if (uuid) {
-      if (isAIElement(uuid)) {
-        const coords = parseAIElementCoords(uuid);
-        if (coords) {
-          const tapped = await tapAtCoordinates(mcp, coords.x, coords.y);
-          if (tapped) {
-            return {
-              success: true,
-              message: `Tapped "${label}" via vision at [${coords.x}, ${coords.y}]`,
-            };
-          }
-        }
-      } else {
-        await mcp.callTool("appium_click", { elementUUID: uuid });
-        return { success: true, message: `Tapped "${label}" via vision` };
-      }
-    }
+    const visionTap = await tryTapByVision(mcp, label);
+    if (visionTap) return visionTap;
   }
 
   return { success: false, message: `No matching element for "${label}"` };
 }
 
 async function flowTypeText(mcp: MCPClient, text: string): Promise<ActionResult> {
+  // ── Vision mode: locate input field via vision, then type via keyboard ──
+  if (isVisionMode()) {
+    // Try vision to find and tap the input field
+    const visionUuid = await findByVision(mcp, "text input field, search box, or editable area");
+    if (visionUuid) {
+      if (isAIElement(visionUuid)) {
+        const coords = parseAIElementCoords(visionUuid);
+        if (coords) await tapAtCoordinates(mcp, coords.x, coords.y);
+      } else {
+        await mcp.callTool("appium_click", { elementUUID: visionUuid });
+      }
+    }
+    // Type via keyboard (preferred on Android)
+    const udid = await detectDeviceUdid();
+    if (udid) {
+      const kb = await typeViaKeyboard(text, udid);
+      if (kb.success) return { success: true, message: kb.message };
+    }
+    // Fallback: try set_value on the vision-located element if it's a real UUID
+    if (visionUuid && !isAIElement(visionUuid)) {
+      await mcp.callTool("appium_clear_element", { elementUUID: visionUuid }).catch(() => {});
+      const setResult = await mcp.callTool("appium_set_value", { elementUUID: visionUuid, text });
+      const setText =
+        setResult.content?.map((c: { type: string; text?: string }) => (c.type === "text" ? c.text : "")).join("") ?? "";
+      if (!setText.toLowerCase().includes("error") && !setText.toLowerCase().includes("failed")) {
+        return { success: true, message: `Typed "${text}" via vision` };
+      }
+    }
+    return { success: false, message: "Could not type text in vision mode" };
+  }
+
+  // ── DOM mode ──
   const pageSource = await getPageSource(mcp);
   const platform = detectPlatform(pageSource);
 
@@ -194,6 +295,177 @@ async function flowTypeText(mcp: MCPClient, text: string): Promise<ActionResult>
     return { success: false, message: setText.slice(0, 200) };
   }
   return { success: true, message: `Typed "${text}"` };
+}
+
+/** Check DOM for text match across element fields. */
+function domContainsText(elements: UIElement[], needle: string): boolean {
+  const n = needle.toLowerCase();
+  return elements.some(el => {
+    const fields = [el.text, el.hint ?? "", el.accessibilityId, el.id];
+    return fields.some(f => f.toLowerCase().includes(n));
+  });
+}
+
+/** Parse current page source into elements. */
+async function getScreenElements(mcp: MCPClient): Promise<UIElement[]> {
+  const pageSource = await getPageSource(mcp);
+  const platform = detectPlatform(pageSource);
+  return platform === "android"
+    ? parseAndroidPageSource(pageSource)
+    : parseIOSPageSource(pageSource);
+}
+
+const ASSERT_DOM_POLLS_BEFORE_VISION = 3;
+
+/**
+ * Vision-based assertion: take a screenshot and ask the LLM
+ * "Is this visible on screen?" — returns a true yes/no answer.
+ */
+const mcpDebug = process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true";
+
+async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
+  const apiKey = getStarkVisionApiKey();
+  if (!apiKey) {
+    if (mcpDebug) ui.printWarning("[vision-assert] No API key configured, skipping vision assert");
+    return false;
+  }
+
+  if (mcpDebug) ui.printAgentBullet(`[vision-assert] Taking screenshot for: "${text}"`);
+  const imageBase64 = await screenshot(mcp);
+  if (!imageBase64) {
+    if (mcpDebug) ui.printWarning("[vision-assert] Failed to capture screenshot");
+    return false;
+  }
+  if (mcpDebug) ui.printAgentBullet(`[vision-assert] Screenshot captured (${Math.round(imageBase64.length / 1024)}KB)`);
+
+  const { StarkVisionClient } = (await import("df-vision")).default;
+  const client = new StarkVisionClient({
+    apiKey,
+    model: getStarkVisionModel(),
+  });
+
+  if (mcpDebug) ui.printAgentBullet(`[vision-assert] Asking LLM: is "${text}" visible? (model: ${getStarkVisionModel()})`);
+  const response = await client.isElementVisible(imageBase64, text, true);
+  if (mcpDebug) ui.printAgentBullet(`[vision-assert] LLM response: ${response}`);
+
+  // Parse structured JSON response first (e.g. { conditionSatisfied: true/false })
+  let result = false;
+  try {
+    const parsed = JSON.parse(response);
+    if (typeof parsed.conditionSatisfied === "boolean") {
+      result = parsed.conditionSatisfied;
+    } else if (typeof parsed.visible === "boolean") {
+      result = parsed.visible;
+    } else {
+      // Fallback to text matching on the raw response
+      const lower = response.toLowerCase();
+      result = lower.includes('"conditionsatisfied": true') || lower.includes('"visible": true');
+    }
+  } catch {
+    // Not JSON — fall back to simple text matching (avoid matching words in explanations)
+    const lower = response.toLowerCase();
+    result = /\btrue\b/.test(lower) && !/\bfalse\b/.test(lower);
+  }
+
+  const verdictMsg = result
+    ? chalk.green("[vision-assert] Verdict: VISIBLE ✓")
+    : chalk.red("[vision-assert] Verdict: NOT VISIBLE ✗");
+  console.log(`  ${verdictMsg}`);
+  return result;
+}
+
+async function assertTextVisible(
+  mcp: MCPClient,
+  text: string,
+  poll: FlowTapPollOptions
+): Promise<ActionResult> {
+  const visionFirst = isVisionMode();
+  const useVision = isVisionLocateEnabled();
+
+  if (visionFirst) {
+    // ── Vision mode: screenshot + LLM yes/no verification ──
+    const visible = await visionAssert(mcp, text);
+    if (visible) {
+      return { success: true, message: `Verified "${text}" is visible (via vision)` };
+    }
+  } else {
+    // ── DOM-first mode ──
+    const domPolls = useVision ? ASSERT_DOM_POLLS_BEFORE_VISION : poll.maxAttempts;
+    for (let attempt = 0; attempt < domPolls; attempt++) {
+      const elements = await getScreenElements(mcp);
+      if (domContainsText(elements, text)) {
+        return { success: true, message: `Verified "${text}" is visible` };
+      }
+      if (attempt + 1 < domPolls) await sleep(poll.intervalMs);
+    }
+
+    // Vision fallback in DOM mode
+    if (useVision) {
+      const visible = await visionAssert(mcp, text);
+      if (visible) {
+        return { success: true, message: `Verified "${text}" is visible (via vision)` };
+      }
+    }
+  }
+
+  return { success: false, message: `Assertion failed: "${text}" not found on screen` };
+}
+
+/**
+ * Scroll in a direction, checking after each scroll whether `text` is visible.
+ * Unlike assertTextVisible, this always scrolls first before checking — it does
+ * NOT check the current screen before the first scroll.
+ */
+async function scrollUntilVisible(
+  mcp: MCPClient,
+  text: string,
+  direction: "up" | "down" | "left" | "right",
+  maxScrolls: number,
+  poll: FlowTapPollOptions
+): Promise<ActionResult> {
+  const visionFirst = isVisionMode();
+  const useVision = isVisionLocateEnabled();
+
+  for (let scroll = 0; scroll < maxScrolls; scroll++) {
+    // Scroll first
+    await mcp.callTool("appium_scroll", { direction });
+    await sleep(800);
+
+    // Check visibility after scroll
+    if (visionFirst) {
+      const visible = await visionAssert(mcp, text);
+      if (visible) {
+        return {
+          success: true,
+          message: `Found "${text}" after ${scroll + 1} scroll(s) ${direction} (via vision)`,
+        };
+      }
+    } else {
+      // DOM check
+      const elements = await getScreenElements(mcp);
+      if (domContainsText(elements, text)) {
+        return {
+          success: true,
+          message: `Found "${text}" after ${scroll + 1} scroll(s) ${direction}`,
+        };
+      }
+      // Vision fallback in DOM mode
+      if (useVision) {
+        const visible = await visionAssert(mcp, text);
+        if (visible) {
+          return {
+            success: true,
+            message: `Found "${text}" after ${scroll + 1} scroll(s) ${direction} (via vision)`,
+          };
+        }
+      }
+    }
+  }
+
+  return {
+    success: false,
+    message: `"${text}" not found after ${maxScrolls} scroll(s) ${direction}`,
+  };
 }
 
 async function executeStep(
@@ -237,8 +509,7 @@ async function executeStep(
     case "type":
       return flowTypeText(mcp, step.text);
     case "enter":
-      await mcp.callTool("appium_mobile_press_key", { key: "Enter" });
-      return { success: true, message: "Enter" };
+      return pressEnterKey(mcp);
     case "back":
       await mcp.callTool("appium_mobile_press_key", { key: "BACK" });
       return { success: true, message: "Back" };
@@ -256,6 +527,10 @@ async function executeStep(
         message: bad ? text.slice(0, 200) : `Swiped ${step.direction}`,
       };
     }
+    case "assert":
+      return assertTextVisible(mcp, step.text, tapPoll);
+    case "scrollAssert":
+      return scrollUntilVisible(mcp, step.text, step.direction, step.maxScrolls, tapPoll);
     case "done":
       return { success: true, message: step.message ?? "done" };
   }
