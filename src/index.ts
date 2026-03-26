@@ -28,6 +28,9 @@ import { decomposeGoal, createPlanExecutor, evaluateSubGoal, evaluateScreen, ass
 import { DEFAULT_MODELS } from "./constants.js";
 import { getStarkVisionModel } from "./vision/locate-enabled.js";
 import { prepareScreenshotForLlm } from "./vision/prepare-screenshot-for-llm.js";
+import { runExplorer } from "./explorer/index.js";
+import type { ExplorerConfig } from "./explorer/types.js";
+import { runPlayground } from "./playground/index.js";
 import * as ui from "./ui/terminal.js";
 
 interface CLIArgs {
@@ -35,7 +38,14 @@ interface CLIArgs {
   record: boolean;
   replay: string | null;
   flow: string | null;
+  playground: boolean;
   plan: boolean;
+  explore: string | null;
+  numFlows: number;
+  noCrawl: boolean;
+  outputDir: string;
+  maxScreens: number;
+  maxDepth: number;
 }
 
 function printHelp(): void {
@@ -46,12 +56,23 @@ function printHelp(): void {
     --help              Show this help message
     --version           Show version number
     --flow <file.yaml>  Run declarative YAML steps (no LLM needed)
+    --playground        Interactive REPL to build YAML flows step-by-step
+    --explore <prd>     Explore mode: generate test flows from a PRD
+    --num-flows <N>     Number of flows to generate (default: 5)
+    --no-crawl          Skip device crawling (PRD-only flow generation)
+    --output-dir <dir>  Output directory for generated flows (default: generated-flows)
+    --max-screens <N>   Max screens to crawl (default: 10)
+    --max-depth <N>     Max navigation depth for crawling (default: 3)
 
   Examples:
     appclaw "Open Settings"
     appclaw "Send hello on WhatsApp to Mom"
     appclaw "Turn on WiFi"
     appclaw --flow examples/flows/google-search.yaml
+    appclaw --playground
+    appclaw --explore "YouTube app that plays videos and lets users search"
+    appclaw --explore prd.txt --num-flows 10 --no-crawl
+    appclaw --explore "Settings app with WiFi, Bluetooth, Display" --num-flows 3
 `);
 }
 
@@ -71,7 +92,14 @@ function parseArgs(): CLIArgs {
   let record = false;
   let replay: string | null = null;
   let flow: string | null = null;
+  let playground = false;
   let plan = false;
+  let explore: string | null = null;
+  let numFlows = 5;
+  let noCrawl = false;
+  let outputDir = "generated-flows";
+  let maxScreens = 10;
+  let maxDepth = 3;
   const goalParts: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -81,14 +109,28 @@ function parseArgs(): CLIArgs {
       replay = args[++i] ?? null;
     } else if (args[i] === "--flow") {
       flow = args[++i] ?? null;
+    } else if (args[i] === "--playground") {
+      playground = true;
     } else if (args[i] === "--plan") {
       plan = true;
+    } else if (args[i] === "--explore") {
+      explore = args[++i] ?? null;
+    } else if (args[i] === "--num-flows") {
+      numFlows = parseInt(args[++i] ?? "5", 10) || 5;
+    } else if (args[i] === "--no-crawl") {
+      noCrawl = true;
+    } else if (args[i] === "--output-dir") {
+      outputDir = args[++i] ?? "generated-flows";
+    } else if (args[i] === "--max-screens") {
+      maxScreens = parseInt(args[++i] ?? "10", 10) || 10;
+    } else if (args[i] === "--max-depth") {
+      maxDepth = parseInt(args[++i] ?? "3", 10) || 3;
     } else {
       goalParts.push(args[i]);
     }
   }
 
-  return { goal: goalParts.join(" ").trim(), record, replay, flow, plan };
+  return { goal: goalParts.join(" ").trim(), record, replay, flow, playground, plan, explore, numFlows, noCrawl, outputDir, maxScreens, maxDepth };
 }
 
 async function main() {
@@ -117,6 +159,77 @@ async function main() {
       process.exit(result.success ? 0 : 1);
     } finally {
       await mcpClient.close();
+    }
+    return;
+  }
+
+  // ─── Playground mode (interactive REPL → YAML) ───────────
+  if (cliArgs.playground) {
+    await runPlayground();
+    return;
+  }
+
+  // ─── Explorer mode (PRD → flows) ─────────────────────────
+  if (cliArgs.explore) {
+    // Validate LLM API key
+    if (config.LLM_PROVIDER !== "ollama" && !config.LLM_API_KEY) {
+      ui.printError(
+        `LLM_API_KEY is required for provider "${config.LLM_PROVIDER}".`,
+        `Set it in .env or as an environment variable.`
+      );
+      process.exit(1);
+    }
+
+    ui.printHeader();
+    ui.printExplorerHeader();
+
+    const explorerConfig: ExplorerConfig = {
+      prd: cliArgs.explore,
+      numFlows: cliArgs.numFlows,
+      outputDir: cliArgs.outputDir,
+      crawl: !cliArgs.noCrawl,
+      maxScreens: cliArgs.maxScreens,
+      maxDepth: cliArgs.maxDepth,
+    };
+
+    // If crawling is enabled, connect to device
+    let mcp: Awaited<ReturnType<typeof createMCPClient>> | undefined;
+    if (explorerConfig.crawl) {
+      try {
+        ui.startSpinner(`Connecting to appium-mcp (${config.MCP_TRANSPORT})...`);
+        mcp = await createMCPClient({
+          transport: config.MCP_TRANSPORT,
+          host: config.MCP_HOST,
+          port: config.MCP_PORT,
+        });
+        ui.stopSpinner();
+        ui.printSetupOk("Connected to appium-mcp");
+
+        // Create Appium session
+        ui.startSpinner("Creating Appium session...");
+        const sessionResult = await mcp.callTool("create_session", androidCreateSessionArgs(config));
+        const resultText = extractText(sessionResult);
+        if (resultText.toLowerCase().includes("error") || resultText.toLowerCase().includes("failed")) {
+          throw new Error(resultText);
+        }
+        ui.stopSpinner();
+        ui.printSetupOk("Appium session created");
+      } catch (err: any) {
+        ui.stopSpinner();
+        ui.printWarning(`Device connection failed: ${err?.message ?? err}. Continuing without crawling.`);
+        explorerConfig.crawl = false;
+        if (mcp) {
+          await mcp.close();
+          mcp = undefined;
+        }
+      }
+    }
+
+    try {
+      const result = await runExplorer(explorerConfig, config, mcp);
+      process.exit(result.success ? 0 : 1);
+    } finally {
+      if (mcp) await mcp.close();
     }
     return;
   }
@@ -214,35 +327,6 @@ async function main() {
     // Verify MCP connection and discover tools dynamically
     const availableTools = await mcpClient.listTools();
     ui.stopSpinner();
-    const thinkingLabel = config.LLM_THINKING === "on" && buildThinkingOptions(config)
-      ? `on (budget: ${config.LLM_THINKING_BUDGET} tokens)`
-      : "off";
-    const setupRows: [string, string][] = [
-      ["Provider", `${config.LLM_PROVIDER} (${modelName})`],
-      ["Thinking", thinkingLabel],
-      ["Agent Mode", config.AGENT_MODE === "vision" ? "vision (AI vision-first)" : "dom (DOM locators)"],
-      [
-        "Vision locate",
-        config.VISION_LOCATE_PROVIDER === "stark"
-          ? `stark (${getStarkVisionModel()})`
-          : "appium_mcp (ai_instruction)",
-      ],
-      ["Transport", config.MCP_TRANSPORT],
-      ["Tools", `${availableTools.length} MCP tools`],
-    ];
-    if (config.LLM_SCREENSHOT_MAX_EDGE_PX > 0) {
-      setupRows.push(["LLM screenshot max edge", `${config.LLM_SCREENSHOT_MAX_EDGE_PX}px`]);
-    }
-    if (config.APPIUM_MJPEG_SERVER_PORT > 0) {
-      setupRows.push(["MJPEG server port", String(config.APPIUM_MJPEG_SERVER_PORT)]);
-    }
-    if (config.APPIUM_MJPEG_SCREENSHOT_URL.trim()) {
-      setupRows.push(["MJPEG screenshot URL", config.APPIUM_MJPEG_SCREENSHOT_URL.trim()]);
-    }
-    ui.printConfig(setupRows);
-    if (recorder) {
-      ui.printConfig([["Recording", "enabled"]]);
-    }
     console.log();
 
     // Create LLM provider with dynamic tool discovery

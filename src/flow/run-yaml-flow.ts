@@ -231,33 +231,50 @@ async function tapByLabel(
   return { success: false, message: `No matching element for "${label}"` };
 }
 
-async function flowTypeText(mcp: MCPClient, text: string): Promise<ActionResult> {
+async function flowTypeText(mcp: MCPClient, text: string, target?: string): Promise<ActionResult> {
+  // ── If a target field is specified, tap it first to focus ──
+  if (target) {
+    const tapResult = await tapByLabel(mcp, target, { maxAttempts: 10, intervalMs: 300 });
+    if (!tapResult.success) {
+      return { success: false, message: `Could not find target field "${target}" to type into` };
+    }
+    await sleep(300); // Let the field focus
+  }
+
   // ── Vision mode: locate input field via vision, then type via keyboard ──
   if (isVisionMode()) {
-    // Try vision to find and tap the input field
-    const visionUuid = await findByVision(mcp, "text input field, search box, or editable area");
-    if (visionUuid) {
-      if (isAIElement(visionUuid)) {
-        const coords = parseAIElementCoords(visionUuid);
-        if (coords) await tapAtCoordinates(mcp, coords.x, coords.y);
-      } else {
-        await mcp.callTool("appium_click", { elementUUID: visionUuid });
+    // If no target was specified, use vision to find and tap an input field
+    if (!target) {
+      const visionUuid = await findByVision(mcp, "text input field, search box, or editable area");
+      if (visionUuid) {
+        if (isAIElement(visionUuid)) {
+          const coords = parseAIElementCoords(visionUuid);
+          if (coords) await tapAtCoordinates(mcp, coords.x, coords.y);
+        } else {
+          await mcp.callTool("appium_click", { elementUUID: visionUuid });
+        }
       }
     }
     // Type via keyboard (preferred on Android)
     const udid = await detectDeviceUdid();
     if (udid) {
       const kb = await typeViaKeyboard(text, udid);
-      if (kb.success) return { success: true, message: kb.message };
+      if (kb.success) {
+        const msg = target ? `Typed "${text}" in "${target}" via keyboard input` : kb.message;
+        return { success: true, message: msg };
+      }
     }
-    // Fallback: try set_value on the vision-located element if it's a real UUID
-    if (visionUuid && !isAIElement(visionUuid)) {
-      await mcp.callTool("appium_clear_element", { elementUUID: visionUuid }).catch(() => {});
-      const setResult = await mcp.callTool("appium_set_value", { elementUUID: visionUuid, text });
-      const setText =
-        setResult.content?.map((c: { type: string; text?: string }) => (c.type === "text" ? c.text : "")).join("") ?? "";
-      if (!setText.toLowerCase().includes("error") && !setText.toLowerCase().includes("failed")) {
-        return { success: true, message: `Typed "${text}" via vision` };
+    // Fallback: try set_value if we have a vision-located element
+    if (!target) {
+      const visionUuid = await findByVision(mcp, "text input field, search box, or editable area");
+      if (visionUuid && !isAIElement(visionUuid)) {
+        await mcp.callTool("appium_clear_element", { elementUUID: visionUuid }).catch(() => {});
+        const setResult = await mcp.callTool("appium_set_value", { elementUUID: visionUuid, text });
+        const setText =
+          setResult.content?.map((c: { type: string; text?: string }) => (c.type === "text" ? c.text : "")).join("") ?? "";
+        if (!setText.toLowerCase().includes("error") && !setText.toLowerCase().includes("failed")) {
+          return { success: true, message: `Typed "${text}" via vision` };
+        }
       }
     }
     return { success: false, message: "Could not type text in vision mode" };
@@ -271,7 +288,8 @@ async function flowTypeText(mcp: MCPClient, text: string): Promise<ActionResult>
     const udid = await detectDeviceUdid();
     const kb = await typeViaKeyboard(text, udid ?? undefined);
     if (kb.success) {
-      return { success: true, message: kb.message };
+      const msg = target ? `Typed "${text}" in "${target}" via keyboard input` : kb.message;
+      return { success: true, message: msg };
     }
   }
 
@@ -304,6 +322,109 @@ function domContainsText(elements: UIElement[], needle: string): boolean {
     const fields = [el.text, el.hint ?? "", el.accessibilityId, el.id];
     return fields.some(f => f.toLowerCase().includes(n));
   });
+}
+
+/** Find an element whose text/hint/id contains the given needle (case-insensitive). */
+function findElement(elements: UIElement[], needle: string): UIElement | undefined {
+  const n = needle.toLowerCase();
+  return elements.find(el => {
+    const fields = [el.text, el.hint ?? "", el.accessibilityId, el.id];
+    return fields.some(f => f.toLowerCase().includes(n));
+  });
+}
+
+type SpatialRelation = "below" | "above" | "left of" | "right of";
+
+interface SpatialAssertion {
+  subjectText: string;
+  relation: SpatialRelation;
+  anchorText: string;
+}
+
+/**
+ * Try to parse a spatial/relational assertion like:
+ *   "if the text Jest is below Jasmine"
+ *   "the text Submit is above Cancel"
+ *   "Login is right of Register"
+ */
+function parseSpatialAssertion(assertion: string): SpatialAssertion | null {
+  // Patterns: "[if] [the text] <subject> is (below|above|left of|right of) [the text] <anchor>"
+  const re = /^(?:if\s+)?(?:the\s+text\s+)?["']?(.+?)["']?\s+is\s+(below|above|left\s+of|right\s+of)\s+(?:the\s+text\s+)?["']?(.+?)["']?$/i;
+  const match = assertion.match(re);
+  if (!match) return null;
+
+  const relation = match[2].toLowerCase().replace(/\s+/g, " ") as SpatialRelation;
+  return {
+    subjectText: match[1].trim(),
+    relation,
+    anchorText: match[3].trim(),
+  };
+}
+
+/**
+ * Evaluate a spatial relationship between two elements and return
+ * { satisfied, reason } with a human-readable explanation.
+ */
+function evaluateSpatialRelation(
+  elements: UIElement[],
+  spatial: SpatialAssertion
+): { satisfied: boolean; reason: string } {
+  const subject = findElement(elements, spatial.subjectText);
+  const anchor = findElement(elements, spatial.anchorText);
+
+  if (!subject && !anchor) {
+    return {
+      satisfied: false,
+      reason: `Neither "${spatial.subjectText}" nor "${spatial.anchorText}" found on screen`,
+    };
+  }
+  if (!subject) {
+    return {
+      satisfied: false,
+      reason: `"${spatial.subjectText}" not found on screen`,
+    };
+  }
+  if (!anchor) {
+    return {
+      satisfied: false,
+      reason: `"${spatial.anchorText}" not found on screen`,
+    };
+  }
+
+  const [sx, sy] = subject.center;
+  const [ax, ay] = anchor.center;
+
+  let satisfied = false;
+  let actual = "";
+
+  switch (spatial.relation) {
+    case "below":
+      satisfied = sy > ay;
+      actual = satisfied
+        ? `"${spatial.subjectText}" is below "${spatial.anchorText}"`
+        : `"${spatial.subjectText}" is actually above "${spatial.anchorText}", not below`;
+      break;
+    case "above":
+      satisfied = sy < ay;
+      actual = satisfied
+        ? `"${spatial.subjectText}" is above "${spatial.anchorText}"`
+        : `"${spatial.subjectText}" is actually below "${spatial.anchorText}", not above`;
+      break;
+    case "left of":
+      satisfied = sx < ax;
+      actual = satisfied
+        ? `"${spatial.subjectText}" is left of "${spatial.anchorText}"`
+        : `"${spatial.subjectText}" is actually right of "${spatial.anchorText}", not left`;
+      break;
+    case "right of":
+      satisfied = sx > ax;
+      actual = satisfied
+        ? `"${spatial.subjectText}" is right of "${spatial.anchorText}"`
+        : `"${spatial.subjectText}" is actually left of "${spatial.anchorText}", not right`;
+      break;
+  }
+
+  return { satisfied, reason: actual };
 }
 
 /** Parse current page source into elements. */
@@ -381,19 +502,35 @@ async function assertTextVisible(
 ): Promise<ActionResult> {
   const visionFirst = isVisionMode();
   const useVision = isVisionLocateEnabled();
+  let lastElements: UIElement[] = [];
 
+  // ── Check for spatial/relational assertions (e.g. "Jest is below Jasmine") ──
+  const spatial = parseSpatialAssertion(text);
+  if (spatial) {
+    // For spatial assertions, get elements and evaluate the relationship
+    lastElements = await getScreenElements(mcp);
+    const { satisfied, reason } = evaluateSpatialRelation(lastElements, spatial);
+    if (satisfied) {
+      return { success: true, message: `Assertion passed: ${reason}` };
+    }
+    return { success: false, message: `Assertion failed: ${reason}` };
+  }
+
+  // ── Standard text-visibility assertion ──
   if (visionFirst) {
     // ── Vision mode: screenshot + LLM yes/no verification ──
     const visible = await visionAssert(mcp, text);
     if (visible) {
       return { success: true, message: `Verified "${text}" is visible (via vision)` };
     }
+    // Grab screen elements for the failure message
+    try { lastElements = await getScreenElements(mcp); } catch { /* ignore */ }
   } else {
     // ── DOM-first mode ──
     const domPolls = useVision ? ASSERT_DOM_POLLS_BEFORE_VISION : poll.maxAttempts;
     for (let attempt = 0; attempt < domPolls; attempt++) {
-      const elements = await getScreenElements(mcp);
-      if (domContainsText(elements, text)) {
+      lastElements = await getScreenElements(mcp);
+      if (domContainsText(lastElements, text)) {
         return { success: true, message: `Verified "${text}" is visible` };
       }
       if (attempt + 1 < domPolls) await sleep(poll.intervalMs);
@@ -408,7 +545,16 @@ async function assertTextVisible(
     }
   }
 
-  return { success: false, message: `Assertion failed: "${text}" not found on screen` };
+  // Build a summary of what's actually on screen
+  const screenTexts = lastElements
+    .map(el => el.text)
+    .filter(t => t.length > 0);
+  const uniqueTexts = [...new Set(screenTexts)];
+  const screenSummary = uniqueTexts.length > 0
+    ? `\n    Screen contains: ${uniqueTexts.join(" | ")}`
+    : "\n    Screen: (no text elements found)";
+
+  return { success: false, message: `Assertion failed: "${text}" not found on screen${screenSummary}` };
 }
 
 /**
@@ -459,13 +605,23 @@ async function scrollUntilVisible(
     }
   }
 
+  // Show what's on screen after exhausting all scrolls
+  let screenSummary = "";
+  try {
+    const elements = await getScreenElements(mcp);
+    const uniqueTexts = [...new Set(elements.map(el => el.text).filter(t => t.length > 0))];
+    screenSummary = uniqueTexts.length > 0
+      ? `\n    Screen contains: ${uniqueTexts.join(" | ")}`
+      : "\n    Screen: (no text elements found)";
+  } catch { /* ignore */ }
+
   return {
     success: false,
-    message: `"${text}" not found after ${maxScrolls} scroll(s) ${direction}`,
+    message: `"${text}" not found after ${maxScrolls} scroll(s) ${direction}${screenSummary}`,
   };
 }
 
-async function executeStep(
+export async function executeStep(
   mcp: MCPClient,
   step: FlowStep,
   meta: FlowMeta,
@@ -504,7 +660,7 @@ async function executeStep(
     case "tap":
       return tapByLabel(mcp, step.label, tapPoll);
     case "type":
-      return flowTypeText(mcp, step.text);
+      return flowTypeText(mcp, step.text, step.target);
     case "enter":
       return pressEnterKey(mcp);
     case "back":

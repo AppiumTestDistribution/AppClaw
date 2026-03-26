@@ -12,7 +12,7 @@ export type FlowStep =
   | ({ kind: "openApp"; query: string } & Verbatim)
   | ({ kind: "wait"; seconds: number } & Verbatim)
   | ({ kind: "tap"; label: string } & Verbatim)
-  | ({ kind: "type"; text: string } & Verbatim)
+  | ({ kind: "type"; text: string; target?: string } & Verbatim)
   | ({ kind: "enter" } & Verbatim)
   | ({ kind: "back" } & Verbatim)
   | ({ kind: "home" } & Verbatim)

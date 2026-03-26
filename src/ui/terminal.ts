@@ -7,6 +7,7 @@
 
 import chalk from "chalk";
 import cliSpinners from "cli-spinners";
+import path from "node:path";
 import readline from "node:readline";
 
 import { Config } from "../config.js";
@@ -333,7 +334,9 @@ export function printInteractiveHeader(): void {
   console.log(bxAuto(`   ${theme.info("--record")}   ${theme.muted("Record actions for replay")}`));
   console.log(bxAuto(`   ${theme.info("--replay")}   ${theme.muted("Replay a recorded flow")}`));
   console.log(bxAuto(`   ${theme.info("--flow")}     ${theme.muted("Run steps from a YAML file")}`));
+  console.log(bxAuto(`   ${theme.info("--playground")} ${theme.muted("Build YAML flows interactively")}`));
   console.log(bxAuto(`   ${theme.info("--plan")}     ${theme.muted("Decompose complex goals")}`));
+  console.log(bxAuto(`   ${theme.info("--explore")}  ${theme.muted("Generate flows from a PRD")}`));
   console.log(boxEmpty());
   console.log(boxBottom());
   console.log();
@@ -671,6 +674,96 @@ export function printTokenSummary(
     ` ${theme.dim("·")} ${theme.success(`$${cost.toFixed(4)}`)}` +
     ` ${theme.dim("·")} ${theme.dim(modelName)}`
   );
+}
+
+// ─── Explorer Agent ──────────────────────────────────────
+
+export function printExplorerHeader(): void {
+  console.log();
+  console.log(boxTop("Explorer Agent"));
+  console.log(boxEmpty());
+  console.log(bxAuto(`   ${theme.brand("PRD → Think → Explore → Generate Flows")}`));
+  console.log(boxEmpty());
+  console.log(boxBottom());
+  console.log();
+}
+
+export function printExplorerPhase(phase: string, message: string): void {
+  const phaseColors: Record<string, (s: string) => string> = {
+    Read: theme.info,
+    Think: theme.brand,
+    Explore: theme.step,
+    Act: theme.success,
+  };
+  const colorFn = phaseColors[phase] ?? theme.dim;
+  console.log();
+  console.log(`  ${colorFn(`▸ ${phase}`)} ${theme.white(message)}`);
+}
+
+export function printExplorerAnalysis(analysis: {
+  appName: string;
+  appId?: string;
+  features: Array<{ name: string; description: string }>;
+  userJourneys: Array<{ name: string; priority: string; description: string }>;
+  reasoning: string;
+}): void {
+  console.log();
+  console.log(section("PRD Analysis"));
+  console.log(`  ${theme.label("App")} ${theme.white(analysis.appName)}${analysis.appId ? theme.dim(` (${analysis.appId})`) : ""}`);
+  console.log();
+
+  console.log(`  ${theme.label("Features")}`);
+  for (const f of analysis.features) {
+    console.log(`    ${theme.dim("•")} ${theme.white(f.name)} ${theme.dim("—")} ${theme.dim(f.description)}`);
+  }
+  console.log();
+
+  console.log(`  ${theme.label("Journeys")}`);
+  for (const j of analysis.userJourneys) {
+    const priorityColor = j.priority === "high" ? theme.error : j.priority === "medium" ? theme.warn : theme.dim;
+    console.log(`    ${priorityColor(`[${j.priority}]`)} ${theme.white(j.name)}`);
+    console.log(`          ${theme.dim(j.description)}`);
+  }
+  console.log();
+
+  const reasonLines = wrapText(analysis.reasoning, 72, 2);
+  for (const line of reasonLines.slice(0, 3)) {
+    console.log(`  ${theme.dim(line)}`);
+  }
+}
+
+export function printExplorerScreen(screenId: string, tappableCount: number, textCount: number): void {
+  console.log(`    ${theme.success("+")} ${theme.step(screenId)} ${theme.dim(`(${tappableCount} tappable, ${textCount} texts)`)}`);
+}
+
+export function printExplorerAction(action: string): void {
+  console.log(`    ${theme.dim("→")} ${theme.muted(action)}`);
+}
+
+export function printExplorerSummary(screenCount: number, transitionCount: number): void {
+  console.log();
+  console.log(`  ${theme.success("✓")} ${theme.success.bold("Crawl complete")} ${theme.dim(`— ${screenCount} screens, ${transitionCount} transitions`)}`);
+}
+
+export function printExplorerResults(
+  flows: Array<{ name: string; description: string }>,
+  files: string[],
+): void {
+  console.log();
+  console.log(section("Generated Flows"));
+  console.log();
+  for (let i = 0; i < flows.length; i++) {
+    const flow = flows[i];
+    const file = files[i];
+    console.log(`  ${theme.success("✓")} ${theme.dim(`${i + 1}.`)} ${theme.white(flow.name)}`);
+    console.log(`       ${theme.dim(flow.description)}`);
+    if (file) {
+      console.log(`       ${theme.muted(file)}`);
+    }
+  }
+  console.log();
+  console.log(`  ${theme.success("✓")} ${theme.success.bold(`${flows.length} flows generated`)} ${theme.dim(`→ ${files[0] ? path.dirname(files[0]) : ""}`)}`);
+  console.log();
 }
 
 // Re-export theme for ad-hoc use

@@ -25,7 +25,14 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     if (query) return { kind: "openApp", query, verbatim };
   }
 
-  const clickMatch = t.match(/^(?:click|tap)(?:\s+on)?\s+(.+)$/i);
+  // "navigate to X" / "go to X screen" — tap-style navigation
+  const navigateMatch = t.match(/^navigate\s+to\s+(?:the\s+)?(.+?)(?:\s+(?:screen|page|tab|section|view))?$/i);
+  if (navigateMatch) {
+    const label = trimPunct(navigateMatch[1].trim());
+    if (label) return { kind: "tap", label, verbatim };
+  }
+
+  const clickMatch = t.match(/^(?:click|tap|select|choose|pick)(?:\s+on)?\s+(?:the\s+)?(.+)$/i);
   if (clickMatch) {
     const label = trimPunct(clickMatch[1].trim());
     if (label) return { kind: "tap", label, verbatim };
@@ -41,15 +48,51 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   if (typeMatch) {
     return { kind: "type", text: typeMatch[1], verbatim };
   }
-  // "Enter X in the search bar" / "Enter X in the text field" / "Type X in ..."
-  const typeInMatch = t.match(/^(?:type|enter|input)\s+["']?(.+?)["']?\s+(?:in|into)\s+(?:the\s+)?(?:search\s+bar|text\s*field|input\s*field|field|box|area).*$/i);
+  // "Type "X" in/into <target>" / "Enter 'X' in <target>" — quoted text + any target
+  const typeQuotedInMatch = t.match(/^(?:type|enter|input)\s+["'](.+?)["']\s+(?:in|into)\s+(?:the\s+)?(.+)$/i);
+  if (typeQuotedInMatch) {
+    const text = typeQuotedInMatch[1].trim();
+    const target = trimPunct(typeQuotedInMatch[2].trim());
+    if (text) return { kind: "type", text, target: target || undefined, verbatim };
+  }
+  // "Enter X in Y" / "Type X in Y" — unquoted text + target
+  // Use greedy (.+) with \s+(?:in|into) so the last "in/into" wins.
+  const typeInMatch = t.match(/^(?:type|enter|input)\s+(.+)\s+(?:in|into)\s+(?:the\s+)?(.+)$/i);
   if (typeInMatch) {
     const text = trimPunct(typeInMatch[1].trim());
-    if (text) return { kind: "type", text, verbatim };
+    const target = trimPunct(typeInMatch[2].trim());
+    if (text) return { kind: "type", text, target: target || undefined, verbatim };
   }
   const typeBare = t.match(/^(?:type|input)\s+(.+)$/i);
   if (typeBare && !t.match(/^type\s*:/i)) {
     const text = trimPunct(typeBare[1].trim());
+    if (text) return { kind: "type", text, verbatim };
+  }
+
+  // "search for X" / "search X" / "look for X" / "find X" — type the query text
+  const searchForMatch = t.match(/^(?:search|look|find)\s+(?:for\s+)?["']?(.+?)["']?$/i);
+  if (searchForMatch && !t.match(/^(?:search|find)$/i)) {
+    let text = trimPunct(searchForMatch[1].trim());
+    // Check for "in <target>" destination
+    const searchInMatch = text.match(/^(.+)\s+(?:in|into)\s+(?:the\s+)?(.+)$/i);
+    if (searchInMatch) {
+      const target = trimPunct(searchInMatch[2].trim());
+      text = trimPunct(searchInMatch[1].trim());
+      if (text) return { kind: "type", text, target: target || undefined, verbatim };
+    }
+    if (text) return { kind: "type", text, verbatim };
+  }
+
+  // "enter X" (bare, not "enter text X") — type the text
+  const enterTextBare = t.match(/^enter\s+(?!text\b)["']?(.+?)["']?$/i);
+  if (enterTextBare && !t.match(/^enter$/i)) {
+    let text = trimPunct(enterTextBare[1].trim());
+    const enterInMatch = text.match(/^(.+)\s+(?:in|into)\s+(?:the\s+)?(.+)$/i);
+    if (enterInMatch) {
+      const target = trimPunct(enterInMatch[2].trim());
+      text = trimPunct(enterInMatch[1].trim());
+      if (text) return { kind: "type", text, target: target || undefined, verbatim };
+    }
     if (text) return { kind: "type", text, verbatim };
   }
 
@@ -65,6 +108,12 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     return { kind: "swipe", direction, verbatim };
   }
 
+  // "wait" / "wait a moment" / "wait a bit" (no number) — default 2 seconds
+  const waitBareMatch = t.match(/^(?:wait|sleep|pause)(?:\s+(?:a\s+)?(?:moment|bit|while|sec|second))?$/i);
+  if (waitBareMatch) {
+    return { kind: "wait", seconds: 2, verbatim };
+  }
+
   const waitMatch = t.match(
     /^(?:wait|sleep|pause)(?:\s+for)?\s+(\d+(?:\.\d+)?)\s*(s|sec|seconds|ms|milliseconds)?$/i
   );
@@ -76,13 +125,13 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     return { kind: "wait", seconds, verbatim };
   }
 
-  const backMatch = t.match(/^(?:go\s+)?back$/i);
+  const backMatch = t.match(/^(?:go\s+)?back$|^navigate\s+back$|^press\s+back(?:\s+button)?$/i);
   if (backMatch) return { kind: "back", verbatim };
 
-  const homeMatch = t.match(/^(?:go\s+)?home$/i);
+  const homeMatch = t.match(/^(?:go\s+)?home$|^go\s+to\s+home(?:\s+screen)?$|^press\s+home(?:\s+button)?$/i);
   if (homeMatch) return { kind: "home", verbatim };
 
-  const enterMatch = t.match(/^(?:press\s+enter|hit\s+enter|send\s+enter|pe[r]?form\s+search|submit|submit\s+search|search)$/i);
+  const enterMatch = t.match(/^(?:press\s+enter|hit\s+enter|send\s+enter|pe[r]?form\s+search|submit|submit\s+search|submit\s+form|search|confirm|hit\s+return|press\s+return)$/i);
   if (enterMatch) return { kind: "enter", verbatim };
 
   // scroll down until "X" is visible / scroll down 3 times to find "X"
@@ -101,6 +150,20 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   if (assertMatch) {
     const text = trimPunct(assertMatch[1].trim());
     if (text) return { kind: "assert", text, verbatim };
+  }
+
+  // "toggle X" / "enable X" / "disable X" / "turn on X" / "turn off X" — tap-style
+  const toggleMatch = t.match(/^(?:toggle|enable|disable|turn\s+on|turn\s+off|switch\s+on|switch\s+off)\s+(?:the\s+)?(.+)$/i);
+  if (toggleMatch) {
+    const label = trimPunct(toggleMatch[1].trim());
+    if (label) return { kind: "tap", label, verbatim };
+  }
+
+  // "close X" / "dismiss X" / "cancel X" — tap-style
+  const closeMatch = t.match(/^(?:close|dismiss|cancel)\s+(?:the\s+)?(.+)$/i);
+  if (closeMatch) {
+    const label = trimPunct(closeMatch[1].trim());
+    if (label) return { kind: "tap", label, verbatim };
   }
 
   const doneMatch = t.match(/^done(?:\s*[:\-]\s*|\s+)(.+)$/i);

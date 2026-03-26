@@ -114,6 +114,8 @@ AGENT_MODE=dom
 
 ## Usage
 
+### Agent mode (LLM-driven)
+
 ```bash
 # Interactive mode
 appclaw
@@ -137,12 +139,85 @@ npm start "Open Settings"
 
 ### YAML flows (no LLM needed)
 
-Run declarative steps from a YAML file:
+Run declarative automation steps from a YAML file — fast, repeatable, zero LLM cost:
 
 ```bash
 appclaw --flow examples/flows/google-search.yaml
 ```
 
+Flows support both structured and natural language syntax:
+
+**Structured:**
+```yaml
+appId: com.android.settings
+name: Turn on WiFi
+---
+- launchApp
+- wait: 2
+- tap: "Connections"
+- tap: "Wi-Fi"
+- done: "Wi-Fi turned on"
+```
+
+**Natural language:**
+```yaml
+name: YouTube search
+---
+- open YouTube app
+- click on search icon
+- type "Appium 3.0" in the search bar
+- perform search
+- scroll down until "TestMu AI" is visible
+- done
+```
+
+Supported natural language patterns include: `open <app>`, `click/tap <element>`, `type "text"`, `scroll up/down`, `swipe left/right`, `wait N seconds`, `go back`, `press home`, `assert "text" is visible`, `press enter`, and `done`.
+
+### Playground (interactive REPL)
+
+Build YAML flows interactively on a real device — type commands and watch them execute live:
+
+```bash
+appclaw --playground
+```
+
+Features:
+- Type natural-language commands that execute immediately on the device
+- Steps accumulate as you go
+- Export to a YAML flow file anytime
+- Slash commands: `/help`, `/steps`, `/export`, `/clear`, `/device`, `/disconnect`
+
+### Explorer (PRD-driven test generation)
+
+Generate YAML test flows from a PRD or app description — the explorer analyzes the document, optionally crawls the app on-device, and outputs ready-to-run flows:
+
+```bash
+# From a text description
+appclaw --explore "YouTube app with search and playback" --num-flows 5
+
+# From a PRD file, skip device crawling
+appclaw --explore prd.txt --num-flows 3 --no-crawl
+
+# Full options
+appclaw --explore "Settings app" --num-flows 10 --output-dir my-flows --max-screens 15 --max-depth 4
+```
+
+### Record & replay
+
+```bash
+# Record a goal execution
+appclaw --record "Open Settings"
+
+# Replay a recording (adaptive — reads screen, not coordinates)
+appclaw --replay logs/recording-xyz.json
+```
+
+### Goal decomposition
+
+```bash
+# Break complex multi-app goals into sub-goals
+appclaw --plan "Copy the weather and send it on Slack"
+```
 
 ## Configuration
 
@@ -150,13 +225,15 @@ All configuration is via `.env`:
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_PROVIDER` | `gemini` | LLM provider (currently only `gemini` is supported for vision) |
-| `LLM_API_KEY` | — | Gemini API key |
-| `LLM_MODEL` | (auto) | Model override (e.g. `gemini-2.0-flash`) |
+| `LLM_PROVIDER` | `gemini` | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`) |
+| `LLM_API_KEY` | — | API key for your provider |
+| `LLM_MODEL` | (auto) | Model override (e.g. `gemini-2.0-flash`, `claude-sonnet-4-20250514`) |
 | `AGENT_MODE` | `vision` | `dom` (XML locators) or `vision` (screenshot-first) |
-| `VISION_LOCATE_PROVIDER` | `stark` | Vision backend for locating elements |
+| `VISION_LOCATE_PROVIDER` | `stark` | Vision backend for locating elements (`stark` or `appium_mcp`) |
 | `MAX_STEPS` | `30` | Max steps per goal |
 | `STEP_DELAY` | `500` | Milliseconds between steps |
+| `LLM_THINKING` | `off` | Extended thinking/reasoning (`on` or `off`) |
+| `LLM_THINKING_BUDGET` | `1024` | Token budget for extended thinking |
 | `SHOW_TOKEN_USAGE` | `false` | Print token usage and cost per step |
 
 ## How It Works
@@ -189,6 +266,27 @@ Each step, AppClaw:
 | **Checkpointing** | Saves known-good states for rollback |
 | **Human-in-the-loop** | Pauses for OTP, CAPTCHA, or ambiguous choices |
 | **Action retry** | Feeds failures back to the LLM for re-planning |
+
+## CLI Reference
+
+```
+Usage: appclaw [options] [goal]
+
+Options:
+  --help              Show help message
+  --version           Show version number
+  --flow <file.yaml>  Run declarative YAML steps (no LLM needed)
+  --playground        Interactive REPL to build YAML flows step-by-step
+  --explore <prd>     Generate test flows from a PRD or description
+  --num-flows <N>     Number of flows to generate (default: 5)
+  --no-crawl          Skip device crawling (PRD-only generation)
+  --output-dir <dir>  Output directory for generated flows
+  --max-screens <N>   Max screens to crawl (default: 10)
+  --max-depth <N>     Max navigation depth (default: 3)
+  --record            Record goal execution for replay
+  --replay <file>     Replay a recorded session
+  --plan              Decompose complex goals into sub-goals
+```
 
 ## License
 
