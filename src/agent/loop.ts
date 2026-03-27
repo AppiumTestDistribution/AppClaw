@@ -11,7 +11,7 @@
 
 import type { MCPClient } from "../mcp/types.js";
 import { findElement, isMCPError, extractText } from "../mcp/tools.js";
-import { typeViaKeyboard, detectDeviceUdid } from "../mcp/keyboard.js";
+import { typeViaKeyboard, detectDeviceUdid, pressEnterKey } from "../mcp/keyboard.js";
 import type { LLMProvider, AgentContext, ToolCallDecision } from "../llm/provider.js";
 import type { ActionResult } from "../llm/schemas.js";
 import { getScreenState } from "../perception/screen.js";
@@ -247,7 +247,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     stuck.recordAction(history.at(-1)?.action ?? "start", screenHash);
     let stuckHint: string | undefined;
 
-    if (stuck.isStuck()) {
+    if (stuck.isStuck(goal)) {
       ui.stopSpinner();
       ui.printStuck(step + 1);
 
@@ -387,6 +387,62 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     // ─── 5. DONE? ────────────────────────────────────────
     if (decision.toolName === "done") {
       const reason = (decision.args.reason as string) ?? "Goal completed";
+
+      // ── Post-done verification ──────────────────────────
+      // Guards against the LLM hallucinating goal completion.
+      // Take a fresh screenshot and ask the LLM to verify the goal is actually achieved.
+      // Only verify once per done attempt — if verification itself fails, trust the LLM.
+      if (captureScreenshot && llm.supportsVision && step > 0) {
+        try {
+          await sleep(stepDelay);
+          const verifyScreen = await getScreenState(mcp, maxElements, true, skipPageSource, false);
+          if (verifyScreen.screenshot) {
+            const verifyDecision = await llm.getDecision({
+              goal: `VERIFICATION: The agent claims the goal "${goal}" is achieved because: "${reason}". ` +
+                `Look at the screenshot carefully. Is the goal ACTUALLY achieved? ` +
+                `If YES → call "done" with the same reason. ` +
+                `If NO → call the appropriate action tool to continue working toward the goal. ` +
+                `Be strict: if the keyboard is still covering the screen, if the expected content is not visible, ` +
+                `or if the action clearly didn't complete, the goal is NOT achieved.`,
+              step,
+              maxSteps,
+              dom: verifyScreen.dom,
+              screenshot: verifyScreen.screenshot,
+              lastResult: `Agent called done with reason: "${reason}". Verifying...`,
+              screenChanges: { changed: false, addedCount: 0, removedCount: 0, summary: "Verification step" },
+              platform: detectedPlatform,
+            });
+
+            if (verifyDecision.usage) {
+              totalInputTokens += verifyDecision.usage.inputTokens;
+              totalOutputTokens += verifyDecision.usage.outputTokens;
+            }
+
+            if (verifyDecision.toolName !== "done") {
+              // Verification rejected — the goal is NOT actually achieved
+              ui.printWarning(`Done rejected by verification — continuing`);
+              lastResult =
+                `⚠️ VERIFICATION FAILED: You called "done" but the screenshot does NOT confirm the goal is achieved. ` +
+                `Continue working toward the goal. Do NOT call "done" again until you have verified success visually.`;
+              llm.feedToolResult(lastResult);
+              // Use the verification's screenshot for the next step
+              postActionScreenshot = verifyScreen.screenshot;
+              cachedPostScreen = verifyScreen;
+              history.push({
+                step,
+                action: "done_rejected",
+                decision,
+                result: lastResult,
+                screenHash,
+              });
+              continue; // Back to the top of the loop
+            }
+          }
+        } catch {
+          // Verification failed to execute — trust the LLM's original judgment
+        }
+      }
+
       ui.printGoalSuccess(step + 1, reason);
       const pricing = MODEL_PRICING[modelName] ?? [0, 0];
       const cost = (totalInputTokens / 1_000_000) * pricing[0] + (totalOutputTokens / 1_000_000) * pricing[1];
@@ -586,6 +642,7 @@ const META_TOOLS = new Set([
   "launch_app",
   "go_back",
   "go_home",
+  "press_enter",
 ]);
 
 function isMetaTool(name: string): boolean {
@@ -844,6 +901,26 @@ async function executeMetaTool(
       case "go_home":
         await mcp.callTool("appium_mobile_press_key", { key: "HOME" });
         return { success: true, message: "Went home" };
+
+      case "press_enter": {
+        // Strategy 1: ADB keyevent (most reliable on Android)
+        if (platform === "android") {
+          const enterResult = await pressEnterKey(deviceUdid ?? undefined);
+          if (enterResult.success) {
+            return { success: true, message: "Pressed Enter" };
+          }
+        }
+        // Strategy 2: Appium execute script fallback
+        try {
+          await mcp.callTool("appium_execute_script", {
+            script: "mobile: shell",
+            args: [{ command: "input", args: ["keyevent", "66"] }],
+          });
+          return { success: true, message: "Pressed Enter" };
+        } catch {
+          return { success: false, message: "Failed to press Enter — both ADB and Appium script failed" };
+        }
+      }
 
       default:
         return { success: false, message: `Unknown meta-tool: ${decision.toolName}` };

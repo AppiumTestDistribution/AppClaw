@@ -8,7 +8,7 @@
 
 export interface StuckDetector {
   recordAction(action: string, screenHash: string): void;
-  isStuck(): boolean;
+  isStuck(goal?: string): boolean;
   getRecoveryHint(goal: string): string;
   /** Get a DOM-aware recovery hint that identifies untried interactive elements */
   getDOMRecoveryHint(goal: string, currentDom: string, triedSelectors: string[]): string;
@@ -36,7 +36,7 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
       if (recentHashes.length > windowSize) recentHashes.shift();
     },
 
-    isStuck(): boolean {
+    isStuck(goal?: string): boolean {
       if (recentActions.length < 3) return false;
 
       // Check 1: All recent actions are identical
@@ -57,6 +57,22 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
       if (recentHashes.length >= 4) {
         const last4 = recentHashes.slice(-4);
         oscillating = last4[0] === last4[2] && last4[1] === last4[3] && last4[0] !== last4[1];
+      }
+
+      // ── Scroll exemption ──────────────────────────────
+      // When the goal involves scrolling to find content, repeated scroll/swipe
+      // actions are expected — not a stuck loop. Only flag as stuck if the
+      // screen is ALSO unchanged (scroll had zero visual effect).
+      if (goal && !oscillating) {
+        const isScrollGoal = /scroll|find|search|look\s+for|locate|swipe.*until|until.*(?:see|find|visible)/i.test(goal);
+        const allScrollActions = last3.every(
+          (a) => a.startsWith("scroll") || a.startsWith("swipe") || a.includes("appium_scroll") || a.includes("appium_swipe")
+        );
+
+        if (isScrollGoal && allScrollActions && !allSameHash) {
+          // Scrolling is making progress (screen changes between scrolls) — not stuck
+          return false;
+        }
       }
 
       const stuck = allSameAction || allSameHash || highRepetition || oscillating;

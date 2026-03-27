@@ -153,6 +153,7 @@ ${toolsSection}
 - launch_app: Open an app by ${appIdLabel}
 - go_back: Press Back
 - go_home: Press Home
+- press_enter: Press Enter/Return key (submit search, confirm input, dismiss keyboard)
 - done: Signal goal completion
 - ask_user: Request human input
 

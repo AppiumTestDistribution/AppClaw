@@ -77,6 +77,27 @@ function escapeForADBInput(text: string): string {
     .replace(/['"\\&|<>(){}$`!#~;]/g, "\\$&");
 }
 
+/**
+ * Press the Enter/Return key via ADB (Android keycode 66).
+ * Used to submit search queries, confirm text input, or dismiss the keyboard.
+ */
+export async function pressEnterKey(
+  deviceUdid?: string
+): Promise<KeyboardResult> {
+  const adbPath = getADBPath();
+  const deviceFlag = deviceUdid ? `-s ${deviceUdid}` : "";
+
+  try {
+    await execAsync(`${adbPath} ${deviceFlag} shell input keyevent 66`, {
+      timeout: 5000,
+    });
+    return { success: true, message: "Pressed Enter key" };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return { success: false, message: `Press Enter failed: ${errMsg}` };
+  }
+}
+
 function getADBPath(): string {
   const androidHome =
     process.env.ANDROID_HOME ||

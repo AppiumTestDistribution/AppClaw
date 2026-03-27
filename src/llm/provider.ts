@@ -216,6 +216,14 @@ function buildMetaTools(agentMode: "dom" | "vision"): Record<string, Tool> {
       description: "Press the Home button to go to the home screen.",
       inputSchema: z.object({}),
     }),
+
+    press_enter: tool({
+      description:
+        "Press the Enter/Return key. Use to submit search queries, confirm text input, " +
+        "dismiss the keyboard, or select the highlighted suggestion. " +
+        "Equivalent to Android KEYCODE_ENTER (66).",
+      inputSchema: z.object({}),
+    }),
   };
 }
 
@@ -292,7 +300,7 @@ export function createLLMProvider(
   // This approach works reliably with ALL LLM providers.
   const actionHistory: string[] = [];
   let lastToolName: string | null = null;
-  const MAX_HISTORY_ENTRIES = 15;
+  const MAX_HISTORY_ENTRIES = 25;
 
   return {
     supportsVision,
@@ -461,7 +469,7 @@ export function createLLMProvider(
     feedToolResult(resultText: string) {
       if (lastToolName) {
         // Compact summary: "tool_name → result" (max 150 chars)
-        const summary = `${lastToolName} → ${resultText.slice(0, 150)}`;
+        const summary = `${lastToolName} → ${resultText.slice(0, 250)}`;
         actionHistory.push(summary);
         // Trim to max entries
         while (actionHistory.length > MAX_HISTORY_ENTRIES) {
