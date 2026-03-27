@@ -34,15 +34,34 @@ export function parseAIElementCoords(uuid: string): { x: number; y: number } | n
 export async function findByIdStrategies(
   mcp: MCPClient,
   id: string,
-  _text?: string
+  text?: string
 ): Promise<string | null> {
-  // 1. Try accessibility id (content-desc)
-  let uuid = await findElement(mcp, "accessibility id", id).catch(() => null);
-  if (uuid) return uuid;
+  // 1. Try accessibility id (content-desc) — but skip empty or generic IDs like "title"
+  //    that are shared by many elements (e.g. every row in Android Settings).
+  const genericIds = new Set(["", "title", "summary", "icon", "widget", "switch_widget", "checkbox"]);
+  if (!genericIds.has(id.toLowerCase())) {
+    let uuid = await findElement(mcp, "accessibility id", id).catch(() => null);
+    if (uuid) return uuid;
 
-  // 2. Try resource id (Android: com.package:id/name, iOS: name)
-  uuid = await findElement(mcp, "id", id).catch(() => null);
-  if (uuid) return uuid;
+    // 2. Try resource id (Android: com.package:id/name, iOS: name)
+    uuid = await findElement(mcp, "id", id).catch(() => null);
+    if (uuid) return uuid;
+  }
+
+  // 3. Try finding by visible text (xpath) — useful when id/accessibilityId are generic
+  if (text) {
+    const escapedText = text.replace(/'/g, "\\'");
+    const uuid = await findElement(mcp, "xpath", `//*[@text='${escapedText}']`).catch(() => null);
+    if (uuid) return uuid;
+  }
+
+  // 4. Fallback: try generic id anyway if we skipped it
+  if (genericIds.has(id.toLowerCase())) {
+    let uuid = await findElement(mcp, "accessibility id", id).catch(() => null);
+    if (uuid) return uuid;
+    uuid = await findElement(mcp, "id", id).catch(() => null);
+    if (uuid) return uuid;
+  }
 
   return null;
 }

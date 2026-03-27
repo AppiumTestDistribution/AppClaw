@@ -97,6 +97,22 @@ interface PreCheckResult {
 function preCheck(instruction: string): PreCheckResult | null {
   const t = instruction.trim();
 
+  // 0. scrollAssert — "scroll down 2 times until X is visible" must be checked
+  //    BEFORE detectSimpleAction, which would match it as a plain swipe.
+  const scrollAssertMatch = t.match(
+    /^scroll\s+(up|down|left|right)\s+(?:(\d+)\s+times?\s+)?(?:until|to\s+(?:find|see|check|verify))\s+["']?(.+?)["']?\s*(?:is\s+(?:visible|present|shown|displayed|seen|found|there))?$/i
+  );
+  if (scrollAssertMatch) {
+    const direction = scrollAssertMatch[1].toLowerCase() as "up" | "down" | "left" | "right";
+    const maxScrolls = scrollAssertMatch[2] ? Number(scrollAssertMatch[2]) : 3;
+    const text = scrollAssertMatch[3].replace(/[.!?]+$/g, "").replace(/^(?:the\s+)?(?:text|element|label)\s+/i, "").trim();
+    if (text) {
+      return {
+        step: { kind: "scrollAssert", text, direction, maxScrolls, verbatim: t },
+      };
+    }
+  }
+
   // 1. detectSimpleAction — scroll/back/home (zero-cost regex from df-vision)
   const simple = detectSimpleAction(t);
   if (simple) {
@@ -189,8 +205,12 @@ export async function visionExecute(
   // ── Pre-check: non-visual instructions ──
   const pre = preCheck(instruction);
   if (pre?.step) {
-    // Execute directly without vision
-    return null; // Let the caller handle these via executeStep()
+    // scrollAssert needs executeStep (which has scrollUntilVisible logic)
+    if (pre.step.kind === "scrollAssert") {
+      return { step: pre.step, result: { success: false, message: "__needs_executeStep__" } };
+    }
+    // Other pre-check steps — let caller fall through to classifyInstruction → executeStep
+    return null;
   }
   if (pre?.getInfoQuery) {
     // getInfo — screenshot + getElementInfo (separate prompt, not combinedInstruction)
@@ -321,11 +341,14 @@ export async function visionExecute(
     const step: FlowStep = { kind: "assert", text, verbatim: instruction };
     // Already have screenshot — use vision assert directly
     const t2 = performance.now();
-    const visResponse = await client.isElementVisible(imageBase64, text, true);
+    const isVisualQuery = /\b(red|blue|green|yellow|white|black|orange|purple|pink|grey|gray|color|colour|icon|image|logo|pin|dot|marker|badge|circle|arrow|button|bar|line|border|shadow|highlight|map|chart|graph|photo|picture|thumbnail|avatar|checkbox|checked|unchecked|star|rating|spinner|loading|progress)\b/i.test(text);
+    const visQuery = isVisualQuery ? text : `the text "${text}"`;
+    const visResponse = await client.isElementVisible(imageBase64, visQuery, true);
     logTiming("isElementVisible", Math.round(performance.now() - t2));
     let visible = false;
+    const visJsonStr = visResponse.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     try {
-      const parsed = JSON.parse(visResponse);
+      const parsed = JSON.parse(visJsonStr);
       visible = parsed.conditionSatisfied === true;
     } catch {
       visible = /\btrue\b/i.test(visResponse) && !/\bfalse\b/i.test(visResponse);

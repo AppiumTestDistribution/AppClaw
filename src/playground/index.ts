@@ -95,6 +95,25 @@ function stepToDisplay(step: FlowStep, index: number): string {
   return `${num} ${action} ${target}`;
 }
 
+function spinnerDetail(step: FlowStep): string {
+  switch (step.kind) {
+    case "tap":           return "tapping the screen…";
+    case "type":          return "typing into the field…";
+    case "swipe":         return "swiping the screen…";
+    case "scrollAssert":  return "scanning the screen…";
+    case "assert":        return "verifying the screen…";
+    case "launchApp":     return "launching the app…";
+    case "openApp":       return "opening the app…";
+    case "wait":          return "waiting…";
+    case "enter":         return "pressing enter…";
+    case "back":          return "navigating back…";
+    case "home":          return "going home…";
+    case "getInfo":       return "reading the screen…";
+    case "done":          return "wrapping up…";
+    default:              return "executing on device…";
+  }
+}
+
 function printStepResult(stepNum: number, step: FlowStep, success: boolean, message: string): void {
   const action = stepAction(step);
   const target = stepTarget(step);
@@ -221,7 +240,7 @@ async function runStepOnDevice(step: FlowStep): Promise<{ success: boolean; mess
     return { success: false, message: "Not connected to device" };
   }
 
-  const tapPoll: FlowTapPollOptions = { maxAttempts: 20, intervalMs: 300 };
+  const tapPoll: FlowTapPollOptions = { maxAttempts: 3, intervalMs: 300 };
   return executeStep(state.mcp, step, state.meta, state.appResolver ?? undefined, tapPoll);
 }
 
@@ -400,31 +419,95 @@ function printHelp(): void {
     ],
   });
   console.log();
-  console.log(hr("single", undefined, "Step Patterns"));
-  console.log(`  ${theme.dim("Type these directly to execute on device")}`);
+  console.log(hr("single", undefined, "Examples"));
+  console.log(`  ${theme.dim("Type natural commands — they run on the device instantly")}`);
   console.log();
-  printTable({
-    headers: ["Pattern", "Example"],
-    rows: [
-      ["open / launch", "open YouTube app, launch Settings"],
-      ["tap / click", "tap on Search, click Login button"],
-      ["select / choose", "select English, choose Dark mode"],
-      ["type", 'type "hello world", type hello'],
-      ["search for", "search for appium 3.0, find settings"],
-      ["enter / submit", "press enter, submit, confirm"],
-      ["swipe / scroll", "swipe up, scroll down"],
-      ["wait", "wait 3 s, wait, pause a moment"],
-      ["back / home", "go back, navigate back, go home"],
-      ["navigate to", "navigate to Settings screen"],
-      ["toggle / enable", "toggle WiFi, turn on Bluetooth"],
-      ["close / dismiss", "close popup, dismiss dialog"],
-      ["assert / verify", 'assert "Connected" is visible'],
-      ["scroll until", 'scroll down until "Settings" is visible'],
-      ["getInfo", "what's in the header?"],
-      ["done", "done: marks flow end (not executed)"],
-    ],
-  });
-  console.log();
+
+  const examples: Array<{ category: string; lines: string[] }> = [
+    {
+      category: "Apps",
+      lines: [
+        "open YouTube",
+        "launch Settings app",
+      ],
+    },
+    {
+      category: "Tap & Navigate",
+      lines: [
+        "tap on Login",
+        "click Search button",
+        "select English",
+        "navigate to Settings screen",
+      ],
+    },
+    {
+      category: "Type & Search",
+      lines: [
+        'type "hello world"',
+        'type "john" in Username field',
+        "search for appium 3.0",
+        "press enter",
+      ],
+    },
+    {
+      category: "Scroll & Swipe",
+      lines: [
+        "scroll down",
+        "swipe left",
+        'scroll down 2 times until "Krishna" is visible',
+        'scroll up to find "Notifications"',
+      ],
+    },
+    {
+      category: "Assert (recorded as a pass/fail step in your flow)",
+      lines: [
+        'assert "Welcome" is visible',
+        'verify "Login" is displayed',
+        "verify bell icon is present",
+        "check red dot in the map",
+      ],
+    },
+    {
+      category: "Ask (inspect the screen — not recorded)",
+      lines: [
+        "Is there a bell icon on screen?",
+        "What text is shown in the header?",
+        "Is the map loaded?",
+        "How many items are in the list?",
+      ],
+    },
+    {
+      category: "Device Controls",
+      lines: [
+        "go back",
+        "go home",
+        "wait 3 s",
+        "toggle WiFi",
+        "close popup",
+      ],
+    },
+    {
+      category: "Flow",
+      lines: [
+        "done",
+        "done: login flow finished",
+      ],
+    },
+  ];
+
+  for (const section of examples) {
+    // Split "Title (hint)" into colored title + dimmed hint
+    const hintMatch = section.category.match(/^(.+?)(\s*\(.+\))$/);
+    if (hintMatch) {
+      console.log(`  ${theme.step.bold(hintMatch[1])}${theme.dim(hintMatch[2])}`);
+    } else {
+      console.log(`  ${theme.step.bold(section.category)}`);
+    }
+    for (const line of section.lines) {
+      console.log(`    ${theme.info("›")} ${line}`);
+    }
+    console.log();
+  }
 }
 
 // ─── Header ─────────────────────────────────────────────
@@ -686,7 +769,7 @@ async function processLine(line: string): Promise<void> {
 
         if (vResult.result.message === "__needs_executeStep__") {
           const stepNum = state.steps.length + 1;
-          ui.startSpinner(`[${stepNum}] ${vResult.step.kind}`, "running on device");
+          ui.startSpinner(`[${stepNum}] ${vResult.step.kind}`, spinnerDetail(vResult.step));
           const execResult = await runStepOnDevice(vResult.step);
           ui.stopSpinner();
           if (execResult.success) {
@@ -741,7 +824,7 @@ async function processLine(line: string): Promise<void> {
   }
 
   // Execute on device
-  ui.startSpinner(`[${stepNum}] ${parsed.kind}`, "running on device");
+  ui.startSpinner(`[${stepNum}] ${parsed.kind}`, spinnerDetail(parsed));
 
   try {
     const result = await runStepOnDevice(parsed);

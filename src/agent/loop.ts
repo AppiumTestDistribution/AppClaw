@@ -20,7 +20,7 @@ import { createStuckDetector } from "./stuck.js";
 import { createRecoveryEngine } from "./recovery.js";
 import { askUser, classifyHITLRequest } from "./human-in-the-loop.js";
 import { tapAtCoordinates, isAIElement, parseAIElementCoords } from "./element-finder.js";
-import { findElementByVision } from "../mcp/tools.js";
+import { findElementByVision, scaleAIElementUuid } from "../mcp/tools.js";
 import { Config } from "../config.js";
 import { isVisionLocateEnabled } from "../vision/locate-enabled.js";
 import type { ActionRecorder } from "../recording/recorder.js";
@@ -522,9 +522,11 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       // Check for ai-element synthetic UUID first
       const aiMatch = result.message.match(/(ai-element:[^\s]+)/);
       if (aiMatch) {
-        const coords = parseAIElementCoords(aiMatch[1]);
+        // Scale coordinates from screenshot image space to device pixel space
+        const scaledUuid = await scaleAIElementUuid(mcp, aiMatch[1]);
+        const coords = parseAIElementCoords(scaledUuid);
         if (coords) {
-          lastResult += `\n>> AI_ELEMENT found at [${coords.x},${coords.y}]. Use appium_click with elementUUID="${aiMatch[1]}" or tap at these coordinates.`;
+          lastResult += `\n>> AI_ELEMENT found at [${coords.x},${coords.y}]. Use appium_click with elementUUID="${scaledUuid}" or tap at these coordinates.`;
         }
       } else {
         const uuidMatch = result.message.match(

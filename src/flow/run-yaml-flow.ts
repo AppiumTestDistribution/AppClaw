@@ -106,11 +106,17 @@ function scoreTapMatch(el: UIElement, needle: string): number {
   const id = el.id.toLowerCase();
 
   const fields = [text, hint, aid, id];
+  // Score 0: exact match
   for (const f of fields) {
     if (f === n) return 0;
   }
+  // Score 1: needle is inside a field (e.g. needle="Login" in "Login button")
   for (const f of fields) {
     if (f.includes(n)) return 1;
+  }
+  // Score 2: field is inside needle (e.g. field="GOT IT" in needle="got it button")
+  for (const f of fields) {
+    if (f && n.includes(f)) return 2;
   }
   return -1;
 }
@@ -176,7 +182,8 @@ async function tryTapByVision(mcp: MCPClient, label: string): Promise<ActionResu
 }
 
 /** One DOM snapshot: find label and click. Returns null if no match / no UUID (caller may retry). */
-async function tryTapByLabelOnDom(mcp: MCPClient, label: string): Promise<ActionResult | null> {
+/** Returns: ActionResult on success, "no_match" if label not in DOM, null if matched but UUID failed */
+async function tryTapByLabelOnDom(mcp: MCPClient, label: string): Promise<ActionResult | "no_match" | null> {
   const pageSource = await getPageSource(mcp);
   const platform = detectPlatform(pageSource);
   const elements =
@@ -192,7 +199,7 @@ async function tryTapByLabelOnDom(mcp: MCPClient, label: string): Promise<Action
     });
 
   const pick = scored[0]?.el;
-  if (!pick) return null;
+  if (!pick) return "no_match";
 
   const uuid = await findByIdStrategies(mcp, pick.accessibilityId || pick.id, pick.text);
   if (!uuid) return null;
@@ -217,8 +224,11 @@ async function tapByLabel(
   }
 
   // ── DOM mode: DOM-first with vision fallback ──
+  // If the first attempt finds zero DOM matches, skip further polls and
+  // fall through to vision immediately (the element isn't text-based).
   for (let attempt = 0; attempt < poll.maxAttempts; attempt++) {
     const domTap = await tryTapByLabelOnDom(mcp, label);
+    if (domTap === "no_match") break;  // not in DOM at all — skip to vision
     if (domTap) return domTap;
     if (attempt + 1 < poll.maxAttempts) {
       await sleep(poll.intervalMs);
@@ -226,6 +236,7 @@ async function tapByLabel(
   }
 
   if (isVisionLocateEnabled()) {
+    ui.printAgentBullet(`"${label}" not found in page source, trying vision…`);
     const visionTap = await tryTapByVision(mcp, label);
     if (visionTap) return visionTap;
   }
@@ -453,14 +464,6 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
     return false;
   }
 
-  if (mcpDebug) ui.printAgentBullet(`[vision-assert] Taking screenshot for: "${text}"`);
-  const imageBase64 = await screenshot(mcp);
-  if (!imageBase64) {
-    if (mcpDebug) ui.printWarning("[vision-assert] Failed to capture screenshot");
-    return false;
-  }
-  if (mcpDebug) ui.printAgentBullet(`[vision-assert] Screenshot captured (${Math.round(imageBase64.length / 1024)}KB)`);
-
   const { StarkVisionClient } = (await import("df-vision")).default;
   const client = new StarkVisionClient({
     apiKey,
@@ -468,36 +471,62 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
     disableThinking: true,
   });
 
-  if (mcpDebug) ui.printAgentBullet(`[vision-assert] Asking LLM: is "${text}" visible? (model: ${getStarkVisionModel()})`);
-  const visT0 = performance.now();
-  const response = await client.isElementVisible(imageBase64, text, true);
-  const visElapsed = Math.round(performance.now() - visT0);
-  if (mcpDebug) ui.printAgentBullet(`[vision-assert] LLM response (${visElapsed}ms): ${response}`);
+  // If the assertion describes a visual element (color, icon, image, shape, etc.)
+  // pass it as-is so the LLM checks visually. Otherwise prefix with "the text"
+  // so the LLM looks for literal text on screen.
+  const isVisualQuery = /\b(red|blue|green|yellow|white|black|orange|purple|pink|grey|gray|color|colour|icon|image|logo|pin|dot|marker|badge|circle|arrow|button|bar|line|border|shadow|highlight|map|chart|graph|photo|picture|thumbnail|avatar|checkbox|checked|unchecked|star|rating|spinner|loading|progress)\b/i.test(text);
+  const query = isVisualQuery ? text : `the text "${text}"`;
 
-  // Parse structured JSON response first (e.g. { conditionSatisfied: true/false })
-  let result = false;
-  try {
-    const parsed = JSON.parse(response);
-    if (typeof parsed.conditionSatisfied === "boolean") {
-      result = parsed.conditionSatisfied;
-    } else if (typeof parsed.visible === "boolean") {
-      result = parsed.visible;
-    } else {
-      // Fallback to text matching on the raw response
-      const lower = response.toLowerCase();
-      result = lower.includes('"conditionsatisfied": true') || lower.includes('"visible": true');
+  // Retry up to 2 attempts with a fresh screenshot each time (vision can be flaky)
+  const maxAttempts = 2;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await sleep(500); // brief pause before retry
+
+    if (mcpDebug) ui.printAgentBullet(`[vision-assert] Taking screenshot for: "${text}"${attempt > 0 ? ` (retry ${attempt})` : ""}`);
+    const imageBase64 = await screenshot(mcp);
+    if (!imageBase64) {
+      if (mcpDebug) ui.printWarning("[vision-assert] Failed to capture screenshot");
+      continue;
     }
-  } catch {
-    // Not JSON — fall back to simple text matching (avoid matching words in explanations)
-    const lower = response.toLowerCase();
-    result = /\btrue\b/.test(lower) && !/\bfalse\b/.test(lower);
+    if (mcpDebug) ui.printAgentBullet(`[vision-assert] Screenshot captured (${Math.round(imageBase64.length / 1024)}KB)`);
+
+    if (mcpDebug) ui.printAgentBullet(`[vision-assert] Asking LLM: is "${text}" visible? (model: ${getStarkVisionModel()})`);
+    const visT0 = performance.now();
+    const response = await client.isElementVisible(imageBase64, query, true);
+    const visElapsed = Math.round(performance.now() - visT0);
+    if (mcpDebug) ui.printAgentBullet(`[vision-assert] LLM response (${visElapsed}ms): ${response}`);
+
+    // Parse structured JSON response first (e.g. { conditionSatisfied: true/false })
+    // Strip markdown code fences if present (```json ... ```)
+    let result = false;
+    const jsonStr = response.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (typeof parsed.conditionSatisfied === "boolean") {
+        result = parsed.conditionSatisfied;
+      } else if (typeof parsed.visible === "boolean") {
+        result = parsed.visible;
+      } else {
+        const lower = jsonStr.toLowerCase();
+        result = lower.includes('"conditionsatisfied": true') || lower.includes('"visible": true');
+      }
+    } catch {
+      const lower = response.toLowerCase();
+      result = /\btrue\b/.test(lower) && !/\bfalse\b/.test(lower);
+    }
+
+    if (result) {
+      console.log(`  ${chalk.green("[vision-assert] Verdict: VISIBLE ✓")}`);
+      return true;
+    }
+
+    // Only log NOT VISIBLE on final attempt
+    if (attempt === maxAttempts - 1) {
+      console.log(`  ${chalk.red("[vision-assert] Verdict: NOT VISIBLE ✗")}`);
+    }
   }
 
-  const verdictMsg = result
-    ? chalk.green("[vision-assert] Verdict: VISIBLE ✓")
-    : chalk.red("[vision-assert] Verdict: NOT VISIBLE ✗");
-  console.log(`  ${verdictMsg}`);
-  return result;
+  return false;
 }
 
 async function assertTextVisible(

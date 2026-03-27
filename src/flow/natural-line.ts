@@ -9,6 +9,11 @@ function trimPunct(s: string): string {
   return s.replace(/[.!?]+$/g, "").trim();
 }
 
+/** Strip common natural-language prefixes like "the text", "text", "element" from captured text. */
+function stripTextPrefix(s: string): string {
+  return s.replace(/^(?:the\s+)?(?:text|element|label)\s+/i, "").trim();
+}
+
 /**
  * Try to interpret a human-readable instruction as a flow step.
  */
@@ -96,6 +101,18 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     if (text) return { kind: "type", text, verbatim };
   }
 
+  // scroll down until "X" is visible / scroll down 3 times to find "X"
+  // MUST come before the simple swipe/scroll match to avoid premature matching
+  const scrollAssertMatch = t.match(
+    /^scroll\s+(up|down|left|right)\s+(?:(\d+)\s+times?\s+)?(?:until|to\s+(?:find|see|check|verify))\s+["']?(.+?)["']?\s*(?:is\s+(?:visible|present|shown|displayed|seen|found|there))?$/i
+  );
+  if (scrollAssertMatch) {
+    const direction = scrollAssertMatch[1].toLowerCase() as "up" | "down" | "left" | "right";
+    const maxScrolls = scrollAssertMatch[2] ? Number(scrollAssertMatch[2]) : 3;
+    const text = stripTextPrefix(trimPunct(scrollAssertMatch[3].trim()));
+    if (text) return { kind: "scrollAssert", text, direction, maxScrolls, verbatim };
+  }
+
   const swipeMatch = t.match(/^swipe\s+(up|down|left|right)\b/i);
   if (swipeMatch) {
     const direction = swipeMatch[1].toLowerCase() as "up" | "down" | "left" | "right";
@@ -134,21 +151,10 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   const enterMatch = t.match(/^(?:press\s+enter|hit\s+enter|send\s+enter|pe[r]?form\s+search|submit|submit\s+search|submit\s+form|search|confirm|hit\s+return|press\s+return)$/i);
   if (enterMatch) return { kind: "enter", verbatim };
 
-  // scroll down until "X" is visible / scroll down 3 times to find "X"
-  const scrollAssertMatch = t.match(
-    /^scroll\s+(up|down|left|right)\s+(?:(\d+)\s+times?\s+)?(?:until|to\s+(?:find|see|check|verify))\s+["']?(.+?)["']?\s*(?:is\s+(?:visible|present|shown|displayed))?$/i
-  );
-  if (scrollAssertMatch) {
-    const direction = scrollAssertMatch[1].toLowerCase() as "up" | "down" | "left" | "right";
-    const maxScrolls = scrollAssertMatch[2] ? Number(scrollAssertMatch[2]) : 3;
-    const text = trimPunct(scrollAssertMatch[3].trim());
-    if (text) return { kind: "scrollAssert", text, direction, maxScrolls, verbatim };
-  }
-
   const assertMatch = t.match(/^(?:assert|verify|check)\s+(?:that\s+)?["']?(.+?)["']?\s+is\s+(?:visible|present|shown|displayed)$/i)
     ?? t.match(/^(?:assert|verify|check)\s+(?:that\s+)?["']?(.+?)["']?$/i);
   if (assertMatch) {
-    const text = trimPunct(assertMatch[1].trim());
+    const text = stripTextPrefix(trimPunct(assertMatch[1].trim()));
     if (text) return { kind: "assert", text, verbatim };
   }
 
