@@ -168,10 +168,11 @@ name: YouTube search
 - type "Appium 3.0" in the search bar
 - perform search
 - scroll down until "TestMu AI" is visible
+- verify video from TestMu AI is visible
 - done
 ```
 
-Supported natural language patterns include: `open <app>`, `click/tap <element>`, `type "text"`, `scroll up/down`, `swipe left/right`, `wait N seconds`, `go back`, `press home`, `assert "text" is visible`, `press enter`, and `done`.
+Supported natural language patterns include: `open <app>`, `click/tap <element>`, `type "text"`, `scroll up/down`, `swipe left/right`, `scroll down until "X" is visible`, `wait N seconds`, `go back`, `press home`, `verify/assert <element> is visible`, `press enter`, and `done`. Questions like `"whats on the screen?"` or `"how many items are there?"` are answered via vision without executing any action.
 
 ### Playground (interactive REPL)
 

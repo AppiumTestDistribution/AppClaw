@@ -22,6 +22,7 @@ export async function prepareScreenshotForLlm(
 
   try {
     const input = Buffer.from(rawBase64, "base64");
+    const meta = await sharp(input).metadata();
     const resized = await sharp(input)
       .rotate()
       .resize({
@@ -32,6 +33,16 @@ export async function prepareScreenshotForLlm(
       })
       .jpeg({ quality: 80 })
       .toBuffer();
+
+    if (process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true") {
+      const resizedMeta = await sharp(resized).metadata();
+      const rawKB = Math.round(input.length / 1024);
+      const outKB = Math.round(resized.length / 1024);
+      console.log(
+        `        [screenshot] ${meta.width}×${meta.height} ${meta.format} (${rawKB}KB) → ${resizedMeta.width}×${resizedMeta.height} jpeg (${outKB}KB)`
+      );
+    }
+
     return resized.toString("base64");
   } catch {
     return rawBase64;

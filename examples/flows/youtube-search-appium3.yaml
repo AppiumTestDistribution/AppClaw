@@ -6,4 +6,5 @@ name: YouTube — search Appium 3.0 and verify TestMu AI video
 - Type Appium 3.0 in the search bar
 - Peform Search
 - Scroll down 2 times until TestMu AI is visible
+- verify video from TestMu AI is visible
 - done: "TestMu AI video for Appium 3.0 on YouTube is visible"

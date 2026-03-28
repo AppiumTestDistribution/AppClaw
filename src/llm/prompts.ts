@@ -157,7 +157,9 @@ ${toolsSection}
 - done: Signal goal completion
 - ask_user: Request human input
 
-**Callable tools** (${callableToolCount} total — meta-tools above + Appium MCP). Each tool’s JSON schema is attached by the runtime; use it for arguments. Prefer find_and_click / find_and_type when they cover the action.${visionFallback}`;
+**Callable tools** (${callableToolCount} total — meta-tools above + Appium MCP). Each tool’s JSON schema is attached by the runtime; use it for arguments. Prefer find_and_click / find_and_type when they cover the action.${visionFallback}
+
+When RELEVANT PAST EXPERIENCE is provided, prefer those strategies — they worked before in similar situations. But always verify they still apply to the current screen before using them. If a past strategy fails, try alternatives.`;
 }
 
 export function buildUserMessage(context: AgentContext): string {
@@ -183,6 +185,13 @@ export function buildUserMessage(context: AgentContext): string {
   // so the LLM sees what NOT to try before reading available elements.
   if (context.failedOnScreen) {
     parts.push(`\n${context.failedOnScreen}`);
+  }
+
+  // ── Episodic memory: past experience ─────────────────
+  // Inject relevant trajectories from previous successful runs
+  // BEFORE the DOM so the LLM sees proven strategies first.
+  if (context.pastExperience) {
+    parts.push(`\n${context.pastExperience}`);
   }
 
   // ── Contextual hints ──────────────────────────────────

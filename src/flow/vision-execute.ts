@@ -88,6 +88,8 @@ interface PreCheckResult {
   step?: FlowStep;
   /** If set, this is a getInfo query — needs screenshot + getElementInfo. */
   getInfoQuery?: string;
+  /** If set, this is a visibility assert — needs screenshot + isElementVisible (skip understandAndLocate). */
+  assertQuery?: string;
 }
 
 /**
@@ -166,8 +168,34 @@ function preCheck(instruction: string): PreCheckResult | null {
     return { step: { kind: "enter", verbatim: t } };
   }
 
-  // 6. Questions about the screen → getInfo
-  if (/^(?:tell\s+me|what(?:'s|\s+is|\s+are)|how\s+many|show\s+me|describe|is\s+the|does\s+the|what\s+(?:color|text|do)|list)/i.test(t)) {
+  // 6. Visibility assert — any instruction starting with an assert verb.
+  //    Extracts the subject and routes directly to isElementVisible, skipping understandAndLocate.
+  //    Handles typos in suffixes (e.g. "viisble") by not requiring exact visibility keywords —
+  //    just strip the verb prefix and pass the rest to the vision model.
+  const ASSERT_VERB_RE = /^(?:verify|validate|check|assert|confirm|ensure)\s+/i;
+  if (ASSERT_VERB_RE.test(t)) {
+    const text = t
+      .replace(ASSERT_VERB_RE, "")
+      .replace(/^(?:that\s+)?(?:the\s+)?(?:element\s+(?:with\s+)?(?:text\s+)?)?/i, "")
+      .replace(/["']/g, "")
+      .replace(/[.!?]+$/g, "")
+      .trim();
+    if (text) return { assertQuery: text };
+  }
+  // "is X visible?" pattern
+  const isVisibleMatch = t.match(
+    /^is\s+(?:the\s+)?(?:element\s+(?:with\s+)?(?:text\s+)?)?["']?(.+?)["']?\s+(?:visible|present|shown|displayed|there|on\s+(?:the\s+)?screen)\s*\??[\s.!?]*$/i
+  );
+  if (isVisibleMatch) {
+    const text = isVisibleMatch[1].replace(/[.!?]+$/g, "").trim();
+    if (text) return { assertQuery: text };
+  }
+
+  // 7. Questions about the screen → getInfo
+  //    If the instruction ends with "?" and didn't match an assert verb above,
+  //    or if it lacks any actionable verb, it's a question.
+  const ACTION_VERB_RE = /\b(tap|click|press|type|enter|send|set|swipe|scroll|open|launch|start|go\s+to|verify|validate|check|assert|confirm|wait|sleep|pause|long\s+press|drag|clear|delete|back|home|done)\b/i;
+  if (t.endsWith("?") || !ACTION_VERB_RE.test(t)) {
     return { getInfoQuery: t };
   }
 
@@ -242,6 +270,40 @@ export async function visionExecute(
       isGetInfo: true,
       getInfoAnswer: answer,
       getInfoExplanation: explanation,
+    };
+  }
+  if (pre?.assertQuery) {
+    // Visibility assert — screenshot + isElementVisible (skip understandAndLocate)
+    const rawImage = await screenshot(mcp);
+    const imageBase64 = rawImage ? await downscaleForVision(rawImage) : rawImage;
+    if (!imageBase64) {
+      return {
+        step: { kind: "assert", text: pre.assertQuery, verbatim: instruction },
+        result: { success: false, message: "Failed to capture screenshot" },
+      };
+    }
+    const client = new StarkVisionClient({ apiKey, model: getStarkVisionModel(), disableThinking: true });
+    const text = pre.assertQuery;
+    const isVisualQuery = /\b(red|blue|green|yellow|white|black|orange|purple|pink|grey|gray|color|colour|icon|image|logo|pin|dot|marker|badge|circle|arrow|button|bar|line|border|shadow|highlight|map|chart|graph|photo|picture|thumbnail|avatar|checkbox|checked|unchecked|star|rating|spinner|loading|progress)\b/i.test(text);
+    const visQuery = isVisualQuery ? text : `the text "${text}"`;
+    const t0 = performance.now();
+    const visResponse = await client.isElementVisible(imageBase64, visQuery, true);
+    logTiming("isElementVisible", Math.round(performance.now() - t0));
+    let visible = false;
+    try {
+      const parsed = JSON.parse(visResponse.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim());
+      visible = parsed.conditionSatisfied === true;
+    } catch {
+      visible = /\btrue\b/i.test(visResponse) && !/\bfalse\b/i.test(visResponse);
+    }
+    return {
+      step: { kind: "assert", text, verbatim: instruction },
+      result: {
+        success: visible,
+        message: visible
+          ? `Verified "${text}" is visible (via vision)`
+          : `Assertion failed: "${text}" not found on screen`,
+      },
     };
   }
 

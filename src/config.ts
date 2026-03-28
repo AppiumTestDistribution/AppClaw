@@ -78,6 +78,12 @@ const envSchema = z.object({
    * Gemini bills images by resolution; try 384 (fewest image tokens) or 768 (balance).
    */
   LLM_SCREENSHOT_MAX_EDGE_PX: z.coerce.number().default(0),
+
+  /** Episodic memory: persist successful trajectories across sessions. "on" to enable. */
+  EPISODIC_MEMORY: z.enum(["on", "off"]).default("off"),
+
+  /** Override path for episodic memory store. Empty = ~/.appclaw/trajectories.json */
+  EPISODIC_MEMORY_PATH: z.string().default(""),
 });
 
 export type AppClawConfig = z.infer<typeof envSchema>;

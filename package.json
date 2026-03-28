@@ -28,7 +28,7 @@
     "chalk": "^5.6.2",
     "cli-spinners": "^3.4.0",
     "cli-table3": "^0.6.5",
-    "df-vision": "1.1.72",
+    "df-vision": "1.1.73",
     "dotenv": "^17.3.1",
     "fast-xml-parser": "^4.5.0",
     "gradient-string": "^3.0.0",

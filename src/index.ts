@@ -399,6 +399,24 @@ async function main() {
     let journeyCost = 0;
     const allHistory: any[] = [];
 
+    // ── Episodic memory: detect app ID for the journey ──
+    // Try to resolve the primary app from the goal so all sub-goals share it.
+    let journeyAppId: string | undefined;
+    try {
+      const { extractAppIdFromText } = await import("./memory/fingerprint.js");
+      // First try the raw goal for package names
+      journeyAppId = extractAppIdFromText(goal);
+      // If not found, try resolving app names from the goal (e.g., "YouTube" → "com.google.android.youtube")
+      if (!journeyAppId) {
+        const appMatch = goal.match(/(?:open|launch|start)\s+(?:the\s+)?(\w[\w\s]*?)(?:\s+app|\s+and\b)/i);
+        if (appMatch) {
+          journeyAppId = appResolver.resolve(appMatch[1].trim()) ?? undefined;
+        }
+      }
+    } catch {
+      // Non-critical
+    }
+
     while (!executor.isDone()) {
       const subGoal = executor.current!;
 
@@ -537,6 +555,7 @@ async function main() {
         mcp,
         llm,
         appResolver,
+        appId: journeyAppId,
         maxSteps: stepsPerGoal,
         stepDelay: config.STEP_DELAY,
         maxElements: config.MAX_ELEMENTS,

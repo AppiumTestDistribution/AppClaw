@@ -29,6 +29,10 @@ import { preprocessAction, resolveAppId } from "./preprocessor.js";
 import { activateAppWithFallback } from "../mcp/activate-app.js";
 import { MODEL_PRICING } from "../constants.js";
 import * as ui from "../ui/terminal.js";
+import { EpisodicRecorder } from "../memory/recorder.js";
+import { loadStore } from "../memory/store.js";
+import { retrieveTrajectories, formatExperienceForPrompt } from "../memory/retriever.js";
+import { extractScreenLabels, extractGoalKeywords, extractAppIdFromText } from "../memory/fingerprint.js";
 
 const mcpDebug = process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true";
 
@@ -39,6 +43,8 @@ export interface AgentOptions {
   mcp: MCPClient;
   llm: LLMProvider;
   appResolver?: AppResolver;
+  /** Known app package/bundle ID for episodic memory (set by orchestrator) */
+  appId?: string;
   maxSteps?: number;
   stepDelay?: number;
   maxElements?: number;
@@ -128,6 +134,25 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   const deviceUdid = await detectDeviceUdid();
   const agentSpinDetail = ui.formatAgentThinkingDetail(modelName);
 
+  // ── Episodic Memory ──────────────────────────────────
+  // Cross-session trajectory store: remembers winning actions from previous runs.
+  const episodicEnabled = Config.EPISODIC_MEMORY === "on";
+  const episodicStorePath = Config.EPISODIC_MEMORY_PATH || undefined;
+  const episodicRecorder = episodicEnabled
+    ? new EpisodicRecorder(goal, detectedPlatform, Config.AGENT_MODE, episodicStorePath)
+    : undefined;
+  // Seed recorder with known app ID from orchestrator
+  if (episodicRecorder && options.appId) {
+    episodicRecorder.setAppId(options.appId);
+  }
+  const episodicStore = episodicEnabled ? loadStore(episodicStorePath) : undefined;
+  const goalKeywords = episodicEnabled ? extractGoalKeywords(goal) : [];
+
+  if (episodicEnabled) {
+    const entryCount = episodicStore?.entries.length ?? 0;
+    ui.printAgentBullet(`Episodic memory: ON (${entryCount} stored trajectories)`);
+  }
+
   ui.printGoalStart(options.displayGoal ?? goal, maxSteps);
 
   // ─── 0. PRE-PROCESS: handle obvious actions without LLM ──
@@ -137,6 +162,11 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       if (preResult.handled) {
         ui.printPreprocessor(preResult.message ?? "");
         lastResult = preResult.message ?? "";
+        // Feed preprocessor result to episodic recorder for app ID detection
+        if (episodicRecorder && lastResult) {
+          const appIdFromResult = extractAppIdFromText(lastResult);
+          if (appIdFromResult) episodicRecorder.setAppId(appIdFromResult);
+        }
         await sleep(1500);
       }
     } catch (err) {
@@ -204,6 +234,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         const evaluation = await screenEvaluator(screen.dom, goal, step);
         if (evaluation) {
           if (evaluation.done) {
+            if (episodicRecorder) episodicRecorder.finalize(step + 1);
             ui.stopSpinner();
             ui.printGoalSuccess(step + 1, evaluation.reason);
             const pricing = MODEL_PRICING[modelName] ?? [0, 0];
@@ -291,6 +322,30 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         `FAILED ON THIS SCREEN (do NOT repeat these — they will fail again):\n${failLines}`;
     }
 
+    // ── Episodic memory: retrieve past experience ──────
+    let pastExperience: string | undefined;
+    if (episodicStore && episodicRecorder) {
+      episodicRecorder.setPlatform(screen.platform);
+      episodicRecorder.detectAppIdFromDom(screen.dom);
+
+      let screenLabels = extractScreenLabels(screen.dom);
+      // In vision mode DOM is empty — use goal keywords as fallback (same as recorder)
+      if (screenLabels.length === 0) screenLabels = goalKeywords;
+      const matches = retrieveTrajectories(episodicStore, {
+        platform: screen.platform,
+        appId: episodicRecorder.currentAppId || "",
+        currentScreenLabels: screenLabels,
+        goalKeywords,
+        agentMode: Config.AGENT_MODE,
+      });
+
+      if (matches.length > 0) {
+        pastExperience = formatExperienceForPrompt(matches);
+        episodicRecorder.trackInjectedTrajectories(matches);
+        ui.printAgentBullet(`Episodic memory: injecting ${matches.length} past experience(s) (score: ${matches[0].score.toFixed(2)})`);
+      }
+    }
+
     const context: AgentContext = {
       goal,
       step,
@@ -304,6 +359,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       platform: screen.platform,
       editableCount: screen.editableCount,
       failedOnScreen,
+      pastExperience,
     };
 
     let decision: ToolCallDecision;
@@ -443,6 +499,11 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         }
       }
 
+      // ── Episodic memory: save winning trajectories ─────
+      if (episodicRecorder) {
+        episodicRecorder.finalize(step + 1);
+      }
+
       ui.printGoalSuccess(step + 1, reason);
       const pricing = MODEL_PRICING[modelName] ?? [0, 0];
       const cost = (totalInputTokens / 1_000_000) * pricing[0] + (totalOutputTokens / 1_000_000) * pricing[1];
@@ -515,6 +576,21 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         });
         screenFailures.set(screenHash, existing);
       }
+
+      // ── Episodic memory: mark stale if past experience failed ──
+      if (episodicRecorder) {
+        episodicRecorder.markFailedExperience(sel);
+      }
+    }
+
+    // ── Episodic memory: record step ────────────────────
+    if (episodicRecorder) {
+      episodicRecorder.recordStep(
+        screen.dom,
+        decision.toolName,
+        decision.args,
+        result.success
+      );
     }
 
     // When find_element succeeds, extract the UUID and make it prominent

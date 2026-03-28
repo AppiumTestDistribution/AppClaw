@@ -39,6 +39,8 @@ export interface AgentContext {
   editableCount?: number;
   /** Proactive negative cache: selectors that failed on the current screen */
   failedOnScreen?: string;
+  /** Episodic memory: relevant past experience from previous successful runs */
+  pastExperience?: string;
 }
 
 /** Token usage for a single LLM call */
