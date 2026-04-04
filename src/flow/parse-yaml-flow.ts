@@ -1,21 +1,59 @@
 /**
  * Parse flow YAML: structured steps, natural-language lines, or both.
  *
- * - Structured: `tap: "X"`, `wait: 2`, `launchApp`, etc.
- * - Natural language: `open my app`, `click on Login`, `swipe up`, `wait 2 s`
+ * Supports two YAML shapes:
  *
- * Document 1: appId / name (optional)
- * ---
- * Document 2: list of steps
+ * 1. **Flat** (legacy) — a list of steps:
+ *    ```yaml
+ *    platform: android
+ *    ---
+ *    - open Settings
+ *    - tap WiFi
+ *    - done
+ *    ```
+ *
+ * 2. **Phased** — setup / steps / assertions sections:
+ *    ```yaml
+ *    name: login_test
+ *    platform: android
+ *    env: dev
+ *    ---
+ *    setup:
+ *      - open MyApp
+ *      - wait until login screen is visible
+ *    steps:
+ *      - type "${secrets.email}" in email field
+ *      - type "${secrets.password}" in password field
+ *      - tap Login
+ *    assertions:
+ *      - verify Dashboard is visible
+ *      - assert Welcome is visible
+ *    ```
+ *
+ * Variable interpolation (`${variables.X}`, `${secrets.X}`) is resolved
+ * after parsing via the VariableResolver — the parser itself is pure structure.
  */
 
 import { readFileSync } from "fs";
 import { parseAllDocuments } from "yaml";
 
-import type { FlowMeta, FlowStep, ParsedFlow } from "./types.js";
+import type { FlowMeta, FlowStep, FlowPhase, PhasedStep, ParsedFlow } from "./types.js";
 import { tryParseNaturalFlowLine } from "./natural-line.js";
+import { resolveNaturalStep } from "./llm-parser.js";
+import { existsSync } from "fs";
+import { resolve, dirname } from "path";
+import {
+  interpolateStep,
+  emptyBindings,
+  mergeBindings,
+  loadEnvironmentFile,
+  loadInlineBindings,
+  type VariableBindings,
+} from "./variable-resolver.js";
 
-function normalizeStep(raw: unknown, index: number): FlowStep {
+// ── Step normalizer (unchanged logic, extracted for SRP) ───────────
+
+export function normalizeStructured(raw: unknown, index: number): FlowStep | null {
   if (typeof raw === "string") {
     const s = raw.trim();
     if (s === "launchApp") return { kind: "launchApp" };
@@ -26,18 +64,36 @@ function normalizeStep(raw: unknown, index: number): FlowStep {
     const nl = tryParseNaturalFlowLine(s);
     if (nl) return nl;
 
-    throw new Error(
-      `Step ${index + 1}: unknown step "${s}". ` +
-        `Use structured steps (tap:, wait:, …) or natural language, e.g. "open My App", "click on Login", "swipe up".`
-    );
+    // Not recognized — caller will use LLM
+    return null;
   }
 
   if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
     const o = raw as Record<string, unknown>;
     const keys = Object.keys(o);
 
+    // ── Multi-key: waitUntil with timeout ──
+    if (keys.includes("waitUntil") || keys.includes("waitUntilGone")) {
+      const isGone = keys.includes("waitUntilGone");
+      const key = isGone ? "waitUntilGone" : "waitUntil";
+      const val = String(o[key]).trim();
+      const timeout = Number(o.timeout ?? 10);
+      if (!Number.isFinite(timeout) || timeout < 1) {
+        throw new Error(`Step ${index + 1}: waitUntil timeout must be a positive number`);
+      }
+      const valLower = val.toLowerCase();
+      if (!isGone && (valLower === "screen loaded" || valLower === "screenloaded" || valLower === "screen ready" || valLower === "screen stable")) {
+        return { kind: "waitUntil", condition: "screenLoaded", timeoutSeconds: timeout };
+      }
+      return {
+        kind: "waitUntil",
+        condition: isGone ? "gone" : "visible",
+        text: val,
+        timeoutSeconds: timeout,
+      };
+    }
+
     // ── Multi-key: scrollAssert ──
-    // e.g. { scrollAssert: "TestMu AI", direction: "down", maxScrolls: 3 }
     if (keys.includes("scrollAssert") || keys.includes("scrollVerify") || keys.includes("scrollCheck")) {
       const textKey = keys.find(k => k === "scrollAssert" || k === "scrollVerify" || k === "scrollCheck")!;
       const text = String(o[textKey]);
@@ -70,6 +126,16 @@ function normalizeStep(raw: unknown, index: number): FlowStep {
       }
       return { kind: "wait", seconds: sec };
     }
+    if (k === "waitUntil") {
+      const val = String(v).trim().toLowerCase();
+      if (val === "screen loaded" || val === "screenloaded" || val === "screen ready" || val === "screen stable") {
+        return { kind: "waitUntil", condition: "screenLoaded", timeoutSeconds: 10 };
+      }
+      return { kind: "waitUntil", condition: "visible", text: String(v).trim(), timeoutSeconds: 10 };
+    }
+    if (k === "waitUntilGone") {
+      return { kind: "waitUntil", condition: "gone", text: String(v).trim(), timeoutSeconds: 10 };
+    }
     if (k === "tap") return { kind: "tap", label: String(v) };
     if (k === "type") return { kind: "type", text: String(v) };
     if (k === "assert" || k === "verify" || k === "check") {
@@ -87,7 +153,131 @@ function normalizeStep(raw: unknown, index: number): FlowStep {
   throw new Error(`Step ${index + 1}: invalid step (expected string or single-key object)`);
 }
 
-export function parseFlowYamlString(content: string): ParsedFlow {
+// ── Raw step parsing (with LLM fallback) ───────────────────────────
+
+async function parseRawSteps(rawSteps: unknown[]): Promise<FlowStep[]> {
+  const steps: FlowStep[] = [];
+  for (let i = 0; i < rawSteps.length; i++) {
+    const structured = normalizeStructured(rawSteps[i], i);
+    if (structured) {
+      steps.push(structured);
+    } else {
+      const instruction = String(rawSteps[i]).trim();
+      const resolved = await resolveNaturalStep(instruction);
+      steps.push(resolved);
+    }
+  }
+  return steps;
+}
+
+// ── Phased extraction ──────────────────────────────────────────────
+
+interface RawExtraction {
+  meta: FlowMeta;
+  /** Flat list — legacy format */
+  rawSteps?: unknown[];
+  /** Phased format */
+  rawSetup?: unknown[];
+  rawMain?: unknown[];
+  rawAssertions?: unknown[];
+}
+
+const PHASE_KEYS = new Set(["setup", "steps", "assertions"]);
+const META_KEYS = new Set(["appId", "name", "description", "platform", "env"]);
+
+function extractRaw(docs: ReturnType<typeof parseAllDocuments>): RawExtraction {
+  let meta: FlowMeta = {};
+
+  // ── Two-document format ──
+  if (docs.length >= 2) {
+    const m = docs[0].toJS();
+    if (m && typeof m === "object" && !Array.isArray(m)) {
+      const { env: envBlock, ...rest } = m as Record<string, unknown>;
+      meta = rest as FlowMeta;
+      if (envBlock && typeof envBlock === "object") {
+        meta.inlineEnv = envBlock as Record<string, unknown>;
+      } else if (typeof envBlock === "string") {
+        meta.env = envBlock;
+      }
+    }
+
+    const doc2 = docs[1].toJS();
+
+    // doc2 is a plain array → flat format
+    if (Array.isArray(doc2)) {
+      return { meta, rawSteps: doc2 };
+    }
+
+    // doc2 is an object — could be phased or { steps: [...] }
+    if (doc2 && typeof doc2 === "object") {
+      const obj = doc2 as Record<string, unknown>;
+      return extractPhasedOrFlat(meta, obj);
+    }
+
+    return { meta, rawSteps: doc2 as unknown[] };
+  }
+
+  // ── Single-document format ──
+  const j = docs[0].toJS();
+  if (Array.isArray(j)) {
+    return { meta, rawSteps: j };
+  }
+  if (j && typeof j === "object") {
+    const obj = j as Record<string, unknown>;
+    // Pull meta keys out
+    for (const key of META_KEYS) {
+      if (key in obj) {
+        if (key === "env" && typeof obj[key] === "object") {
+          meta.inlineEnv = obj[key] as Record<string, unknown>;
+        } else {
+          (meta as Record<string, unknown>)[key] = obj[key];
+        }
+      }
+    }
+    return extractPhasedOrFlat(meta, obj);
+  }
+
+  throw new Error("Invalid flow YAML root");
+}
+
+function extractPhasedOrFlat(meta: FlowMeta, obj: Record<string, unknown>): RawExtraction {
+  const hasPhaseKeys = Object.keys(obj).some(k => PHASE_KEYS.has(k));
+
+  if (hasPhaseKeys) {
+    // Phased format
+    const rawSetup = Array.isArray(obj.setup) ? obj.setup : undefined;
+    const rawMain = Array.isArray(obj.steps) ? obj.steps : undefined;
+    const rawAssertions = Array.isArray(obj.assertions) ? obj.assertions : undefined;
+
+    if (!rawMain && !rawSetup && !rawAssertions) {
+      throw new Error("Phased flow must have at least one of: setup, steps, assertions");
+    }
+
+    return { meta, rawSetup, rawMain, rawAssertions };
+  }
+
+  // Flat with `steps` key
+  if (Array.isArray(obj.steps)) {
+    return { meta, rawSteps: obj.steps };
+  }
+
+  throw new Error(
+    "Expected a YAML sequence of steps, or two documents (meta --- steps), " +
+    "or an object with `steps: []`, or phased sections (setup/steps/assertions)"
+  );
+}
+
+// ── Public API ─────────────────────────────────────────────────────
+
+export interface ParseOptions {
+  /** Variable bindings to interpolate. If omitted, no interpolation. */
+  bindings?: VariableBindings;
+}
+
+export async function parseFlowYamlString(
+  content: string,
+  options: ParseOptions = {}
+): Promise<ParsedFlow> {
   const docs = parseAllDocuments(content);
   if (docs.length === 0) {
     throw new Error("Empty YAML");
@@ -99,44 +289,129 @@ export function parseFlowYamlString(content: string): ParsedFlow {
     }
   }
 
-  let meta: FlowMeta = {};
-  let rawSteps: unknown[];
+  const raw = extractRaw(docs);
+  const bindings = options.bindings ?? emptyBindings();
 
-  if (docs.length >= 2) {
-    const m = docs[0].toJS();
-    if (m && typeof m === "object" && !Array.isArray(m)) {
-      meta = m as FlowMeta;
-    }
-    rawSteps = docs[1].toJS() as unknown[];
-  } else {
-    const j = docs[0].toJS();
-    if (Array.isArray(j)) {
-      rawSteps = j;
-    } else if (j && typeof j === "object") {
-      const o = j as Record<string, unknown>;
-      if (Array.isArray(o.steps)) {
-        const { steps, ...rest } = o;
-        meta = rest as FlowMeta;
-        rawSteps = steps as unknown[];
-      } else {
-        throw new Error(
-          "Expected a YAML sequence of steps, or two documents (meta --- steps), or an object with `steps: []`"
-        );
+  // ── Phased format ──
+  if (raw.rawSetup || raw.rawMain || raw.rawAssertions) {
+    const phases: PhasedStep[] = [];
+    const allSteps: FlowStep[] = [];
+
+    if (raw.rawSetup) {
+      const setupSteps = await parseRawSteps(raw.rawSetup);
+      for (const s of setupSteps) {
+        const resolved = interpolateStep(s as Record<string, unknown>, bindings) as FlowStep;
+        phases.push({ step: resolved, phase: "setup" });
+        allSteps.push(resolved);
       }
-    } else {
-      throw new Error("Invalid flow YAML root");
     }
+
+    if (raw.rawMain) {
+      const mainSteps = await parseRawSteps(raw.rawMain);
+      for (const s of mainSteps) {
+        const resolved = interpolateStep(s as Record<string, unknown>, bindings) as FlowStep;
+        phases.push({ step: resolved, phase: "test" });
+        allSteps.push(resolved);
+      }
+    }
+
+    if (raw.rawAssertions) {
+      const assertSteps = await parseRawSteps(raw.rawAssertions);
+      for (const s of assertSteps) {
+        const resolved = interpolateStep(s as Record<string, unknown>, bindings) as FlowStep;
+        // Wrap plain text assertions: if a step came through as a tap/type/etc but
+        // it's in the assertions section, leave it. If it's a raw string that parsed
+        // as something other than assert, keep it — the user may want to do actions
+        // in assertions. But if it didn't parse (and was LLM-resolved), trust the LLM.
+        phases.push({ step: resolved, phase: "assertion" });
+        allSteps.push(resolved);
+      }
+    }
+
+    return { meta: raw.meta, steps: allSteps, phases };
   }
 
-  if (!Array.isArray(rawSteps)) {
+  // ── Flat format (legacy) ──
+  if (!raw.rawSteps || !Array.isArray(raw.rawSteps)) {
     throw new Error("Flow steps must be a YAML array");
   }
 
-  const steps = rawSteps.map((r, i) => normalizeStep(r, i));
-  return { meta, steps };
+  const steps = await parseRawSteps(raw.rawSteps);
+  const resolvedSteps = steps.map(
+    s => interpolateStep(s as Record<string, unknown>, bindings) as FlowStep
+  );
+  const phases: PhasedStep[] = resolvedSteps.map(step => ({ step, phase: "test" as FlowPhase }));
+
+  return { meta: raw.meta, steps: resolvedSteps, phases };
 }
 
-export function parseFlowYamlFile(filepath: string): ParsedFlow {
+/**
+ * Parse a flow YAML file with automatic environment resolution.
+ *
+ * If the YAML meta contains `env: <name>`, the parser will look for
+ * `.appclaw/env/<name>.yaml` relative to the flow file's directory
+ * (walking up to find `.appclaw/`). Inline `env:` blocks are also supported.
+ *
+ * Explicit `options.bindings` take precedence over auto-resolved bindings
+ * (e.g. when the user passes `--env` on the CLI).
+ */
+export async function parseFlowYamlFile(
+  filepath: string,
+  options: ParseOptions = {}
+): Promise<ParsedFlow> {
   const content = readFileSync(filepath, "utf-8");
-  return parseFlowYamlString(content);
+
+  // If caller already provided bindings (e.g. --env CLI flag), use those directly
+  if (options.bindings && Object.keys(options.bindings.variables).length > 0) {
+    return parseFlowYamlString(content, options);
+  }
+
+  // First pass: extract meta to discover env: field (parse without bindings)
+  const docs = parseAllDocuments(content);
+  if (docs.length === 0) throw new Error("Empty YAML");
+  const raw = extractRaw(docs);
+  let bindings = emptyBindings();
+
+  // Auto-resolve env: from YAML meta
+  if (raw.meta.env) {
+    const envFile = findEnvFile(filepath, raw.meta.env);
+    if (envFile) {
+      try {
+        bindings = loadEnvironmentFile(envFile);
+      } catch {
+        // Non-fatal: log warning but continue without bindings
+      }
+    }
+  }
+
+  // Merge inline env block (lower priority than file-based)
+  if (raw.meta.inlineEnv) {
+    try {
+      const inlineBindings = loadInlineBindings(raw.meta.inlineEnv);
+      bindings = mergeBindings(inlineBindings, bindings); // file-based wins
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  return parseFlowYamlString(content, { bindings });
+}
+
+/**
+ * Walk up from the flow file directory to find `.appclaw/env/<name>.yaml`.
+ * Returns the full path or null if not found.
+ */
+function findEnvFile(flowFilePath: string, envName: string): string | null {
+  let dir = dirname(resolve(flowFilePath));
+  const root = resolve("/");
+
+  while (dir !== root) {
+    const candidate = resolve(dir, ".appclaw", "env", `${envName}.yaml`);
+    if (existsSync(candidate)) return candidate;
+    const ymlCandidate = resolve(dir, ".appclaw", "env", `${envName}.yml`);
+    if (existsSync(ymlCandidate)) return ymlCandidate;
+    dir = dirname(dir);
+  }
+
+  return null;
 }

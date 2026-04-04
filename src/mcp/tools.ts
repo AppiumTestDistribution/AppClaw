@@ -109,15 +109,19 @@ export async function screenshot(client: MCPClient, elementUUID?: string): Promi
  * Find an element using AI vision (ai_instruction strategy).
  * Returns the synthetic ai-element UUID (e.g. "ai-element:540,960:bbox")
  * or throws if not found.
+ *
+ * When `existingScreenshot` is provided, reuses it instead of capturing a
+ * fresh one — saves ~10-20ms MCP round-trip when the screen hasn't changed.
  */
 export async function findElementByVision(
   client: MCPClient,
-  description: string
+  description: string,
+  existingScreenshot?: string | null
 ): Promise<string> {
   if (Config.VISION_LOCATE_PROVIDER === "stark") {
     logVisionLocateBackend("stark", "attempt", description);
     const { starkLocateTapTarget } = await import("../vision/stark-locate.js");
-    const located = await starkLocateTapTarget(client, description);
+    const located = await starkLocateTapTarget(client, description, existingScreenshot);
     logVisionLocateBackend(
       "stark",
       "success",

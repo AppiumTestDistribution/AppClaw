@@ -1,0 +1,479 @@
+{
+  "name": "appclaw",
+  "displayName": "AppClaw",
+  "description": "AI-powered mobile automation agent — control Android & iOS devices from VS Code",
+  "version": "0.1.0",
+  "publisher": "AppClaw",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "mobile",
+    "automation",
+    "appium",
+    "android",
+    "ios",
+    "testing",
+    "ai"
+  ],
+  "activationEvents": [
+    "onLanguage:yaml",
+    "workspaceContains:**/*.appclaw.yaml"
+  ],
+  "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AppiumTestDistribution/appclaw"
+  },
+  "icon": "media/icon.png",
+  "license": "MIT",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "appclaw",
+          "title": "AppClaw",
+          "icon": "media/appclaw-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "appclaw": [
+        {
+          "id": "appclaw.devices",
+          "name": "Devices"
+        },
+        {
+          "id": "appclaw.flows",
+          "name": "Flows"
+        },
+        {
+          "id": "appclaw.history",
+          "name": "History"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "appclaw.runGoal",
+        "title": "AppClaw: Run Goal",
+        "icon": "$(play)"
+      },
+      {
+        "command": "appclaw.runFlow",
+        "title": "AppClaw: Run Flow File",
+        "icon": "$(play)"
+      },
+      {
+        "command": "appclaw.runFlowStep",
+        "title": "AppClaw: Run This Step",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "appclaw.openDevicePanel",
+        "title": "AppClaw: Open Device Panel",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "appclaw.playground",
+        "title": "AppClaw: Start Playground",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "appclaw.takeScreenshot",
+        "title": "AppClaw: Take Screenshot"
+      },
+      {
+        "command": "appclaw.stopExecution",
+        "title": "AppClaw: Stop Execution",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "appclaw.refreshDevices",
+        "title": "Refresh Devices",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "appclaw.refreshFlows",
+        "title": "Refresh Flows",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "appclaw.viewReport",
+        "title": "AppClaw: View Execution Report",
+        "icon": "$(graph)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "appclaw.runFlow",
+          "when": "resourceExtname == .yaml",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "appclaw.runFlow",
+          "when": "resourceExtname == .yaml",
+          "group": "appclaw"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "appclaw.refreshDevices",
+          "when": "view == appclaw.devices",
+          "group": "navigation"
+        },
+        {
+          "command": "appclaw.refreshFlows",
+          "when": "view == appclaw.flows",
+          "group": "navigation"
+        },
+        {
+          "command": "appclaw.viewReport",
+          "when": "view == appclaw.history",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "appclaw.runFlow",
+          "when": "view == appclaw.flows",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": [
+      {
+        "title": "Agent Mode",
+        "order": 0,
+        "properties": {
+          "appclaw.agentMode": {
+            "type": "string",
+            "default": "vision",
+            "enum": [
+              "vision",
+              "dom"
+            ],
+            "enumDescriptions": [
+              "Screenshot-first — uses AI vision as the primary interaction strategy",
+              "DOM-first — uses XML page source to find elements, works with any LLM provider"
+            ],
+            "markdownDescription": "**How the agent perceives the screen.**\n\n- **vision** _(recommended)_ — takes screenshots and uses AI vision to locate elements\n- **dom** — parses XML page source to find elements; no vision setup needed"
+          },
+          "appclaw.visionMode": {
+            "type": "string",
+            "default": "fallback",
+            "enum": [
+              "always",
+              "fallback",
+              "never"
+            ],
+            "enumDescriptions": [
+              "Always use vision for every interaction",
+              "Use vision only when DOM-based interaction fails (default for DOM mode)",
+              "Disable vision entirely — DOM only, no screenshots"
+            ],
+            "markdownDescription": "**When to use AI vision.**\n\n- **always** — every step uses a screenshot _(auto-set when Agent Mode = vision)_\n- **fallback** — vision kicks in only when DOM interaction fails _(default for DOM mode)_\n- **never** — pure DOM mode, no screenshots taken"
+          },
+          "appclaw.visionLocateProvider": {
+            "type": "string",
+            "default": "stark",
+            "enum": [
+              "stark",
+              "appium_mcp"
+            ],
+            "enumDescriptions": [
+              "Stark (df-vision + Gemini) — fastest, most accurate. Only needs a Gemini API key.",
+              "Appium MCP server-side AI vision — uses OpenAI-compatible vision API for element location."
+            ],
+            "markdownDescription": "**Vision element-location strategy.** _Only used when Agent Mode = vision._\n\n- **stark** _(recommended)_ — uses Gemini for element location. Just set a Gemini API key.\n- **appium_mcp** — uses Appium MCP's server-side AI vision. Requires AI Vision API config below."
+          }
+        }
+      },
+      {
+        "title": "LLM",
+        "order": 1,
+        "properties": {
+          "appclaw.llmProvider": {
+            "type": "string",
+            "default": "gemini",
+            "enum": [
+              "gemini",
+              "anthropic",
+              "openai",
+              "groq",
+              "ollama"
+            ],
+            "markdownDescription": "LLM provider for the AI agent reasoning. **Gemini recommended** for best vision support."
+          },
+          "appclaw.llmApiKey": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "API key for the chosen LLM provider. _Also used as fallback for vision API keys when using Gemini._"
+          },
+          "appclaw.llmModel": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Model name override. Leave empty for provider default (e.g. `gemini-2.5-flash` for Gemini)."
+          }
+        }
+      },
+      {
+        "title": "Stark Vision",
+        "order": 2,
+        "properties": {
+          "appclaw.geminiApiKey": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Gemini API key for Stark vision.\n\n💡 **Tip:** If LLM Provider is `gemini`, you can leave this empty — Stark will reuse the LLM API Key automatically. Only set this if you want a separate key for vision.\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `stark`"
+          },
+          "appclaw.starkVisionModel": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Model for Stark vision (empty = auto-select, e.g. `gemini-2.5-flash`).\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `stark`"
+          }
+        }
+      },
+      {
+        "title": "AI Vision (Appium MCP)",
+        "order": 3,
+        "properties": {
+          "appclaw.aiVisionApiBaseUrl": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "AI Vision API base URL.\n\nExample: `https://generativelanguage.googleapis.com/v1beta/openai`\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `appium_mcp`, **or** Agent Mode = `dom` + Vision Mode = `fallback`"
+          },
+          "appclaw.aiVisionApiKey": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "API key for the AI Vision endpoint.\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `appium_mcp`, **or** Agent Mode = `dom` + Vision Mode = `fallback`"
+          },
+          "appclaw.aiVisionModel": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "AI Vision model name (e.g. `gemini-2.5-flash`).\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `appium_mcp`, **or** Agent Mode = `dom` + Vision Mode = `fallback`"
+          },
+          "appclaw.aiVisionCoordType": {
+            "type": "string",
+            "default": "absolute",
+            "enum": [
+              "normalized",
+              "absolute"
+            ],
+            "enumDescriptions": [
+              "Coordinates as 0-1 fractions of screen dimensions",
+              "Coordinates as absolute pixel values (recommended for Gemini)"
+            ],
+            "markdownDescription": "Coordinate format returned by the AI Vision model.\n\n- **absolute** _(recommended for Gemini)_ — pixel coordinates\n- **normalized** — 0–1 fractions\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `appium_mcp`, **or** Agent Mode = `dom` + Vision Mode = `fallback`"
+          }
+        }
+      },
+      {
+        "title": "Device",
+        "order": 4,
+        "properties": {
+          "appclaw.platform": {
+            "type": "string",
+            "default": "",
+            "enum": [
+              "",
+              "android",
+              "ios"
+            ],
+            "enumDescriptions": [
+              "Auto-detect / prompt at runtime",
+              "Android (ADB / UiAutomator2)",
+              "iOS (XCUITest)"
+            ],
+            "description": "Target platform (empty = auto-detect)"
+          },
+          "appclaw.deviceType": {
+            "type": "string",
+            "default": "",
+            "enum": [
+              "",
+              "simulator",
+              "real"
+            ],
+            "description": "iOS device type (simulator or real device)"
+          },
+          "appclaw.deviceUdid": {
+            "type": "string",
+            "default": "",
+            "description": "Device UDID (skips device picker)"
+          },
+          "appclaw.deviceName": {
+            "type": "string",
+            "default": "",
+            "description": "Device name (partial match)"
+          }
+        }
+      },
+      {
+        "title": "Agent",
+        "order": 5,
+        "properties": {
+          "appclaw.maxSteps": {
+            "type": "number",
+            "default": 30,
+            "description": "Maximum agent steps per goal"
+          },
+          "appclaw.stepDelay": {
+            "type": "number",
+            "default": 500,
+            "markdownDescription": "Delay (ms) between steps to let the UI settle. `500` is a good default."
+          },
+          "appclaw.maxElements": {
+            "type": "number",
+            "default": 40,
+            "description": "Maximum DOM elements to send to the LLM (DOM mode)"
+          },
+          "appclaw.llmThinking": {
+            "type": "string",
+            "default": "on",
+            "enum": [
+              "on",
+              "off"
+            ],
+            "description": "Enable extended thinking/reasoning for the LLM"
+          },
+          "appclaw.llmThinkingBudget": {
+            "type": "number",
+            "default": 128,
+            "description": "Max tokens for LLM thinking budget"
+          },
+          "appclaw.llmScreenshotMaxEdgePx": {
+            "type": "number",
+            "default": 0,
+            "markdownDescription": "Downscale screenshots sent to LLM (max edge in px). `0` = send full resolution. Try `512` for faster/cheaper Gemini calls."
+          },
+          "appclaw.showTokenUsage": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show token usage and cost in output"
+          },
+          "appclaw.episodicMemory": {
+            "type": "string",
+            "default": "off",
+            "enum": [
+              "on",
+              "off"
+            ],
+            "markdownDescription": "Persist successful trajectories across sessions. Helps the agent learn from past runs."
+          },
+          "appclaw.episodicMemoryPath": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Custom path for episodic memory store. Empty = `~/.appclaw/trajectories.json`"
+          }
+        }
+      },
+      {
+        "title": "MCP Connection",
+        "order": 6,
+        "properties": {
+          "appclaw.mcpTransport": {
+            "type": "string",
+            "default": "stdio",
+            "enum": [
+              "stdio",
+              "sse"
+            ],
+            "markdownDescription": "How to connect to the Appium MCP server.\n\n- **stdio** — spawns `npx appium-mcp` as a child process (default)\n- **sse** — connects to a running MCP server via HTTP"
+          },
+          "appclaw.mcpHost": {
+            "type": "string",
+            "default": "localhost",
+            "description": "MCP server host (only used with SSE transport)"
+          },
+          "appclaw.mcpPort": {
+            "type": "number",
+            "default": 8080,
+            "description": "MCP server port (only used with SSE transport)"
+          }
+        }
+      },
+      {
+        "title": "Device Streaming",
+        "order": 7,
+        "properties": {
+          "appclaw.mjpegEnabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable live MJPEG device screen streaming in the Device Panel"
+          },
+          "appclaw.mjpegHost": {
+            "type": "string",
+            "default": "127.0.0.1",
+            "description": "MJPEG server host"
+          },
+          "appclaw.mjpegPortAndroid": {
+            "type": "number",
+            "default": 7810,
+            "description": "MJPEG server port for Android"
+          },
+          "appclaw.mjpegPortIos": {
+            "type": "number",
+            "default": 9100,
+            "description": "MJPEG server port for iOS"
+          }
+        }
+      },
+      {
+        "title": "Advanced",
+        "order": 8,
+        "properties": {
+          "appclaw.cliPath": {
+            "type": "string",
+            "default": "npx appclaw",
+            "description": "Path to appclaw CLI (or npx command)"
+          },
+          "appclaw.mcpDebug": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable MCP debug logging (MCP_DEBUG=1)"
+          }
+        }
+      }
+    ],
+    "yamlValidation": [
+      {
+        "fileMatch": [
+          "tests/**/*.yaml",
+          "tests/**/*.yml",
+          "flows/**/*.yaml",
+          "flows/**/*.yml",
+          "**/*.flow.yaml",
+          "**/*.flow.yml"
+        ],
+        "url": "../schemas/flow.schema.json"
+      },
+      {
+        "fileMatch": [
+          ".appclaw/env/*.yaml",
+          ".appclaw/env/*.yml"
+        ],
+        "url": "../schemas/env.schema.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "watch": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,100 +1,85 @@
 /**
- * LLM-based instruction classifier — replaces regex parsing in natural-line.ts.
+ * LLM-based step resolver — fallback when regex can't parse a natural language step.
  *
- * Sends the user's natural language instruction to the configured LLM
- * and gets back a structured FlowStep classification.
+ * Sends the instruction to the configured LLM with a structured schema
+ * and gets back a concrete FlowStep. Supports any language or phrasing.
  */
 
-import { generateText } from "ai";
+import { generateObject } from "ai";
+import { z } from "zod";
 import { buildModel } from "../llm/provider.js";
-import { loadConfig, type AppClawConfig } from "../config.js";
+import { Config } from "../config.js";
 import type { FlowStep } from "./types.js";
 
-const CLASSIFICATION_PROMPT = `You are a mobile test instruction classifier. Given a user instruction, classify it into exactly one step type and return the result as a JSON object.
+const stepSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("openApp"), query: z.string().describe("App name to open") }),
+  z.object({ kind: z.literal("tap"), label: z.string().describe("Element label/text to tap") }),
+  z.object({
+    kind: z.literal("type"),
+    text: z.string().describe("Text to type"),
+    target: z.string().optional().describe("Target field to type into"),
+  }),
+  z.object({ kind: z.literal("enter") }),
+  z.object({ kind: z.literal("back") }),
+  z.object({ kind: z.literal("home") }),
+  z.object({
+    kind: z.literal("swipe"),
+    direction: z.enum(["up", "down", "left", "right"]),
+    repeat: z.number().optional(),
+  }),
+  z.object({ kind: z.literal("wait"), seconds: z.number().describe("Seconds to wait, default 2") }),
+  z.object({
+    kind: z.literal("waitUntil"),
+    condition: z.enum(["visible", "gone", "screenLoaded"]),
+    text: z.string().optional().describe("Text/element to wait for (not needed for screenLoaded)"),
+    timeoutSeconds: z.number().describe("Timeout in seconds, default 10"),
+  }),
+  z.object({ kind: z.literal("assert"), text: z.string().describe("Text to verify is visible") }),
+  z.object({
+    kind: z.literal("scrollAssert"),
+    text: z.string(),
+    direction: z.enum(["up", "down", "left", "right"]),
+    maxScrolls: z.number(),
+  }),
+  z.object({ kind: z.literal("getInfo"), query: z.string() }),
+  z.object({ kind: z.literal("done"), message: z.string().optional() }),
+  z.object({ kind: z.literal("launchApp") }),
+]);
 
-Available step types:
-1. openApp — open/launch/start an app → { "kind": "openApp", "query": "<app name>" }
-2. tap — tap/click/select/choose/press/toggle/navigate to/close/dismiss an element → { "kind": "tap", "label": "<element description>" }
-3. type — type/enter/input text, search for something → { "kind": "type", "text": "<text to type>", "target": "<optional field name or omit>" }
-4. enter — press enter/return/submit/confirm/perform search → { "kind": "enter" }
-5. back — go back/navigate back/press back → { "kind": "back" }
-6. home — go home/press home → { "kind": "home" }
-7. swipe — swipe/scroll in a direction → { "kind": "swipe", "direction": "up|down|left|right" }
-8. wait — wait/pause/sleep → { "kind": "wait", "seconds": <number, default 2> }
-9. assert — verify/check/assert something is visible/present → { "kind": "assert", "text": "<text to verify>" }
-10. scrollAssert — scroll until something is visible → { "kind": "scrollAssert", "text": "<text>", "direction": "down", "maxScrolls": 3 }
-11. getInfo — ask a question about what's on screen (colors, state, count, describe, what text, is X yellow, tell me, what's in, show me, how many, list) → { "kind": "getInfo", "query": "<the full question>" }
-12. done — mark flow as complete → { "kind": "done", "message": "<optional message or omit>" }
-
-Rules:
-- Return ONLY a valid JSON object. No markdown fences, no explanation.
-- If the instruction is a question about what's visible on screen, use getInfo.
-- "search for X" means type X into a search field → kind: type.
-- "navigate to X" means tap on X → kind: tap.
-- For type with "X in Y", set text=X and target=Y.
-- Default wait seconds = 2 if not specified.
-- Default scrollAssert direction = "down", maxScrolls = 3.
-- For done without a message, omit the message field.`;
-
-let cachedModel: ReturnType<typeof buildModel> | null = null;
-let cachedConfig: AppClawConfig | null = null;
-
-function getModel() {
-  if (!cachedModel) {
-    cachedConfig = loadConfig();
-    cachedModel = buildModel(cachedConfig);
-  }
-  return cachedModel;
-}
+const SYSTEM_PROMPT =
+  `You are a mobile app test step interpreter. Convert the user's natural language instruction into a structured test step.\n\n` +
+  `Rules:\n` +
+  `- "open/launch/start <app>" → openApp\n` +
+  `- "click/tap/press/select <element>" → tap\n` +
+  `- "type/enter/input <text>" or "search for <text>" → type\n` +
+  `- "wait for <element> to be visible/appear" → waitUntil (visible)\n` +
+  `- "wait for <element> to disappear/be gone" → waitUntil (gone)\n` +
+  `- "wait for screen to load/stabilize" → waitUntil (screenLoaded)\n` +
+  `- "wait <N> seconds" → wait\n` +
+  `- "swipe/scroll <direction>" → swipe\n` +
+  `- "verify/check/assert <text>" → assert\n` +
+  `- "scroll until <text> visible" → scrollAssert\n` +
+  `- "go back" → back, "go home" → home\n` +
+  `- "press enter/submit/search" → enter\n` +
+  `- "done" → done\n` +
+  `Extract the relevant parameters. Works with any language.`;
 
 /**
- * Classify a natural language instruction into a FlowStep using the LLM.
- * Returns the classified step with `verbatim` set to the original instruction.
+ * Resolve a free-form natural language instruction into a concrete FlowStep via LLM.
  */
-const mcpDebug = process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true";
+export async function resolveNaturalStep(instruction: string): Promise<FlowStep> {
+  const model = buildModel(Config);
 
-export async function classifyInstruction(instruction: string): Promise<FlowStep> {
-  const model = getModel();
-
-  const t0 = performance.now();
-  const result = await generateText({
+  const { object } = await generateObject({
     model: model as any,
-    system: CLASSIFICATION_PROMPT,
-    messages: [{ role: "user", content: instruction }],
-    temperature: 0,
-    maxOutputTokens: 256,
+    schema: stepSchema,
+    system: SYSTEM_PROMPT,
+    prompt: instruction,
     providerOptions: {
       google: { thinkingConfig: { thinkingBudget: 0 } },
       anthropic: { thinking: { type: "disabled" } },
     },
   });
-  if (mcpDebug) {
-    const elapsed = Math.round(performance.now() - t0);
-    console.log(`        classifyInstruction ${elapsed}ms`);
-  }
 
-  const text = result.text
-    .replace(/(^```json\s*|```\s*$)/g, "")
-    .trim();
-
-  let parsed: any;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error(`LLM returned invalid JSON for instruction "${instruction}": ${text}`);
-  }
-
-  // Validate kind
-  const validKinds = [
-    "openApp", "tap", "type", "enter", "back", "home",
-    "swipe", "wait", "assert", "scrollAssert", "getInfo", "done",
-  ];
-  if (!validKinds.includes(parsed.kind)) {
-    throw new Error(`LLM returned unknown step kind "${parsed.kind}" for instruction "${instruction}"`);
-  }
-
-  // Attach verbatim
-  parsed.verbatim = instruction;
-
-  return parsed as FlowStep;
+  return { ...object, verbatim: instruction } as FlowStep;
 }

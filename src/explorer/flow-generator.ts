@@ -161,6 +161,12 @@ Generate ${numFlows} diverse flows covering the most important journeys. Include
       lines.push(`- ${step}`);
     }
 
+    // Auto-append "done" if the last step isn't already a done step
+    const lastStep = flow.steps[flow.steps.length - 1];
+    if (!lastStep || !lastStep.toLowerCase().startsWith("done")) {
+      lines.push("- done");
+    }
+
     return {
       name: flow.name,
       description: flow.comment,

@@ -25,6 +25,12 @@ export interface MCPClient {
   close(): Promise<void>;
 }
 
+/** Shared MCP client with reference-counted lifecycle */
+export interface SharedMCPClient extends MCPClient {
+  /** Release this handle. The underlying connection closes when the last handle is released. */
+  release(): Promise<void>;
+}
+
 export interface MCPToolResult {
   content: MCPContent[];
 }

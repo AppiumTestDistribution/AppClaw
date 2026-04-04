@@ -31,6 +31,11 @@ export function setDeviceScreenSize(deviceScreenSize: string): void {
   }
 }
 
+/** Get the cached screen size, or null if not yet determined. */
+export function getCachedScreenSize(): { width: number; height: number } | null {
+  return cachedScreenSize;
+}
+
 /** Set the current platform so coordinate scaling knows pixel vs point mode. */
 export function setDevicePlatform(platform: "android" | "ios"): void {
   currentPlatform = platform;

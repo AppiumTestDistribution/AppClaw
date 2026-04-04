@@ -67,10 +67,13 @@ function buildSyntheticUuid(x: number, y: number): string {
 
 /**
  * Locate a tappable point from NL instruction using Stark + current screen via MCP.
+ * When `existingScreenshot` is provided, reuses it instead of capturing a new one
+ * (avoids a redundant MCP round-trip when a screenshot was already taken this step).
  */
 export async function starkLocateTapTarget(
   mcp: MCPClient,
-  instruction: string
+  instruction: string,
+  existingScreenshot?: string | null
 ): Promise<StarkLocateResult & { syntheticUuid: string }> {
   const apiKey = getStarkVisionApiKey();
   if (!apiKey) {
@@ -85,7 +88,7 @@ export async function starkLocateTapTarget(
     );
   }
 
-  const imageBase64 = await captureScreenshotBase64(mcp);
+  const imageBase64 = existingScreenshot || await captureScreenshotBase64(mcp);
   if (!imageBase64) {
     throw new Error("Stark vision: could not capture screenshot via MCP");
   }

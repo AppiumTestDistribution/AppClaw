@@ -101,6 +101,30 @@ async function promptPlatform(): Promise<Platform> {
   });
 }
 
+/**
+ * Inline platform prompt for the interactive goal screen.
+ * Returns the selected platform, or null if only one option (auto-selects android).
+ */
+export async function promptPlatformInline(): Promise<Platform | null> {
+  if (!canPrompt()) return null;
+
+  const items: { label: string; value: Platform }[] = [
+    { label: "Android", value: "android" },
+  ];
+
+  if (isMacOS()) {
+    items.push({ label: "iOS", value: "ios" });
+  }
+
+  // Only one option — no need to prompt
+  if (items.length === 1) return null;
+
+  return interactivePicker(items, {
+    prompt: "Select platform:",
+    searchable: false,
+  });
+}
+
 /** Interactive device type prompt (simulator vs real) */
 async function promptDeviceType(): Promise<DeviceType> {
   return interactivePicker(

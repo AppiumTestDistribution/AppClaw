@@ -34,7 +34,8 @@ function logMCP(name: string, args: Record<string, unknown>, result: MCPToolResu
   }
 }
 
-export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
+/** Build the underlying MCP Client + connect transport */
+async function connectClient(config: MCPConfig): Promise<Client> {
   const client = new Client({ name: "appclaw", version: "0.1.0" });
 
   if (config.transport === "stdio") {
@@ -79,6 +80,11 @@ export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
     await client.connect(transport);
   }
 
+  return client;
+}
+
+/** Wrap a raw Client into our MCPClient interface */
+function wrapClient(client: Client): MCPClient {
   return {
     async callTool(name: string, args: Record<string, unknown>): Promise<MCPToolResult> {
       const t0 = mcpDebug ? performance.now() : 0;
@@ -99,6 +105,77 @@ export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
 
     async close(): Promise<void> {
       await client.close();
+    },
+  };
+}
+
+/** Create a standalone MCP client (one connection, one owner). */
+export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
+  const client = await connectClient(config);
+  return wrapClient(client);
+}
+
+// ─── Shared MCP client with reference counting ───────────────────
+// Allows multiple parallel flows to share one appium-mcp server.
+
+/** Config key for deduplication */
+function configKey(config: MCPConfig): string {
+  return `${config.transport}:${config.host}:${config.port}`;
+}
+
+interface SharedEntry {
+  client: Client;
+  refCount: number;
+  /** The promise used for initial connection (for dedup of concurrent acquires) */
+  connectPromise: Promise<Client>;
+}
+
+const sharedClients = new Map<string, SharedEntry>();
+
+/**
+ * Acquire a shared MCP client. Multiple callers with the same config
+ * will share a single underlying connection + appium-mcp process.
+ *
+ * Call `release()` on the returned handle when done. The underlying
+ * connection is closed only when the last handle is released.
+ */
+export async function acquireSharedMCPClient(
+  config: MCPConfig,
+): Promise<MCPClient & { release(): Promise<void> }> {
+  const key = configKey(config);
+  let entry = sharedClients.get(key);
+
+  if (!entry) {
+    // First caller — start connecting
+    const connectPromise = connectClient(config);
+    entry = {
+      client: undefined as unknown as Client, // filled after await
+      refCount: 0,
+      connectPromise,
+    };
+    sharedClients.set(key, entry);
+    entry.client = await connectPromise;
+  } else {
+    // Connection may still be in progress from a concurrent acquire
+    await entry.connectPromise;
+  }
+
+  entry.refCount++;
+  const wrapped = wrapClient(entry.client);
+
+  return {
+    callTool: wrapped.callTool,
+    listTools: wrapped.listTools,
+    // close() on shared clients is a no-op — use release() instead
+    async close() { /* no-op for shared clients */ },
+    async release() {
+      const e = sharedClients.get(key);
+      if (!e) return;
+      e.refCount--;
+      if (e.refCount <= 0) {
+        sharedClients.delete(key);
+        await e.client.close();
+      }
     },
   };
 }

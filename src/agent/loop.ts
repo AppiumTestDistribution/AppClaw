@@ -23,6 +23,7 @@ import { tapAtCoordinates, isAIElement, parseAIElementCoords } from "./element-f
 import { findElementByVision, scaleAIElementUuid } from "../mcp/tools.js";
 import { Config } from "../config.js";
 import { isVisionLocateEnabled } from "../vision/locate-enabled.js";
+import { getCachedScreenSize } from "../vision/window-size.js";
 import type { ActionRecorder } from "../recording/recorder.js";
 import type { AppResolver } from "./app-resolver.js";
 import { preprocessAction, resolveAppId } from "./preprocessor.js";
@@ -74,6 +75,8 @@ export interface StepEvent {
   decision: ToolCallDecision;
   result: ActionResult;
   elementsCount: number;
+  /** Base64 screenshot taken after the action (for IDE streaming) */
+  screenshot?: string;
 }
 
 export interface AgentResult {
@@ -554,7 +557,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     let result: ActionResult;
 
     if (isMetaTool(decision.toolName)) {
-      result = await executeMetaTool(mcp, decision, appResolver, deviceUdid, detectedPlatform);
+      result = await executeMetaTool(mcp, decision, appResolver, deviceUdid, detectedPlatform, screenshotForLLM);
     } else {
       // Forward directly to MCP — appium tools, skills, everything
       result = await executeMCPTool(mcp, decision);
@@ -701,7 +704,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
     recorder?.record(step, decision as any, screen.filtered, lastResult);
 
-    onStep?.({ step, decision, result, elementsCount: screen.elementCount });
+    onStep?.({ step, decision, result, elementsCount: screen.elementCount, screenshot: postActionScreenshot });
   }
 
   ui.printGoalFailed(`Max steps (${maxSteps}) reached`);
@@ -739,8 +742,37 @@ async function executeMetaTool(
   decision: ToolCallDecision,
   appResolver?: AppResolver,
   deviceUdid?: string | null,
-  platform: "android" | "ios" = "android"
+  platform: "android" | "ios" = "android",
+  /** Reusable screenshot from the current step (avoids redundant capture in vision locate) */
+  currentScreenshot?: string
 ): Promise<ActionResult> {
+  /**
+   * Scale LLM-provided 0-1000 normalized coordinates to device space.
+   * Uses the same scaleCoordinates() from df-vision that the playground uses —
+   * guarantees identical coordinate handling across both paths.
+   *
+   * Note: df-vision convention is [y, x] order for coordinates.
+   */
+  async function scaleLLMCoords(tapX: number, tapY: number): Promise<{ x: number; y: number }> {
+    const deviceSize = getCachedScreenSize();
+    if (!deviceSize) {
+      // Fallback: no device size, can't scale — return as-is (will likely miss)
+      return { x: Math.round(tapX), y: Math.round(tapY) };
+    }
+    try {
+      const starkVision = (await import("df-vision")).default;
+      // scaleCoordinates expects [y, x] in 0-1000 normalized space
+      const bbox = starkVision.scaleCoordinates([tapY, tapX] as [number, number], deviceSize);
+      return { x: Math.round(bbox.center.x), y: Math.round(bbox.center.y) };
+    } catch {
+      // df-vision unavailable — simple fallback
+      return {
+        x: Math.round((tapX / 1000) * deviceSize.width),
+        y: Math.round((tapY / 1000) * deviceSize.height),
+      };
+    }
+  }
+
   try {
     const args = decision.args;
 
@@ -751,13 +783,29 @@ async function executeMetaTool(
         const strategy = isVisionMode ? "ai_instruction" : args.strategy as string;
         const selector = args.selector as string;
         const bounds = args.bounds as string | undefined;
+        const tapX = args.tapX as number | undefined;
+        const tapY = args.tapY as number | undefined;
         const attempts: string[] = [];
 
         if (isVisionMode) {
           // ══ VISION MODE: AI vision only, no DOM locators ══
+
+          // Fast path: LLM provided 0-1000 normalized coordinates — skip vision locate entirely
+          // Uses same scaleCoordinates() from df-vision as the playground
+          if (tapX != null && tapY != null) {
+            const scaled = await scaleLLMCoords(tapX, tapY);
+            const tapped = await tapAtCoordinates(mcp, scaled.x, scaled.y);
+            if (tapped) {
+              if (mcpDebug) console.log(`        [fast-tap] LLM (${Math.round(tapX)},${Math.round(tapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`);
+              return { success: true, message: `Clicked "${selector.slice(0, 60)}" via LLM coordinates at [${scaled.x},${scaled.y}]` };
+            }
+            attempts.push(`llm_coords [${scaled.x},${scaled.y}]: tap failed`);
+            // Fall through to vision locate as backup
+          }
+
           if (isVisionLocateEnabled()) {
             try {
-              const visionUuid = await findElementByVision(mcp, selector);
+              const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
               // Pass the UUID (ai-element: or standard) directly to appium_click
               // appium-mcp handles ai-element: UUIDs natively with coordinate tapping
               const clickResult = await mcp.callTool("appium_click", { elementUUID: visionUuid });
@@ -828,7 +876,7 @@ async function executeMetaTool(
         // Strategy 3: AI Vision fallback
         if (isVisionLocateEnabled()) {
           try {
-            const visionUuid = await findElementByVision(mcp, selector);
+            const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
             const clickResult = await mcp.callTool("appium_click", { elementUUID: visionUuid });
             if (!isMCPError(clickResult)) {
               const coords = parseAIElementCoords(visionUuid);
@@ -865,15 +913,28 @@ async function executeMetaTool(
         const selector = args.selector as string;
         const text = (args.text as string) ?? "";
         const typeBounds = args.bounds as string | undefined;
+        const typeTapX = args.tapX as number | undefined;
+        const typeTapY = args.tapY as number | undefined;
 
         let uuid: string | null = null;
         let tappedViaVision = false;
 
         if (isVisionModeType) {
           // ══ VISION MODE: AI vision only ══
-          if (isVisionLocateEnabled()) {
+
+          // Fast path: LLM provided 0-1000 normalized coordinates — skip vision locate
+          if (typeTapX != null && typeTapY != null) {
+            const scaled = await scaleLLMCoords(typeTapX, typeTapY);
+            const tapped = await tapAtCoordinates(mcp, scaled.x, scaled.y);
+            if (tapped) {
+              tappedViaVision = true;
+              if (mcpDebug) console.log(`        [fast-tap] LLM (${Math.round(typeTapX)},${Math.round(typeTapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`);
+            }
+          }
+
+          if (!tappedViaVision && isVisionLocateEnabled()) {
             try {
-              const visionUuid = await findElementByVision(mcp, selector);
+              const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
               // Use appium_click which natively handles ai-element: UUIDs
               const clickResult = await mcp.callTool("appium_click", { elementUUID: visionUuid });
               if (!isMCPError(clickResult)) {
@@ -898,7 +959,7 @@ async function executeMetaTool(
           // Vision fallback in DOM mode
           if (!uuid && isVisionLocateEnabled()) {
             try {
-              const visionUuid = await findElementByVision(mcp, selector);
+              const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
               const clickResult = await mcp.callTool("appium_click", { elementUUID: visionUuid });
               if (!isMCPError(clickResult)) {
                 tappedViaVision = true;

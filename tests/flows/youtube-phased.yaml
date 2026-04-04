@@ -1,0 +1,19 @@
+name: YouTube Search
+description: Searches YouTube and verifies video results
+platform: android
+env: dev
+---
+setup:
+  - open ${variables.app_name} app
+  - wait until search icon is visible
+
+steps:
+  - click on search icon
+  - type '${secrets.search_query}'
+  - wait 3s
+  - click on the first result from the list
+  - wait for the search results to be visible
+  - scroll down
+
+assertions:
+  - verify ${variables.expected_channel} is visible

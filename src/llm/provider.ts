@@ -121,13 +121,22 @@ function buildMetaTools(agentMode: "dom" | "vision"): Record<string, Tool> {
     description:
       "Tap something on screen using AI vision (screenshot). " +
       "Describe what you SEE in plain language — visible text, icon shape, color, position. " +
-      "Do NOT use xpath, resource IDs, XML, or accessibility ids; vision cannot parse those reliably.",
+      "Do NOT use xpath, resource IDs, XML, or accessibility ids; vision cannot parse those reliably. " +
+      "If you can estimate the tap location, provide tapX and tapY (normalized 0-1000) to skip the vision-locate step and speed up execution.",
     inputSchema: z.object({
       selector: z
         .string()
         .describe(
           "Plain-language target, e.g. first video titled Appium 3.0, red Subscribe button, magnifying glass search icon top right"
         ),
+      tapY: z
+        .number()
+        .optional()
+        .describe("Estimated Y position in normalized 0-1000 scale (0=top, 1000=bottom)"),
+      tapX: z
+        .number()
+        .optional()
+        .describe("Estimated X position in normalized 0-1000 scale (0=left, 1000=right)"),
       bounds: z
         .string()
         .optional()
@@ -138,12 +147,21 @@ function buildMetaTools(agentMode: "dom" | "vision"): Record<string, Tool> {
   const findAndTypeVision = tool({
     description:
       "Focus an input using AI vision, then type. Describe the field in plain language from the screenshot. " +
-      "Do NOT use xpath or resource IDs. After typing, check the next screenshot for suggestions before calling done.",
+      "Do NOT use xpath or resource IDs. After typing, check the next screenshot for suggestions before calling done. " +
+      "If you can estimate the field location, provide tapX and tapY (normalized 0-1000) to skip the vision-locate step.",
     inputSchema: z.object({
       selector: z
         .string()
         .describe("Plain-language field, e.g. search bar at top with hint Search YouTube, email text field"),
       text: z.string().describe("Text to type"),
+      tapY: z
+        .number()
+        .optional()
+        .describe("Estimated Y position in normalized 0-1000 scale (0=top, 1000=bottom)"),
+      tapX: z
+        .number()
+        .optional()
+        .describe("Estimated X position in normalized 0-1000 scale (0=left, 1000=right)"),
       bounds: z
         .string()
         .optional()
@@ -420,6 +438,7 @@ export function createLLMProvider(
           args: (toolArgs ?? {}) as Record<string, unknown>,
           reasoning: reasoningText || undefined,
           usage,
+
         };
       }
 

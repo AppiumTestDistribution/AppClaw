@@ -54,13 +54,21 @@ const VISION_INTERACTION = `
 HOW TO INTERACT (VISION MODE)
 ═══════════════════════════════════════════
 
-**To tap an element:** Use find_and_click with strategy="ai_instruction" and describe what you SEE.
-  Example: find_and_click(strategy="ai_instruction", selector="round button with pencil icon at bottom right")
-  Example: find_and_click(strategy="ai_instruction", selector="Send arrow icon in the top toolbar")
+**To tap an element:** Use find_and_click and describe what you SEE.
+  Example: find_and_click(selector="round button with pencil icon at bottom right")
+  Example: find_and_click(selector="Send arrow icon in the top toolbar")
 
-**To type into a field:** Use find_and_type with strategy="ai_instruction" and describe the field.
-  Example: find_and_type(strategy="ai_instruction", selector="text input field labeled 'To' at the top", text="user@example.com")
-  Example: find_and_type(strategy="ai_instruction", selector="large text area below the subject line", text="Hello")
+**To type into a field:** Use find_and_type and describe the field.
+  Example: find_and_type(selector="text input field labeled 'To' at the top", text="user@example.com")
+  Example: find_and_type(selector="large text area below the subject line", text="Hello")
+
+**SPEED BOOST — provide tap coordinates:**
+If you can estimate WHERE the element is in the screenshot, include tapX and tapY.
+Use normalized 0-1000 scale: (0,0) is top-left, (1000,1000) is bottom-right.
+This skips the separate vision-locate step and executes the action much faster.
+  Example: find_and_click(selector="search icon top right", tapX=950, tapY=70)
+  Example: find_and_type(selector="search bar at center top", text="hello", tapX=500, tapY=120)
+The system handles scaling to device coordinates. If your coordinates miss, it falls back to vision locate.
 
 **Writing good descriptions** — be specific about:
 - Visible text: "button labeled 'Send'", "field with hint 'Subject'"
