@@ -1177,14 +1177,6 @@
             </tbody>
           </table>
 
-          <h3>Vision Locate Provider <code>VISION_LOCATE_PROVIDER</code></h3>
-          <table class="cmd-table">
-            <thead><tr><th>Value</th><th>Behavior</th></tr></thead>
-            <tbody>
-              <tr><td>appium_mcp</td><td>Default. Uses appium-mcp's AI-powered element finding.</td></tr>
-              <tr><td>stark</td><td>Uses Stark Vision (screenshot + Gemini API) for in-process coordinate detection.</td></tr>
-            </tbody>
-          </table>
         </section>
 
         <section id="env-vars" class="reveal">
@@ -1221,10 +1213,7 @@
             <tbody>
               <tr><td>VISION_MODE</td><td><code>always</code>, <code>fallback</code>, or <code>never</code></td></tr>
               <tr><td>AGENT_MODE</td><td><code>dom</code> or <code>vision</code></td></tr>
-              <tr><td>VISION_LOCATE_PROVIDER</td><td><code>appium_mcp</code> or <code>stark</code></td></tr>
-              <tr><td>STARK_VISION_API_KEY</td><td>Gemini API key for Stark vision</td></tr>
-              <tr><td>GEMINI_API_KEY</td><td>Fallback Gemini key</td></tr>
-              <tr><td>STARK_VISION_MODEL</td><td>Model for vision (default: gemini-2.0-flash)</td></tr>
+              <tr><td>GEMINI_API_KEY</td><td>Gemini API key for Stark vision — only needed when <code>LLM_PROVIDER</code> is not <code>gemini</code> and <code>AGENT_MODE=vision</code>. If provider is already Gemini, <code>LLM_API_KEY</code> is reused automatically.</td></tr>
             </tbody>
           </table>
 

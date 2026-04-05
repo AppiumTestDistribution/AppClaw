@@ -66,7 +66,7 @@ cp .env.example .env
 Edit `.env` based on your preferred mode:
 
 <details>
-<summary><strong>Vision + Stark (recommended)</strong></summary>
+<summary><strong>Vision mode (recommended)</strong></summary>
 
 Screenshot-first mode using Stark (df-vision + Gemini) for element location. Requires a Gemini API key.
 
@@ -75,26 +75,6 @@ LLM_PROVIDER=gemini
 LLM_API_KEY=your-gemini-api-key
 LLM_MODEL=gemini-3.1-flash-lite-preview
 AGENT_MODE=vision
-VISION_LOCATE_PROVIDER=stark
-```
-
-</details>
-
-<details>
-<summary><strong>Vision + Appium MCP</strong></summary>
-
-Screenshot-first mode using appium-mcp's server-side AI vision for element location. See [appium-mcp AI Vision setup](https://github.com/appium/appium-mcp?tab=readme-ov-file#ai-vision-element-finding) for details.
-
-```env
-LLM_PROVIDER=gemini
-LLM_API_KEY=your-gemini-api-key
-LLM_MODEL=gemini-3.1-flash-lite-preview
-AGENT_MODE=vision
-VISION_LOCATE_PROVIDER=appium_mcp
-AI_VISION_ENABLED=true
-AI_VISION_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-AI_VISION_API_KEY=your-vision-api-key
-AI_VISION_MODEL=gemini-2.0-flash
 ```
 
 </details>
@@ -263,9 +243,8 @@ All configuration is via `.env`:
 | **LLM** | | |
 | `LLM_PROVIDER` | `gemini` | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`) |
 | `LLM_API_KEY` | — | API key for your provider |
-| `LLM_MODEL` | (auto) | Model override (e.g. `gemini-2.0-flash`, `claude-sonnet-4-20250514`) |
+| `LLM_MODEL` | (auto) | Model override (e.g. `gemini-3.1-flash-lite-preview`, `claude-sonnet-4-20250514`) |
 | `AGENT_MODE` | `vision` | `dom` (XML locators) or `vision` (screenshot-first) |
-| `VISION_LOCATE_PROVIDER` | `stark` | Vision backend for locating elements (`stark` or `appium_mcp`) |
 | **Agent** | | |
 | `MAX_STEPS` | `30` | Max steps per goal |
 | `STEP_DELAY` | `500` | Milliseconds between steps |

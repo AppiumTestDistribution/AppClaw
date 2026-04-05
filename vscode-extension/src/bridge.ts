@@ -121,23 +121,15 @@ export function getEnvFromSettings(): Record<string, string> {
   // ── Agent mode + vision settings ─────────────────────────
   const agentMode = config.get<string>("agentMode", "vision");
   const visionMode = config.get<string>("visionMode", "fallback");
-  const visionLocateProvider = config.get<string>("visionLocateProvider", "stark");
 
   env.AGENT_MODE = agentMode;
 
   if (agentMode === "vision") {
-    // Vision mode: always use vision, set the locate provider
+    // Vision mode: always use vision (Stark)
     env.VISION_MODE = "always";
-    env.VISION_LOCATE_PROVIDER = visionLocateProvider;
-    if (visionLocateProvider === "appium_mcp") {
-      env.AI_VISION_ENABLED = "true";
-    }
   } else {
     // DOM mode: respect user's visionMode choice
     env.VISION_MODE = visionMode;
-    if (visionMode === "fallback") {
-      env.AI_VISION_ENABLED = "true";
-    }
   }
 
   // ── Direct setting → env var mappings ───────────────────
@@ -146,14 +138,8 @@ export function getEnvFromSettings(): Record<string, string> {
     llmProvider: "LLM_PROVIDER",
     llmApiKey: "LLM_API_KEY",
     llmModel: "LLM_MODEL",
-    // Stark Vision
+    // Vision (Gemini key for Stark when provider ≠ gemini)
     geminiApiKey: "GEMINI_API_KEY",
-    starkVisionModel: "STARK_VISION_MODEL",
-    // AI Vision (Appium MCP / DOM fallback)
-    aiVisionApiBaseUrl: "AI_VISION_API_BASE_URL",
-    aiVisionApiKey: "AI_VISION_API_KEY",
-    aiVisionModel: "AI_VISION_MODEL",
-    aiVisionCoordType: "AI_VISION_COORD_TYPE",
     // Device
     platform: "PLATFORM",
     deviceType: "DEVICE_TYPE",

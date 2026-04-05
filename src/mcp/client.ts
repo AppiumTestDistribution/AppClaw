@@ -46,7 +46,8 @@ async function connectClient(config: MCPConfig): Promise<Client> {
 
     const transport = new StdioClientTransport({
       command: "npx",
-      args: ["appium-mcp@latest"],
+      // --yes: auto-confirm installation without prompting (avoids consuming MCP stdin as "y/n" answer)
+      args: ["--yes", "appium-mcp@1.44.0"],
       env: {
         ...process.env,
         ANDROID_HOME: androidHome,
@@ -63,17 +64,32 @@ async function connectClient(config: MCPConfig): Promise<Client> {
       stderr: "pipe",
     });
 
-    // Log appium-mcp stderr for debugging (especially AI vision errors)
+    // Buffer stderr — log live in debug mode, attach to error on failure so root cause is visible
+    const stderrLines: string[] = [];
     if (transport.stderr) {
       transport.stderr.on("data", (data: Buffer) => {
         const msg = data.toString().trim();
-        if (msg && mcpDebug) {
+        if (!msg) return;
+        // Filter npm install noise so only real appium-mcp output remains
+        if (!msg.startsWith("npm warn") && !msg.startsWith("npm notice")) {
+          stderrLines.push(msg);
+        }
+        if (mcpDebug) {
           console.error(`  ${theme.dim("[appium-mcp]")} ${theme.dim(msg)}`);
         }
       });
     }
 
-    await client.connect(transport);
+    try {
+      await client.connect(transport);
+    } catch (err: any) {
+      if (stderrLines.length > 0) {
+        const detail = stderrLines.join("\n");
+        err.mcpStderr = detail;
+        err.message = `${err.message}\n\nappium-mcp output:\n${detail}`;
+      }
+      throw err;
+    }
   } else {
     const url = new URL(`http://${config.host}:${config.port}/sse`);
     const transport = new SSEClientTransport(url);

@@ -180,19 +180,6 @@
               "Disable vision entirely — DOM only, no screenshots"
             ],
             "markdownDescription": "**When to use AI vision.**\n\n- **always** — every step uses a screenshot _(auto-set when Agent Mode = vision)_\n- **fallback** — vision kicks in only when DOM interaction fails _(default for DOM mode)_\n- **never** — pure DOM mode, no screenshots taken"
-          },
-          "appclaw.visionLocateProvider": {
-            "type": "string",
-            "default": "stark",
-            "enum": [
-              "stark",
-              "appium_mcp"
-            ],
-            "enumDescriptions": [
-              "Stark (df-vision + Gemini) — fastest, most accurate. Only needs a Gemini API key.",
-              "Appium MCP server-side AI vision — uses OpenAI-compatible vision API for element location."
-            ],
-            "markdownDescription": "**Vision element-location strategy.** _Only used when Agent Mode = vision._\n\n- **stark** _(recommended)_ — uses Gemini for element location. Just set a Gemini API key.\n- **appium_mcp** — uses Appium MCP's server-side AI vision. Requires AI Vision API config below."
           }
         }
       },
@@ -210,67 +197,28 @@
               "groq",
               "ollama"
             ],
-            "markdownDescription": "LLM provider for the AI agent reasoning. **Gemini recommended** for best vision support."
+            "markdownDescription": "LLM provider for agent reasoning. **Gemini recommended** — required for vision mode."
           },
           "appclaw.llmApiKey": {
             "type": "string",
             "default": "",
-            "markdownDescription": "API key for the chosen LLM provider. _Also used as fallback for vision API keys when using Gemini._"
+            "markdownDescription": "API key for the chosen LLM provider. _If provider is Gemini, this key is also reused for Stark vision automatically._"
           },
           "appclaw.llmModel": {
             "type": "string",
             "default": "",
-            "markdownDescription": "Model name override. Leave empty for provider default (e.g. `gemini-2.5-flash` for Gemini)."
+            "markdownDescription": "Model name override. Leave empty for the provider default (e.g. `gemini-3.1-flash-lite-preview` for Gemini)."
           }
         }
       },
       {
-        "title": "Stark Vision",
+        "title": "Vision",
         "order": 2,
         "properties": {
           "appclaw.geminiApiKey": {
             "type": "string",
             "default": "",
-            "markdownDescription": "Gemini API key for Stark vision.\n\n💡 **Tip:** If LLM Provider is `gemini`, you can leave this empty — Stark will reuse the LLM API Key automatically. Only set this if you want a separate key for vision.\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `stark`"
-          },
-          "appclaw.starkVisionModel": {
-            "type": "string",
-            "default": "",
-            "markdownDescription": "Model for Stark vision (empty = auto-select, e.g. `gemini-2.5-flash`).\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `stark`"
-          }
-        }
-      },
-      {
-        "title": "AI Vision (Appium MCP)",
-        "order": 3,
-        "properties": {
-          "appclaw.aiVisionApiBaseUrl": {
-            "type": "string",
-            "default": "",
-            "markdownDescription": "AI Vision API base URL.\n\nExample: `https://generativelanguage.googleapis.com/v1beta/openai`\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `appium_mcp`, **or** Agent Mode = `dom` + Vision Mode = `fallback`"
-          },
-          "appclaw.aiVisionApiKey": {
-            "type": "string",
-            "default": "",
-            "markdownDescription": "API key for the AI Vision endpoint.\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `appium_mcp`, **or** Agent Mode = `dom` + Vision Mode = `fallback`"
-          },
-          "appclaw.aiVisionModel": {
-            "type": "string",
-            "default": "",
-            "markdownDescription": "AI Vision model name (e.g. `gemini-2.5-flash`).\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `appium_mcp`, **or** Agent Mode = `dom` + Vision Mode = `fallback`"
-          },
-          "appclaw.aiVisionCoordType": {
-            "type": "string",
-            "default": "absolute",
-            "enum": [
-              "normalized",
-              "absolute"
-            ],
-            "enumDescriptions": [
-              "Coordinates as 0-1 fractions of screen dimensions",
-              "Coordinates as absolute pixel values (recommended for Gemini)"
-            ],
-            "markdownDescription": "Coordinate format returned by the AI Vision model.\n\n- **absolute** _(recommended for Gemini)_ — pixel coordinates\n- **normalized** — 0–1 fractions\n\n⚙️ **Used when:** Agent Mode = `vision` + Provider = `appium_mcp`, **or** Agent Mode = `dom` + Vision Mode = `fallback`"
+            "markdownDescription": "Gemini API key for Stark vision. **Only required when LLM Provider is not Gemini and Agent Mode is `vision`.** If provider is already Gemini, the LLM API Key is reused automatically."
           }
         }
       },

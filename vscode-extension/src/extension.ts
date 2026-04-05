@@ -453,87 +453,30 @@ export function activate(context: vscode.ExtensionContext): void {
   // ── Setting-change hints ──────────────────────────────────
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("appclaw.visionLocateProvider")) {
-        const mode = vscode.workspace
-          .getConfiguration("appclaw")
-          .get<string>("visionLocateProvider", "stark");
-        if (mode === "appium_mcp") {
-          vscode.window
-            .showInformationMessage(
-              "Appium MCP vision requires AI Vision settings (API URL, key, model). Configure them now?",
-              "Open AI Vision Settings"
-            )
-            .then((choice) => {
-              if (choice) {
-                vscode.commands.executeCommand(
-                  "workbench.action.openSettings",
-                  "appclaw.aiVision"
-                );
-              }
-            });
-        }
-      }
       if (e.affectsConfiguration("appclaw.agentMode")) {
         const config = vscode.workspace.getConfiguration("appclaw");
         const agentMode = config.get<string>("agentMode", "vision");
         if (agentMode === "vision") {
-          const provider = config.get<string>("visionLocateProvider", "stark");
-          if (provider === "stark") {
-            const llmProvider = config.get<string>("llmProvider", "gemini");
-            if (llmProvider === "gemini") {
-              vscode.window.showInformationMessage(
-                "Vision + Stark enabled. Since LLM Provider is Gemini, your LLM API Key will be reused for Stark vision automatically — no extra config needed."
-              );
-            } else {
-              vscode.window
-                .showInformationMessage(
-                  "Vision + Stark enabled. Set a Gemini API Key for Stark vision.",
-                  "Open Stark Vision Settings"
-                )
-                .then((choice) => {
-                  if (choice) {
-                    vscode.commands.executeCommand(
-                      "workbench.action.openSettings",
-                      "appclaw.gemini"
-                    );
-                  }
-                });
-            }
+          const llmProvider = config.get<string>("llmProvider", "gemini");
+          if (llmProvider === "gemini") {
+            vscode.window.showInformationMessage(
+              "Vision mode enabled. Your LLM API Key will be reused for Stark vision automatically."
+            );
           } else {
             vscode.window
               .showInformationMessage(
-                "Vision + Appium MCP enabled. Configure AI Vision settings (API URL, key, model).",
-                "Open AI Vision Settings"
+                "Vision mode enabled. Set a Gemini API Key under Vision settings for Stark vision.",
+                "Open Vision Settings"
               )
               .then((choice) => {
                 if (choice) {
                   vscode.commands.executeCommand(
                     "workbench.action.openSettings",
-                    "appclaw.aiVision"
+                    "appclaw.geminiApiKey"
                   );
                 }
               });
           }
-        }
-      }
-      if (e.affectsConfiguration("appclaw.visionMode")) {
-        const config = vscode.workspace.getConfiguration("appclaw");
-        const visionMode = config.get<string>("visionMode", "fallback");
-        const agentMode = config.get<string>("agentMode", "vision");
-        if (agentMode === "dom" && visionMode === "fallback") {
-          vscode.window
-            .showInformationMessage(
-              "Vision fallback requires AI Vision settings (API URL, key, model). Configure them now?",
-              "Open AI Vision Settings"
-            )
-            .then((choice) => {
-              if (choice) {
-                vscode.commands.executeCommand(
-                  "workbench.action.openSettings",
-                  "appclaw.aiVision"
-                );
-              }
-            });
         }
       }
     })

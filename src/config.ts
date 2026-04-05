@@ -2,7 +2,7 @@ import "dotenv/config";
 import { z } from "zod";
 
 const envSchema = z.object({
-  LLM_PROVIDER: z.enum(["anthropic", "openai", "gemini", "groq", "ollama"]).default("anthropic"),
+  LLM_PROVIDER: z.enum(["anthropic", "openai", "gemini", "groq", "ollama"]).default("gemini"),
   LLM_API_KEY: z.string().default(""),
   LLM_MODEL: z.string().default(""),
 
@@ -42,13 +42,6 @@ const envSchema = z.object({
   VISION_MODE: z.enum(["always", "fallback", "never"]).default("fallback"),
   LOG_DIR: z.string().default("logs"),
 
-  /**
-   * Where natural-language visual locate resolves to coordinates.
-   * - stark: df-vision + Gemini (screenshot in-process; tap via appium-mcp).
-   * - appium_mcp: appium_find_element with strategy ai_instruction (MCP server vision).
-   */
-  VISION_LOCATE_PROVIDER: z.enum(["stark", "appium_mcp"]).default("appium_mcp"),
-
   /** Gemini API key for Stark vision (optional if GEMINI_API_KEY is set). */
   STARK_VISION_API_KEY: z.string().default(""),
 
@@ -64,20 +57,13 @@ const envSchema = z.object({
   AGENT_MODE: z.enum(["dom", "vision"]).default("dom"),
 
   /**
-   * Log which vision backend is used for each NL locate (`[vision-locate] stark-vision | …` or `mcp vision | …`).
+   * Log Stark vision locate calls (`[vision-locate] stark-vision | …`).
    * Set to false to silence.
    */
   VISION_LOCATE_LOG: z.enum(["true", "false"]).default("true").transform(v => v === "true"),
 
   /** Per-step and run summary: token counts and estimated cost in the terminal. Set true to show. */
   SHOW_TOKEN_USAGE: z.enum(["true", "false"]).default("false").transform(v => v === "true"),
-
-  /** AI Vision via appium-mcp ai_instruction (when VISION_LOCATE_PROVIDER=appium_mcp) */
-  AI_VISION_ENABLED: z.enum(["true", "false"]).default("false").transform(v => v === "true"),
-  AI_VISION_API_BASE_URL: z.string().default(""),
-  AI_VISION_API_KEY: z.string().default(""),
-  AI_VISION_MODEL: z.string().default(""),
-  AI_VISION_COORD_TYPE: z.enum(["normalized", "absolute"]).default("normalized"),
 
   /** Enable extended thinking/reasoning for supported providers (anthropic, gemini, openai) */
   LLM_THINKING: z.enum(["on", "off"]).default("on"),

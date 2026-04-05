@@ -77,7 +77,7 @@ export async function starkLocateTapTarget(
 ): Promise<StarkLocateResult & { syntheticUuid: string }> {
   const apiKey = getStarkVisionApiKey();
   if (!apiKey) {
-    throw new Error("Stark vision requires STARK_VISION_API_KEY or GEMINI_API_KEY");
+    throw new Error("Stark vision requires LLM_API_KEY (Gemini)");
   }
 
   const trimmed = instruction.trim();

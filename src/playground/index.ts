@@ -601,7 +601,6 @@ async function connectToDevice(): Promise<boolean> {
       cliDeviceName: _deviceArgs.deviceName ?? null,
       config,
     });
-
     _resolvedPlatform = deviceResult.platform;
 
     // Auto-set platform in flow metadata so exported YAML includes it
@@ -968,7 +967,7 @@ async function handleGetInfo(query: string): Promise<string | null> {
     const apiKey = getStarkVisionApiKey();
     if (!apiKey) {
       ui.stopSpinner();
-      console.log(`  ${theme.error("✗")} getInfo requires STARK_VISION_API_KEY or GEMINI_API_KEY`);
+      console.log(`  ${theme.error("✗")} getInfo requires LLM_API_KEY (Gemini)`);
       return null;
     }
 

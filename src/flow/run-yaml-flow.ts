@@ -853,7 +853,7 @@ export async function executeStep(
     case "getInfo": {
       const infoApiKey = getStarkVisionApiKey();
       if (!infoApiKey) {
-        return { success: false, message: "getInfo requires STARK_VISION_API_KEY or GEMINI_API_KEY" };
+        return { success: false, message: "getInfo requires LLM_API_KEY (Gemini)" };
       }
       const infoImage = await screenshot(mcp);
       if (!infoImage) {
