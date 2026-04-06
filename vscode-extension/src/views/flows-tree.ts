@@ -33,8 +33,10 @@ export class FlowsTreeProvider
       try {
         const doc = await vscode.workspace.openTextDocument(uri);
         const text = doc.getText(new vscode.Range(0, 0, 30, 0)); // read first 30 lines
-        if (text.includes("steps:")) {
-          flowFiles.push(new FlowItem(uri));
+        const isSuite = text.includes("flows:");
+        const isFlow = text.includes("steps:");
+        if (isSuite || isFlow) {
+          flowFiles.push(new FlowItem(uri, isSuite));
         }
       } catch {
         // skip unreadable files
@@ -54,14 +56,14 @@ export class FlowsTreeProvider
 }
 
 class FlowItem extends vscode.TreeItem {
-  constructor(public readonly uri: vscode.Uri) {
+  constructor(public readonly uri: vscode.Uri, isSuite = false) {
     const relativePath = vscode.workspace.asRelativePath(uri);
     super(path.basename(uri.fsPath), vscode.TreeItemCollapsibleState.None);
 
     this.description = path.dirname(relativePath);
-    this.iconPath = new vscode.ThemeIcon("file");
-    this.tooltip = relativePath;
-    this.contextValue = "flowFile";
+    this.iconPath = new vscode.ThemeIcon(isSuite ? "list-flat" : "file");
+    this.tooltip = relativePath + (isSuite ? " (suite)" : "");
+    this.contextValue = isSuite ? "suiteFile" : "flowFile";
 
     this.command = {
       command: "vscode.open",

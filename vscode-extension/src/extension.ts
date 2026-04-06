@@ -6,7 +6,9 @@
  */
 
 import * as vscode from "vscode";
-import { AppclawBridge, getEnvFromSettings, getCliCommand } from "./bridge";
+import * as path from "path";
+import * as fs from "fs";
+import { AppclawBridge, getEnvFromSettings, getCliCommand, type WorkerResult } from "./bridge";
 import { DevicePanel } from "./webview/device-panel";
 import { FlowCodeLensProvider } from "./providers/flow-codelens";
 import { FlowCompletionProvider } from "./providers/flow-completion";
@@ -16,6 +18,10 @@ import { HistoryTreeProvider } from "./views/history-tree";
 
 let bridge: AppclawBridge;
 let outputChannel: vscode.OutputChannel;
+
+/** Suite run state — persisted so "Re-run Failed" can reference it after the run finishes. */
+let lastSuiteFile: string | undefined;
+let lastFailedFlows: string[] = [];
 
 /** Format a bridge event into a human-readable log line */
 function formatEvent(event: any): string | null {
@@ -180,6 +186,84 @@ export function activate(context: vscode.ExtensionContext): void {
       timestamp: new Date(),
     });
   });
+  bridge.on("suite_done", (data) => {
+    handleSuiteOrParallelDone(data.workers as WorkerResult[] | undefined, data.passedCount, data.failedCount, data.success);
+  });
+  bridge.on("parallel_done", (data) => {
+    handleSuiteOrParallelDone(data.workers as WorkerResult[] | undefined, data.passedCount, data.failedCount, data.success);
+  });
+
+  // ─── Suite / Parallel Result Handling ────────────────
+  /**
+   * Find the YAML line for a flow file entry in a suite YAML.
+   * Matches lines like `  - flows/foo.yaml` or `  - ./flows/foo.yaml`.
+   */
+  function findSuiteFlowLine(doc: vscode.TextDocument, flowFile: string): number | undefined {
+    const base = path.basename(flowFile);
+    for (let i = 0; i < doc.lineCount; i++) {
+      const text = doc.lineAt(i).text;
+      if (/^\s*-\s+/.test(text) && (text.includes(flowFile) || text.includes(base))) {
+        return i;
+      }
+    }
+    return undefined;
+  }
+
+  async function handleSuiteOrParallelDone(
+    workers: WorkerResult[] | undefined,
+    passedCount: number,
+    failedCount: number,
+    success: boolean,
+  ) {
+    const total = passedCount + failedCount;
+    const label = success
+      ? `Suite passed: ${passedCount}/${total}`
+      : `Suite: ${passedCount}/${total} passed, ${failedCount} failed`;
+
+    // Store failed flows for re-run
+    lastFailedFlows = (workers ?? [])
+      .filter(w => !w.success && w.flowFile)
+      .map(w => w.flowFile!);
+
+    // Add to history tree
+    historyTree.addEntry({
+      goal: lastSuiteFile ? `Suite: ${path.basename(lastSuiteFile)}` : "Suite run",
+      success,
+      steps: (workers ?? []).reduce((sum, w) => sum + w.stepsExecuted, 0),
+      timestamp: new Date(),
+    });
+
+    // Apply gutter decorations to the suite YAML editor (if visible)
+    if (lastSuiteFile && workers && workers.length > 0) {
+      const editor = vscode.window.visibleTextEditors.find(
+        e => e.document.uri.fsPath === lastSuiteFile
+      );
+      if (editor) {
+        const passed: vscode.Range[] = [];
+        const failed: vscode.Range[] = [];
+        for (const w of workers) {
+          if (!w.flowFile) { continue; }
+          const lineIdx = findSuiteFlowLine(editor.document, w.flowFile);
+          if (lineIdx === undefined) { continue; }
+          const r = new vscode.Range(lineIdx, 0, lineIdx, editor.document.lineAt(lineIdx).text.length);
+          (w.success ? passed : failed).push(r);
+        }
+        editor.setDecorations(passedStepDecoration, passed);
+        editor.setDecorations(failedStepDecoration, failed);
+      }
+    }
+
+    // Show notification with action buttons
+    const actions: string[] = ["View Report"];
+    if (lastFailedFlows.length > 0) { actions.push("Re-run Failed"); }
+
+    const choice = await vscode.window.showInformationMessage(label, ...actions);
+    if (choice === "View Report") {
+      vscode.commands.executeCommand("appclaw.viewReport");
+    } else if (choice === "Re-run Failed") {
+      vscode.commands.executeCommand("appclaw.rerunFailed");
+    }
+  }
 
   // ─── Flow Step Highlighting ───────────────────────────
   /**
@@ -335,6 +419,15 @@ export function activate(context: vscode.ExtensionContext): void {
         currentGoal = `Flow: ${filePath.split("/").pop()}`;
         activeFlowFilePath = filePath;
         clearFlowDecorations();
+
+        // Detect suite YAMLs so suite_done can decorate + re-run
+        try {
+          const content = fs.readFileSync(filePath, "utf8");
+          if (/^\s*flows\s*:/m.test(content)) {
+            lastSuiteFile = filePath;
+            lastFailedFlows = [];
+          }
+        } catch { /* ignore */ }
         outputChannel.show(true);
         outputChannel.appendLine(`\n--- Running flow: ${filePath} ---`);
 
@@ -430,6 +523,34 @@ export function activate(context: vscode.ExtensionContext): void {
       await new Promise(r => setTimeout(r, 1000));
       vscode.env.openExternal(vscode.Uri.parse(`http://localhost:${port}`));
       outputChannel.appendLine(`[appclaw] Report server started on http://localhost:${port}`);
+    })
+  );
+
+  // Re-run Failed — write a temp suite YAML with only failed flows and execute it
+  context.subscriptions.push(
+    vscode.commands.registerCommand("appclaw.rerunFailed", async () => {
+      if (lastFailedFlows.length === 0) {
+        vscode.window.showWarningMessage("AppClaw: No failed flows to re-run.");
+        return;
+      }
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+      const tmpDir = path.join(workspaceRoot, ".appclaw");
+      if (!fs.existsSync(tmpDir)) { fs.mkdirSync(tmpDir, { recursive: true }); }
+      const tmpFile = path.join(tmpDir, "rerun-failed.yaml");
+
+      // Emit relative paths so the CLI resolves them from the workspace root
+      const relPaths = lastFailedFlows.map(f =>
+        path.isAbsolute(f) ? path.relative(workspaceRoot, f) : f
+      );
+      const yaml = `# Auto-generated: re-run of failed flows\nflows:\n${relPaths.map(f => `  - ${f}`).join("\n")}\n`;
+      fs.writeFileSync(tmpFile, yaml, "utf8");
+
+      lastSuiteFile = tmpFile;
+      lastFailedFlows = [];
+      outputChannel.show(true);
+      outputChannel.appendLine(`\n--- Re-running ${relPaths.length} failed flow(s) ---`);
+      bridge.runFlow(tmpFile);
     })
   );
 

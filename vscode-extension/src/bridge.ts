@@ -72,13 +72,21 @@ export interface FlowDoneEvent {
     phaseResults?: unknown[];
   };
 }
+export interface WorkerResult {
+  flowFile?: string;
+  deviceName: string;
+  success: boolean;
+  stepsExecuted: number;
+  stepsTotal: number;
+  reason?: string;
+}
 export interface ParallelDoneEvent {
   event: "parallel_done";
-  data: { success: boolean; passedCount: number; failedCount: number; reason?: string; workers?: unknown[] };
+  data: { success: boolean; passedCount: number; failedCount: number; reason?: string; workers?: WorkerResult[] };
 }
 export interface SuiteDoneEvent {
   event: "suite_done";
-  data: { success: boolean; passedCount: number; failedCount: number; reason?: string; workers?: unknown[] };
+  data: { success: boolean; passedCount: number; failedCount: number; reason?: string; workers?: WorkerResult[] };
 }
 export interface ErrorEvent {
   event: "error";

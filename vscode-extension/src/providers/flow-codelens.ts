@@ -6,6 +6,7 @@
  */
 
 import * as vscode from "vscode";
+import * as path from "path";
 
 /** Matches section keys that contain runnable steps */
 const SECTION_KEY = /^\s*(setup|steps|assertions)\s*:/;
@@ -22,15 +23,44 @@ export class FlowCodeLensProvider implements vscode.CodeLensProvider {
     _token: vscode.CancellationToken
   ): vscode.CodeLens[] {
     const text = document.getText();
-    // Only provide for YAML files that look like AppClaw flows
+    const lenses: vscode.CodeLens[] = [];
+    const topRange = new vscode.Range(0, 0, 0, 0);
+
+    // ── Suite YAML (has `flows:` key) ───────────────────────────────
+    if (/^\s*flows\s*:/m.test(text)) {
+      lenses.push(
+        new vscode.CodeLens(topRange, {
+          title: "$(play) Run Suite",
+          command: "appclaw.runFlow",
+          arguments: [document.uri],
+        })
+      );
+
+      const suiteDir = path.dirname(document.uri.fsPath);
+      for (let i = 0; i < document.lineCount; i++) {
+        const line = document.lineAt(i).text;
+        const m = line.match(/^\s*-\s+(\S+\.ya?ml)\s*$/);
+        if (m) {
+          const flowPath = path.resolve(suiteDir, m[1]);
+          const range = new vscode.Range(i, 0, i, 0);
+          lenses.push(
+            new vscode.CodeLens(range, {
+              title: "$(play) Run",
+              command: "appclaw.runFlow",
+              arguments: [vscode.Uri.file(flowPath)],
+            })
+          );
+        }
+      }
+      return lenses;
+    }
+
+    // ── Flow YAML (has steps/setup/assertions) ──────────────────────
     if (!/^\s*(setup|steps|assertions)\s*:/m.test(text)) {
       return [];
     }
 
-    const lenses: vscode.CodeLens[] = [];
-
     // Top-of-file: Run entire flow
-    const topRange = new vscode.Range(0, 0, 0, 0);
     lenses.push(
       new vscode.CodeLens(topRange, {
         title: "$(play) Run Flow",
