@@ -37,7 +37,7 @@
 import { readFileSync } from "fs";
 import { parseAllDocuments } from "yaml";
 
-import type { FlowMeta, FlowStep, FlowPhase, PhasedStep, ParsedFlow } from "./types.js";
+import type { FlowMeta, FlowStep, FlowPhase, PhasedStep, ParsedFlow, ParsedSuite } from "./types.js";
 import { tryParseNaturalFlowLine } from "./natural-line.js";
 import { resolveNaturalStep } from "./llm-parser.js";
 import { existsSync } from "fs";
@@ -183,7 +183,7 @@ interface RawExtraction {
 }
 
 const PHASE_KEYS = new Set(["setup", "steps", "assertions"]);
-const META_KEYS = new Set(["appId", "name", "description", "platform", "env"]);
+const META_KEYS = new Set(["appId", "name", "description", "platform", "env", "parallel"]);
 
 function extractRaw(docs: ReturnType<typeof parseAllDocuments>): RawExtraction {
   let meta: FlowMeta = {};
@@ -241,6 +241,12 @@ function extractRaw(docs: ReturnType<typeof parseAllDocuments>): RawExtraction {
 }
 
 function extractPhasedOrFlat(meta: FlowMeta, obj: Record<string, unknown>): RawExtraction {
+  // Suite detection: object has a `flows:` key containing file paths
+  if (Array.isArray(obj.flows) && obj.flows.every(f => typeof f === "string")) {
+    // Handled upstream — caller checks for suite before calling this
+    throw new Error("Suite YAML (flows: [...]) must be parsed with parseFlowOrSuiteFile");
+  }
+
   const hasPhaseKeys = Object.keys(obj).some(k => PHASE_KEYS.has(k));
 
   if (hasPhaseKeys) {
@@ -395,6 +401,98 @@ export async function parseFlowYamlFile(
   }
 
   return parseFlowYamlString(content, { bindings });
+}
+
+// ── Suite detection ────────────────────────────────────────────────
+
+/** Returns true if the YAML content describes a suite (has top-level `flows:` list of strings). */
+export function isSuiteYaml(content: string): boolean {
+  try {
+    const docs = parseAllDocuments(content);
+    if (docs.length === 0) return false;
+    // Two-doc: check second doc. Single-doc: check the only doc.
+    const doc = docs.length >= 2 ? docs[1].toJS() : docs[0].toJS();
+    if (doc && typeof doc === "object" && !Array.isArray(doc)) {
+      const obj = doc as Record<string, unknown>;
+      return Array.isArray(obj.flows) && obj.flows.every((f: unknown) => typeof f === "string");
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
+/**
+ * Parse a suite YAML file — a YAML that lists other flow YAML files.
+ *
+ * Supported formats:
+ * ```yaml
+ * name: regression_suite
+ * platform: android
+ * parallel: 2
+ * flows:
+ *   - flows/login.yaml
+ *   - flows/checkout.yaml
+ * ```
+ *
+ * Or two-document style:
+ * ```yaml
+ * name: regression_suite
+ * platform: android
+ * parallel: 2
+ * ---
+ * flows:
+ *   - flows/login.yaml
+ *   - flows/checkout.yaml
+ * ```
+ *
+ * Flow paths are resolved relative to the suite file's directory.
+ */
+export function parseSuiteYamlFile(filepath: string): ParsedSuite {
+  const content = readFileSync(filepath, "utf-8");
+  const docs = parseAllDocuments(content);
+  if (docs.length === 0) throw new Error("Empty suite YAML");
+
+  for (const doc of docs) {
+    if (doc.errors.length > 0) {
+      throw new Error(doc.errors.map(e => e.message).join("; "));
+    }
+  }
+
+  let meta: FlowMeta = {};
+  let rawFlows: unknown[] | undefined;
+
+  if (docs.length >= 2) {
+    // Two-doc: first is meta, second has `flows:`
+    const m = docs[0].toJS();
+    if (m && typeof m === "object" && !Array.isArray(m)) {
+      meta = m as FlowMeta;
+    }
+    const doc2 = docs[1].toJS();
+    if (doc2 && typeof doc2 === "object" && !Array.isArray(doc2)) {
+      rawFlows = (doc2 as Record<string, unknown>).flows as unknown[];
+    }
+  } else {
+    // Single doc: meta fields + flows in same object
+    const doc = docs[0].toJS();
+    if (doc && typeof doc === "object" && !Array.isArray(doc)) {
+      const obj = doc as Record<string, unknown>;
+      for (const key of META_KEYS) {
+        if (key in obj) (meta as Record<string, unknown>)[key] = obj[key];
+      }
+      rawFlows = obj.flows as unknown[];
+    }
+  }
+
+  if (!Array.isArray(rawFlows) || rawFlows.length === 0) {
+    throw new Error("Suite YAML must have a non-empty `flows:` list of file paths");
+  }
+  if (!rawFlows.every(f => typeof f === "string")) {
+    throw new Error("Suite `flows:` entries must all be file path strings");
+  }
+
+  const suiteDir = dirname(resolve(filepath));
+  const flows = (rawFlows as string[]).map(f => resolve(suiteDir, f));
+
+  return { meta, flows };
 }
 
 /**

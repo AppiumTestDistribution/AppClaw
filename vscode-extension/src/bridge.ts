@@ -72,6 +72,14 @@ export interface FlowDoneEvent {
     phaseResults?: unknown[];
   };
 }
+export interface ParallelDoneEvent {
+  event: "parallel_done";
+  data: { success: boolean; passedCount: number; failedCount: number; reason?: string; workers?: unknown[] };
+}
+export interface SuiteDoneEvent {
+  event: "suite_done";
+  data: { success: boolean; passedCount: number; failedCount: number; reason?: string; workers?: unknown[] };
+}
 export interface ErrorEvent {
   event: "error";
   data: { message: string; detail?: string };
@@ -92,6 +100,8 @@ export type AppclawEvent =
   | HitlEvent
   | FlowStepEvent
   | FlowDoneEvent
+  | ParallelDoneEvent
+  | SuiteDoneEvent
   | ErrorEvent
   | DoneEvent;
 
@@ -107,6 +117,8 @@ export interface AppclawBridgeEvents {
   hitl: [HitlEvent["data"]];
   flow_step: [FlowStepEvent["data"]];
   flow_done: [FlowDoneEvent["data"]];
+  parallel_done: [ParallelDoneEvent["data"]];
+  suite_done: [SuiteDoneEvent["data"]];
   error: [ErrorEvent["data"]];
   done: [DoneEvent["data"]];
   stderr: [string];

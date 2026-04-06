@@ -57,6 +57,14 @@ function formatEvent(event: any): string | null {
       const fail = d.failedAt ? ` (failed at step ${d.failedAt})` : "";
       return `[appclaw] ${icon} Flow done: ${d.stepsExecuted}/${d.stepsTotal} steps${fail}${d.reason ? ` — ${d.reason}` : ""}`;
     }
+    case "parallel_done": {
+      const icon = d.success ? "\u2713" : "\u2717";
+      return `[appclaw] ${icon} Parallel run: ${d.passedCount}/${d.passedCount + d.failedCount} passed${d.reason ? ` — ${d.reason}` : ""}`;
+    }
+    case "suite_done": {
+      const icon = d.success ? "\u2713" : "\u2717";
+      return `[appclaw] ${icon} Suite done: ${d.passedCount}/${d.passedCount + d.failedCount} passed${d.reason ? ` — ${d.reason}` : ""}`;
+    }
     case "hitl":
       return `[appclaw] HITL (${d.type}): ${d.prompt}`;
     case "error":

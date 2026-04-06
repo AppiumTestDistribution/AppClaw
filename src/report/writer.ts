@@ -19,6 +19,7 @@ import type {
   RunManifest,
   RunIndex,
   RunIndexEntry,
+  SuiteEntry,
   StepArtifact,
   StepStatus,
 } from "./types.js";
@@ -100,6 +101,8 @@ export class RunArtifactCollector {
     readonly meta: FlowMeta,
     readonly platform: "android" | "ios",
     readonly device?: string,
+    readonly suiteId?: string,
+    readonly suiteName?: string,
   ) {
     this.runId = generateRunId();
     this.startedAt = new Date().toISOString();
@@ -224,6 +227,9 @@ export class RunArtifactCollector {
       stepsExecuted: result.stepsExecuted,
       stepsTotal: result.stepsTotal,
       failedPhase: result.failedPhase,
+      device: this.device,
+      suiteId: this.suiteId,
+      suiteName: this.suiteName,
     };
     // Prepend (newest first)
     index.runs.unshift(entry);
@@ -258,4 +264,21 @@ export function getArtifactPath(
   ...segments: string[]
 ): string {
   return path.join(runsDir(projectRoot), runId, ...segments);
+}
+
+/** Write (or overwrite) a suite-level aggregate entry in the global index. */
+export async function writeSuiteEntry(
+  projectRoot: string,
+  entry: SuiteEntry,
+): Promise<void> {
+  const index = await readIndex(projectRoot);
+  if (!index.suites) index.suites = [];
+  // Replace existing entry for this suiteId if it exists, otherwise prepend
+  const existing = index.suites.findIndex(s => s.suiteId === entry.suiteId);
+  if (existing >= 0) {
+    index.suites[existing] = entry;
+  } else {
+    index.suites.unshift(entry);
+  }
+  await writeIndex(projectRoot, index);
 }

@@ -1,0 +1,8 @@
+name: two_doc_suite
+platform: ios
+parallel: 3
+---
+flows:
+  - flat-simple.yaml
+  - structured-keys.yaml
+  - flat-natural-language.yaml

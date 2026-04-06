@@ -14,36 +14,37 @@
 import type { MCPClient, MCPToolResult } from "../mcp/types.js";
 import { pngDimensionsFromBase64 } from "./png-dimensions.js";
 
-/** Cached screen size set from session capabilities (pixels for Android, points for iOS). */
-let cachedScreenSize: { width: number; height: number } | null = null;
-
-/** Current platform — affects whether we return pixels (Android) or points (iOS). */
-let currentPlatform: "android" | "ios" = "android";
+/**
+ * Per-MCP-client caches — keyed by the MCPClient instance so parallel workers
+ * running on different devices never share or overwrite each other's values.
+ */
+const screenSizeCache = new WeakMap<MCPClient, { width: number; height: number }>();
+const platformCache = new WeakMap<MCPClient, "android" | "ios">();
 
 /**
  * Set the cached screen size from a "WxH" string (e.g. "720x1600").
  * Call after `create_session` so Stark coordinate scaling always uses the right coords.
  */
-export function setDeviceScreenSize(deviceScreenSize: string): void {
+export function setDeviceScreenSize(mcp: MCPClient, deviceScreenSize: string): void {
   const m = deviceScreenSize.match(/(\d+)\s*x\s*(\d+)/);
   if (m) {
-    cachedScreenSize = { width: parseInt(m[1], 10), height: parseInt(m[2], 10) };
+    screenSizeCache.set(mcp, { width: parseInt(m[1], 10), height: parseInt(m[2], 10) });
   }
 }
 
-/** Get the cached screen size, or null if not yet determined. */
-export function getCachedScreenSize(): { width: number; height: number } | null {
-  return cachedScreenSize;
+/** Get the cached screen size for this MCP client, or null if not yet determined. */
+export function getCachedScreenSize(mcp: MCPClient): { width: number; height: number } | null {
+  return screenSizeCache.get(mcp) ?? null;
 }
 
 /** Set the current platform so coordinate scaling knows pixel vs point mode. */
-export function setDevicePlatform(platform: "android" | "ios"): void {
-  currentPlatform = platform;
+export function setDevicePlatform(mcp: MCPClient, platform: "android" | "ios"): void {
+  platformCache.set(mcp, platform);
 }
 
-/** Get the current platform. */
-export function getDevicePlatform(): "android" | "ios" {
-  return currentPlatform;
+/** Get the current platform for this MCP client. */
+export function getDevicePlatform(mcp: MCPClient): "android" | "ios" {
+  return platformCache.get(mcp) ?? "android";
 }
 
 function mcpResultText(result: MCPToolResult): string {
@@ -85,7 +86,8 @@ export async function getScreenSizeForStark(
   screenshotBase64: string
 ): Promise<{ width: number; height: number }> {
   // 0. Use cached deviceScreenSize (most reliable — set at session creation)
-  if (cachedScreenSize) return cachedScreenSize;
+  const cached = screenSizeCache.get(mcp);
+  if (cached) return cached;
 
   // 1. Standard window rect tools — returns POINTS on iOS, PIXELS on Android
   //    This is the most reliable source for iOS since it gives the correct coordinate space.
@@ -94,7 +96,7 @@ export async function getScreenSizeForStark(
       const result = await mcp.callTool(name, {});
       const parsed = tryParseSizeFromText(mcpResultText(result));
       if (parsed) {
-        cachedScreenSize = parsed;
+        screenSizeCache.set(mcp, parsed);
         return parsed;
       }
     } catch { /* tool missing */ }
@@ -107,7 +109,7 @@ export async function getScreenSizeForStark(
     const sizeMatch = text.match(/realDisplaySize['":\s]+(\d+)x(\d+)/i);
     if (sizeMatch) {
       const size = { width: parseInt(sizeMatch[1], 10), height: parseInt(sizeMatch[2], 10) };
-      cachedScreenSize = size;
+      screenSizeCache.set(mcp, size);
       return size;
     }
   } catch { /* tool missing */ }
@@ -118,13 +120,13 @@ export async function getScreenSizeForStark(
     // iOS: screenshots are in physical pixels (e.g. 1320x2868 at 3x) but
     // XCUITest W3C Actions expect logical points (e.g. 440x956).
     // Divide by scale factor to get the correct tap coordinate space.
-    if (currentPlatform === "ios") {
+    if ((platformCache.get(mcp) ?? "android") === "ios") {
       const scale = guessIOSScaleFactor(fromImage.width, fromImage.height);
       const pointSize = {
         width: Math.round(fromImage.width / scale),
         height: Math.round(fromImage.height / scale),
       };
-      cachedScreenSize = pointSize;
+      screenSizeCache.set(mcp, pointSize);
       return pointSize;
     }
     return fromImage;

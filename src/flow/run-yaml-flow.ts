@@ -64,6 +64,8 @@ export interface RunYamlFlowOptions {
   onFlowStep?: (step: number, total: number, kind: string, target: string | undefined, status: "running" | "passed" | "failed", error?: string, message?: string) => void;
   /** Optional artifact collector for report generation. When set, screenshots are captured after each step. */
   artifactCollector?: RunArtifactCollector;
+  /** Known device UDID from setup — avoids ADB re-detection (which fails when multiple devices are connected) */
+  deviceUdid?: string;
 }
 
 const DEFAULT_TAP_MAX_ATTEMPTS = 20;
@@ -291,7 +293,7 @@ async function tapByLabel(
   return { success: false, message: `No matching element for "${label}"` };
 }
 
-async function flowTypeText(mcp: MCPClient, text: string, target?: string): Promise<ActionResult> {
+async function flowTypeText(mcp: MCPClient, text: string, target?: string, deviceUdid?: string): Promise<ActionResult> {
   if (mcpDebug) ui.printAgentBullet(`[type] text="${text}", target=${target ?? "(none)"}`);
   // ── If a target field is specified, tap it first to focus ──
   if (target) {
@@ -317,7 +319,7 @@ async function flowTypeText(mcp: MCPClient, text: string, target?: string): Prom
       }
     }
     // Type via keyboard (preferred on Android)
-    const udid = await detectDeviceUdid();
+    const udid = deviceUdid ?? await detectDeviceUdid();
     if (udid) {
       const kb = await typeViaKeyboard(text, udid);
       if (kb.success) {
@@ -346,7 +348,7 @@ async function flowTypeText(mcp: MCPClient, text: string, target?: string): Prom
   const platform = detectPlatform(pageSource);
 
   if (platform === "android") {
-    const udid = await detectDeviceUdid();
+    const udid = deviceUdid ?? await detectDeviceUdid();
     const kb = await typeViaKeyboard(text, udid ?? undefined);
     if (kb.success) {
       const msg = target ? `Typed "${text}" in "${target}" via keyboard input` : kb.message;
@@ -778,7 +780,8 @@ export async function executeStep(
   step: FlowStep,
   meta: FlowMeta,
   appResolver: AppResolver | undefined,
-  tapPoll: FlowTapPollOptions
+  tapPoll: FlowTapPollOptions,
+  deviceUdid?: string,
 ): Promise<ActionResult> {
   switch (step.kind) {
     case "launchApp": {
@@ -814,7 +817,7 @@ export async function executeStep(
     case "tap":
       return tapByLabel(mcp, step.label, tapPoll);
     case "type":
-      return flowTypeText(mcp, step.text, step.target);
+      return flowTypeText(mcp, step.text, step.target, deviceUdid);
     case "enter":
       return pressEnterKey(mcp);
     case "back":
@@ -901,6 +904,7 @@ async function executePhase(
   globalTotal: number,
   onFlowStep: RunYamlFlowOptions["onFlowStep"],
   artifactCollector?: RunArtifactCollector,
+  deviceUdid?: string,
 ): Promise<PhaseResult> {
   const phaseLabels: Record<FlowPhase, string> = {
     setup: "Setup",
@@ -937,7 +941,7 @@ async function executePhase(
     }
 
     onFlowStep?.(globalN, globalTotal, step.kind, label, "running");
-    const result = await executeStep(mcp, step, meta, appResolver, tapPoll);
+    const result = await executeStep(mcp, step, meta, appResolver, tapPoll, deviceUdid);
     ui.printFlowStep(globalN, globalTotal, label, result.success);
     onFlowStep?.(globalN, globalTotal, step.kind, label, result.success ? "passed" : "failed", result.success ? undefined : result.message, result.message);
 
@@ -955,7 +959,7 @@ async function executePhase(
         error: result.success ? undefined : result.message,
         message: result.message,
         tapCoordinates: tapCoords,
-        deviceScreenSize: getCachedScreenSize() ?? undefined,
+        deviceScreenSize: getCachedScreenSize(mcp) ?? undefined,
       });
       // Attach "before" screenshot (shows where the tap/click happened)
       if (beforeImg) {
@@ -1050,7 +1054,7 @@ export async function runYamlFlow(
       const result = await executePhase(
         mcp, phase, steps, meta, appResolver, tapPoll,
         stepDelayMs, globalOffset, totalSteps, options.onFlowStep,
-        options.artifactCollector,
+        options.artifactCollector, options.deviceUdid,
       );
       phaseResults.push(result);
       totalExecuted += result.stepsExecuted;
@@ -1118,7 +1122,7 @@ export async function runYamlFlow(
     }
 
     options.onFlowStep?.(n, total, step.kind, stepLabel(step), "running");
-    const result = await executeStep(mcp, step, meta, appResolver, tapPoll);
+    const result = await executeStep(mcp, step, meta, appResolver, tapPoll, options.deviceUdid);
     ui.printFlowStep(n, total, label, result.success);
     options.onFlowStep?.(n, total, step.kind, stepLabel(step), result.success ? "passed" : "failed", result.success ? undefined : result.message, result.message);
 
@@ -1136,7 +1140,7 @@ export async function runYamlFlow(
         error: result.success ? undefined : result.message,
         message: result.message,
         tapCoordinates: tapCoords,
-        deviceScreenSize: getCachedScreenSize() ?? undefined,
+        deviceScreenSize: getCachedScreenSize(mcp) ?? undefined,
       });
       // Attach "before" screenshot (shows where the tap/click happened)
       if (beforeImgFlat) {

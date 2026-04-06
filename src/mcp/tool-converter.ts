@@ -17,8 +17,7 @@ import type { MCPToolInfo } from "./types.js";
  */
 export function convertMCPToolsToAITools(
   mcpTools: MCPToolInfo[],
-  excludeNames?: Set<string>,
-  aiVisionEnabled?: boolean
+  excludeNames?: Set<string>
 ): Record<string, Tool> {
   const tools: Record<string, Tool> = {};
 
@@ -26,16 +25,7 @@ export function convertMCPToolsToAITools(
     // Skip excluded tools (e.g., session management tools the agent shouldn't call)
     if (excludeNames?.has(mcpTool.name)) continue;
 
-    let description = mcpTool.description ?? mcpTool.name;
-
-    // Enhance appium_find_element description to mention ai_instruction strategy
-    if (mcpTool.name === "appium_find_element" && aiVisionEnabled) {
-      description +=
-        ` Additional strategy: "ai_instruction" — natural language visual description as the selector. ` +
-        `When the app uses Stark vision (VISION_LOCATE_PROVIDER=stark), coordinates come from df-vision + Gemini; ` +
-        `otherwise the MCP server's ai_instruction vision is used. Use when accessibility id / id / xpath fail.`;
-    }
-
+    const description = mcpTool.description ?? mcpTool.name;
     const schema = mcpTool.inputSchema ?? { type: "object" as const, properties: {} };
 
     tools[mcpTool.name] = tool({

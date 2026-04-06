@@ -16,6 +16,8 @@ export type JsonEvent =
   | { event: "hitl"; data: { type: string; prompt: string } }
   | { event: "flow_step"; data: { step: number; total: number; kind: string; target?: string; status: "running" | "passed" | "failed"; error?: string; message?: string } }
   | { event: "flow_done"; data: { success: boolean; stepsExecuted: number; stepsTotal: number; failedAt?: number; reason?: string; failedPhase?: string; phaseResults?: unknown[] } }
+  | { event: "parallel_done"; data: { success: boolean; passedCount: number; failedCount: number; reason?: string; workers?: unknown[] } }
+  | { event: "suite_done"; data: { success: boolean; passedCount: number; failedCount: number; reason?: string; workers?: unknown[] } }
   | { event: "error"; data: { message: string; detail?: string } }
   | { event: "done"; data: { success: boolean; totalSteps: number; totalCost?: number } };
 

@@ -1,0 +1,6 @@
+name: youtube_suite
+platform: android
+parallel: 2
+flows:
+  - youtube.yaml
+  - youtube.yaml

@@ -18,7 +18,8 @@
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:vsix": "cd vscode-extension && npm run build && npx vsce package"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.0",

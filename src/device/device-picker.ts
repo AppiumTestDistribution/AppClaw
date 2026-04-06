@@ -224,23 +224,33 @@ export function parseDeviceList(text: string, _platform: Platform): DeviceInfo[]
   const lines = text.split("\n");
 
   for (const line of lines) {
-    // Match UDID patterns — standard UUID format or iOS simulator format
-    const udidMatch = line.match(/(?:udid|UDID)[:\s=]+([A-F0-9-]{20,})/i)
+    // Match UDID patterns — ordered from most specific to least specific:
+    // 1. Android emulator: "emulator-5554"
+    // 2. Explicit UDID= label
+    // 3. Standard UUID in parens (iOS simulators)
+    // 4. Bare UUID (iOS simulators)
+    // 5. Real device UDID (40 hex chars)
+    // 6. Short iOS device UDID
+    const udidMatch = line.match(/(emulator-\d+)/)           // Android emulator
+      || line.match(/(?:udid|UDID)[:\s=]+([A-F0-9-]{20,})/i)
       || line.match(/\(([A-F0-9]{8}-(?:[A-F0-9]{4}-){3}[A-F0-9]{12})\)/i)
       || line.match(/([A-F0-9]{8}-(?:[A-F0-9]{4}-){3}[A-F0-9]{12})/i)
-      || line.match(/([0-9A-F]{40})/i)   // Real device UDIDs (40 hex chars)
-      || line.match(/([0-9A-F]{8}-[0-9A-F]{16})/i); // Short iOS device UDIDs
+      || line.match(/([0-9A-F]{40})/i)                        // Real device UDIDs (40 hex chars)
+      || line.match(/([0-9A-F]{8}-[0-9A-F]{16})/i);           // Short iOS device UDIDs
 
     if (!udidMatch) continue;
 
     const udid = udidMatch[1];
 
-    // Extract device name — text before UDID or parenthetical
-    let name = "Unknown";
-    const nameMatch = line.match(/(?:^[-\d.\s]*)([\w][\w\s']+?)(?:\s*\(|\s*[-|]?\s*(?:udid|UDID|state))/i)
-      || line.match(/(?:name|device)[:\s=]+([^\n|,]+)/i);
-    if (nameMatch) {
-      name = nameMatch[1].trim();
+    // For Android emulators, the UDID is the display name too
+    let name = udid.startsWith("emulator-") ? udid : "Unknown";
+
+    if (!udid.startsWith("emulator-")) {
+      const nameMatch = line.match(/(?:^[-\d.\s]*)([\w][\w\s']+?)(?:\s*\(|\s*[-|]?\s*(?:udid|UDID|state))/i)
+        || line.match(/(?:name|device)[:\s=]+([^\n|,]+)/i);
+      if (nameMatch) {
+        name = nameMatch[1].trim();
+      }
     }
 
     // Extract state

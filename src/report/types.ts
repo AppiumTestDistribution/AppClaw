@@ -99,10 +99,29 @@ export interface RunIndexEntry {
   stepsExecuted: number;
   stepsTotal: number;
   failedPhase?: FlowPhase;
+  /** Device name (if known) */
+  device?: string;
+  /** Suite this run belongs to (if part of a parallel or suite run) */
+  suiteId?: string;
+  /** Human-readable suite name */
+  suiteName?: string;
+}
+
+export interface SuiteEntry {
+  suiteId: string;
+  suiteName?: string;
+  platform: "android" | "ios";
+  startedAt: string;
+  durationMs: number;
+  /** Ordered list of run IDs that belong to this suite */
+  runIds: string[];
+  passedCount: number;
+  failedCount: number;
 }
 
 export interface RunIndex {
   schemaVersion: 1;
   generatedAt: string;
   runs: RunIndexEntry[];
+  suites?: SuiteEntry[];
 }

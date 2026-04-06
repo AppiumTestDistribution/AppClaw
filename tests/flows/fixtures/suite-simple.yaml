@@ -1,0 +1,6 @@
+name: simple_suite
+platform: android
+parallel: 2
+flows:
+  - flat-simple.yaml
+  - flat-with-meta.yaml

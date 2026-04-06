@@ -8,6 +8,31 @@ export interface FlowMeta {
   env?: string;
   /** Inline env block for self-contained flows */
   inlineEnv?: Record<string, unknown>;
+  /**
+   * Number of devices to run this flow against in parallel.
+   * Requires that many devices to be available (e.g. `parallel: 2`).
+   */
+  parallel?: number;
+}
+
+/**
+ * A test suite: a collection of YAML flow files to run together.
+ *
+ * Example suite.yaml:
+ * ```yaml
+ * name: regression_suite
+ * platform: android
+ * parallel: 2        # run up to 2 flows concurrently across devices
+ * flows:
+ *   - flows/login.yaml
+ *   - flows/checkout.yaml
+ *   - flows/search.yaml
+ * ```
+ */
+export interface ParsedSuite {
+  meta: FlowMeta;
+  /** Resolved absolute paths to the individual flow YAML files */
+  flows: string[];
 }
 
 /** Set when the step was parsed from a natural-language YAML string (shown in CLI). */

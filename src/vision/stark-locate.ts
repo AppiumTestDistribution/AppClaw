@@ -8,6 +8,7 @@
  * so we destructure named exports here (avoids ESM named-import issues with CJS).
  */
 import starkVision from "df-vision";
+import sharp from "sharp";
 
 import type { MCPClient, MCPToolResult } from "../mcp/types.js";
 
@@ -21,6 +22,27 @@ const {
 } = starkVision;
 import { getStarkVisionApiKey, getStarkVisionModel } from "./locate-enabled.js";
 import { getScreenSizeForStark } from "./window-size.js";
+
+/** Max edge for screenshots sent to Stark/Gemini — coordinates are normalized so resolution doesn't matter. */
+const VISION_MAX_EDGE_PX = 512;
+
+/** Downscale screenshot before sending to vision model. Mirrors the same step in vision-execute.ts. */
+async function downscaleForVision(base64: string): Promise<string> {
+  try {
+    const input = Buffer.from(base64, "base64");
+    const meta = await sharp(input).metadata();
+    if ((meta.width ?? 0) <= VISION_MAX_EDGE_PX && (meta.height ?? 0) <= VISION_MAX_EDGE_PX) {
+      return base64;
+    }
+    const resized = await sharp(input)
+      .resize({ width: VISION_MAX_EDGE_PX, height: VISION_MAX_EDGE_PX, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    return resized.toString("base64");
+  } catch {
+    return base64;
+  }
+}
 
 function textFromMcpResult(result: MCPToolResult): string {
   for (const content of result.content) {
@@ -88,12 +110,15 @@ export async function starkLocateTapTarget(
     );
   }
 
-  const imageBase64 = existingScreenshot || await captureScreenshotBase64(mcp);
-  if (!imageBase64) {
+  const rawScreenshot = existingScreenshot || await captureScreenshotBase64(mcp);
+  if (!rawScreenshot) {
     throw new Error("Stark vision: could not capture screenshot via MCP");
   }
 
-  const screenSize = await getScreenSizeForStark(mcp, imageBase64);
+  // Use raw screenshot for coordinate scaling (needs true device pixels), compressed for Gemini
+  const screenSize = await getScreenSizeForStark(mcp, rawScreenshot);
+  const imageBase64 = await downscaleForVision(rawScreenshot);
+
   const client = new StarkVisionClient({
     apiKey,
     model: getStarkVisionModel(),

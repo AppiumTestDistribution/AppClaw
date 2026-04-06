@@ -20,7 +20,7 @@ import { createStuckDetector } from "./stuck.js";
 import { createRecoveryEngine } from "./recovery.js";
 import { askUser, classifyHITLRequest } from "./human-in-the-loop.js";
 import { tapAtCoordinates, isAIElement, parseAIElementCoords } from "./element-finder.js";
-import { findElementByVision, scaleAIElementUuid } from "../mcp/tools.js";
+import { findElementByVision } from "../mcp/tools.js";
 import { Config } from "../config.js";
 import { isVisionLocateEnabled } from "../vision/locate-enabled.js";
 import { getCachedScreenSize } from "../vision/window-size.js";
@@ -606,11 +606,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       // Check for ai-element synthetic UUID first
       const aiMatch = result.message.match(/(ai-element:[^\s]+)/);
       if (aiMatch) {
-        // Scale coordinates from screenshot image space to device pixel space
-        const scaledUuid = await scaleAIElementUuid(mcp, aiMatch[1]);
-        const coords = parseAIElementCoords(scaledUuid);
+        const coords = parseAIElementCoords(aiMatch[1]);
         if (coords) {
-          lastResult += `\n>> AI_ELEMENT found at [${coords.x},${coords.y}]. Use appium_click with elementUUID="${scaledUuid}" or tap at these coordinates.`;
+          lastResult += `\n>> AI_ELEMENT found at [${coords.x},${coords.y}]. Use appium_click with elementUUID="${aiMatch[1]}" or tap at these coordinates.`;
         }
       } else {
         const uuidMatch = result.message.match(
@@ -754,7 +752,7 @@ async function executeMetaTool(
    * Note: df-vision convention is [y, x] order for coordinates.
    */
   async function scaleLLMCoords(tapX: number, tapY: number): Promise<{ x: number; y: number }> {
-    const deviceSize = getCachedScreenSize();
+    const deviceSize = getCachedScreenSize(mcp);
     if (!deviceSize) {
       // Fallback: no device size, can't scale — return as-is (will likely miss)
       return { x: Math.round(tapX), y: Math.round(tapY) };

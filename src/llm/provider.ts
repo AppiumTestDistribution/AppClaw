@@ -308,8 +308,7 @@ export function createLLMProvider(
     : EXCLUDED_MCP_TOOLS;
   const dynamicTools = convertMCPToolsToAITools(
     mcpTools,
-    excludedTools,
-    isVisionLocateEnabledFromConfig(config)
+    excludedTools
   );
   const metaTools = buildMetaTools(config.AGENT_MODE);
   const allTools = { ...dynamicTools, ...metaTools };

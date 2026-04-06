@@ -20,8 +20,10 @@ import { runAgent } from "./agent/loop.js";
 import { SessionLogger } from "./logger.js";
 import { ActionRecorder } from "./recording/recorder.js";
 import { loadRecording, replayRecording } from "./recording/replayer.js";
-import { parseFlowYamlFile } from "./flow/parse-yaml-flow.js";
+import { parseFlowYamlFile, isSuiteYaml, parseSuiteYamlFile } from "./flow/parse-yaml-flow.js";
 import { runYamlFlow } from "./flow/run-yaml-flow.js";
+import { runFlowOnDevices, runSuite, printParallelSummary } from "./flow/parallel-runner.js";
+import { readFileSync } from "fs";
 import {
   loadEnvironmentFile,
   type VariableBindings,
@@ -372,11 +374,154 @@ async function main() {
     return;
   }
 
-  // ─── YAML flow mode (no LLM) ───────────────────────────
+  // ─── YAML flow / suite mode ────────────────────────────
   if (cliArgs.flow) {
     ui.printHeader();
     ui.printYamlFlowHeader(cliArgs.flow);
 
+    // ── Resolve variable bindings (flow mode only; suites inherit per-flow env) ──
+    let bindings: VariableBindings | undefined;
+    if (cliArgs.env) {
+      const envDir = resolve(process.cwd(), ".appclaw", "env");
+      const envFile = resolve(envDir, `${cliArgs.env}.yaml`);
+      try {
+        bindings = loadEnvironmentFile(envFile);
+        ui.printSetupOk(`Loaded environment: ${cliArgs.env}`);
+      } catch (err) {
+        ui.printError(`Failed to load environment "${cliArgs.env}"`, err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
+    }
+
+    // ── Detect suite vs single flow ──
+    let fileContent: string;
+    try {
+      fileContent = readFileSync(cliArgs.flow, "utf-8");
+    } catch (err) {
+      ui.printError("Cannot read file", `${cliArgs.flow}: ${err instanceof Error ? err.message : err}`);
+      process.exit(1);
+    }
+
+    const isSuite = isSuiteYaml(fileContent);
+
+    // ── Base device setup args (shared between suite and flow paths) ──
+    const baseSetupArgs = {
+      cliPlatform: cliArgs.platform,
+      cliDeviceType: cliArgs.deviceType,
+      cliUdid: cliArgs.deviceUdid,
+      cliDeviceName: cliArgs.deviceName,
+      config,
+    };
+
+    // ══════════════════════════════════════════════════════════════════
+    // SUITE mode — a YAML listing other flow YAML files
+    // ══════════════════════════════════════════════════════════════════
+    if (isSuite) {
+      let suite;
+      try {
+        suite = parseSuiteYamlFile(cliArgs.flow);
+      } catch (err) {
+        ui.printError("Invalid suite YAML", String(err));
+        process.exit(1);
+      }
+
+      const parallelCount = Math.max(1, suite.meta.parallel ?? 1);
+      const suitePlatform = cliArgs.platform ?? suite.meta.platform ?? null;
+
+      try {
+        const suiteResult = await runSuite(
+          suite,
+          parallelCount,
+          { ...baseSetupArgs, cliPlatform: suitePlatform },
+          config,
+          { stepDelayMs: config.STEP_DELAY },
+        );
+
+        printParallelSummary(suiteResult);
+
+        emitJson({
+          event: "suite_done",
+          data: {
+            success: suiteResult.allPassed,
+            passedCount: suiteResult.passedCount,
+            failedCount: suiteResult.failedCount,
+            workers: suiteResult.workers.map(w => ({
+              flowFile: w.flowFile,
+              deviceName: w.deviceName,
+              success: w.result.success,
+              stepsExecuted: w.result.stepsExecuted,
+              stepsTotal: w.result.stepsTotal,
+              reason: w.error ?? w.result.reason,
+            })),
+          },
+        });
+        process.exit(suiteResult.allPassed ? 0 : 1);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        emitJson({ event: "error", data: { message: `Suite execution error: ${msg}` } });
+        emitJson({ event: "suite_done", data: { success: false, passedCount: 0, failedCount: 0, reason: msg } });
+        process.exit(1);
+      }
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // FLOW mode — single YAML flow (possibly parallel: N)
+    // ══════════════════════════════════════════════════════════════════
+    let parsed;
+    try {
+      parsed = await parseFlowYamlFile(cliArgs.flow, bindings ? { bindings } : {});
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      emitJson({ event: "error", data: { message: `Invalid flow YAML: ${msg}` } });
+      ui.printError("Invalid flow YAML", String(err));
+      process.exit(1);
+    }
+
+    const flowCliPlatform = cliArgs.platform ?? parsed.meta.platform ?? null;
+    const parallelCount = parsed.meta.parallel ?? 1;
+
+    // ── Parallel flow: same flow on N devices ──
+    if (parallelCount > 1) {
+      emitJson({ event: "connected", data: { transport: config.MCP_TRANSPORT } });
+      try {
+        const parallelResult = await runFlowOnDevices(
+          cliArgs.flow,
+          parsed,
+          parallelCount,
+          { ...baseSetupArgs, cliPlatform: flowCliPlatform },
+          config,
+          { stepDelayMs: config.STEP_DELAY },
+        );
+
+        printParallelSummary(parallelResult);
+
+        emitJson({
+          event: "parallel_done",
+          data: {
+            success: parallelResult.allPassed,
+            passedCount: parallelResult.passedCount,
+            failedCount: parallelResult.failedCount,
+            workers: parallelResult.workers.map(w => ({
+              deviceName: w.deviceName,
+              success: w.result.success,
+              stepsExecuted: w.result.stepsExecuted,
+              stepsTotal: w.result.stepsTotal,
+              reason: w.error ?? w.result.reason,
+            })),
+          },
+        });
+        process.exit(parallelResult.allPassed ? 0 : 1);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        emitJson({ event: "error", data: { message: `Parallel flow error: ${msg}` } });
+        emitJson({ event: "parallel_done", data: { success: false, passedCount: 0, failedCount: 0, reason: msg } });
+        process.exit(1);
+      }
+      return;
+    }
+
+    // ── Single device flow (original path) ──
     const mcpClient = await createMCPClient({
       transport: config.MCP_TRANSPORT,
       host: config.MCP_HOST,
@@ -385,50 +530,18 @@ async function main() {
     const mcp = mcpClient;
 
     try {
-      // ── Resolve variable bindings ──
-      // --env CLI flag takes precedence; otherwise parseFlowYamlFile
-      // auto-resolves from the YAML `env:` field by walking up to find
-      // .appclaw/env/<name>.yaml.
-      let bindings: VariableBindings | undefined;
-      const envName = cliArgs.env;
-
-      if (envName) {
-        const envDir = resolve(process.cwd(), ".appclaw", "env");
-        const envFile = resolve(envDir, `${envName}.yaml`);
-        try {
-          bindings = loadEnvironmentFile(envFile);
-          ui.printSetupOk(`Loaded environment: ${envName}`);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          ui.printError(`Failed to load environment "${envName}"`, msg);
-          process.exit(1);
-        }
-      }
-
-      let parsed;
-      try {
-        parsed = await parseFlowYamlFile(cliArgs.flow, bindings ? { bindings } : {});
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        emitJson({ event: "error", data: { message: `Invalid flow YAML: ${msg}` } });
-        ui.printError("Invalid flow YAML", String(err));
-        process.exit(1);
-      }
-
-      // Full device setup pipeline (platform → device → iOS setup → session)
-      // YAML `platform:` field is used as fallback when no CLI --platform flag is set
       let flowPlatform: "android" | "ios" = "android";
-      const flowCliPlatform = cliArgs.platform ?? parsed.meta.platform ?? null;
+      let flowDeviceUdid: string | undefined;
       emitJson({ event: "connected", data: { transport: config.MCP_TRANSPORT } });
+      let flowScopedMcp = mcp;
       try {
         const deviceResult = await setupDevice(mcp, {
+          ...baseSetupArgs,
           cliPlatform: flowCliPlatform,
-          cliDeviceType: cliArgs.deviceType,
-          cliUdid: cliArgs.deviceUdid,
-          cliDeviceName: cliArgs.deviceName,
-          config,
         });
         flowPlatform = deviceResult.platform;
+        flowDeviceUdid = deviceResult.deviceUdid;
+        flowScopedMcp = deviceResult.scopedMcp;
         emitJson({ event: "device_ready", data: { platform: flowPlatform } });
       } catch (err: unknown) {
         ui.stopSpinner();
@@ -439,7 +552,7 @@ async function main() {
       }
 
       const flowAppResolver = new AppResolver();
-      await flowAppResolver.initialize(mcp, flowPlatform);
+      await flowAppResolver.initialize(flowScopedMcp, flowPlatform);
 
       const onFlowStep = isJsonMode()
         ? (step: number, total: number, kind: string, target: string | undefined, status: "running" | "passed" | "failed", error?: string, message?: string) => {
@@ -447,7 +560,6 @@ async function main() {
           }
         : undefined;
 
-      // Create artifact collector for report generation
       const artifactCollector = new RunArtifactCollector(
         resolve(cliArgs.flow),
         parsed.meta,
@@ -455,7 +567,7 @@ async function main() {
       );
 
       const result = await runYamlFlow(
-        mcp,
+        flowScopedMcp,
         parsed.meta,
         parsed.steps,
         {
@@ -463,14 +575,13 @@ async function main() {
           appResolver: flowAppResolver,
           onFlowStep,
           artifactCollector,
+          deviceUdid: flowDeviceUdid,
         },
         parsed.phases,
       );
 
-      // Save run artifacts to disk
       try {
-        const projectRoot = process.cwd();
-        const runId = await artifactCollector.finalize(projectRoot, result);
+        const runId = await artifactCollector.finalize(process.cwd(), result);
         ui.printSetupOk(`Report saved: .appclaw/runs/${runId}`);
       } catch (err) {
         ui.printWarning(`Failed to save report: ${err instanceof Error ? err.message : err}`);
@@ -561,6 +672,7 @@ async function main() {
 
     // Full device setup pipeline (platform → device → iOS setup → session)
     let resolvedPlatform: "android" | "ios" = "android";
+    let agentScopedMcp = mcp;
     try {
       const deviceResult = await setupDevice(mcp, {
         cliPlatform: cliArgs.platform,
@@ -570,6 +682,7 @@ async function main() {
         config,
       });
       resolvedPlatform = deviceResult.platform;
+      agentScopedMcp = deviceResult.scopedMcp;
       emitJson({ event: "device_ready", data: { platform: resolvedPlatform } });
     } catch (err: any) {
       ui.stopSpinner();
@@ -580,7 +693,7 @@ async function main() {
 
     // Fetch installed apps for name → package resolution
     const appResolver = new AppResolver();
-    await appResolver.initialize(mcp, resolvedPlatform);
+    await appResolver.initialize(agentScopedMcp, resolvedPlatform);
 
     // ─── Always decompose goals into sub-goals ─────────
     ui.printPlanStart();
@@ -649,7 +762,7 @@ async function main() {
           const captureScreenshot = config.VISION_MODE !== "never" || config.AGENT_MODE === "vision";
           const skipOrchestratorPageSource = config.AGENT_MODE === "vision";
           const screenState = await getScreenState(
-            mcp,
+            agentScopedMcp,
             config.MAX_ELEMENTS,
             captureScreenshot,
             skipOrchestratorPageSource
@@ -763,7 +876,7 @@ async function main() {
       const result = await runAgent({
         goal: enrichedGoal,
         displayGoal: effectiveGoal,
-        mcp,
+        mcp: agentScopedMcp,
         llm,
         appResolver,
         appId: journeyAppId,

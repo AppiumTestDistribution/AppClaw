@@ -10,25 +10,16 @@
  */
 
 import type { MCPClient, LocatorStrategy, MCPToolResult } from "./types.js";
-import { Config } from "../config.js";
-import { getScreenSizeForStark } from "../vision/window-size.js";
-import { pngDimensionsFromBase64 } from "../vision/png-dimensions.js";
 
-function logVisionLocateBackend(
-  backend: "stark" | "appium_mcp",
+function logVisionLocate(
   phase: "attempt" | "success",
   description: string,
   detail?: string
 ): void {
   if (process.env.MCP_DEBUG !== "1" && process.env.MCP_DEBUG !== "true") return;
-  const label =
-    backend === "stark"
-      ? "stark-vision (df-vision + Gemini)"
-      : "mcp vision (appium_find_element / ai_instruction)";
-  const short =
-    description.length > 90 ? `${description.slice(0, 90)}…` : description;
+  const short = description.length > 90 ? `${description.slice(0, 90)}…` : description;
   const extra = detail ? ` ${detail}` : "";
-  console.log(`[vision-locate] ${phase} | ${label} | "${short}"${extra}`);
+  console.log(`[vision-locate] ${phase} | stark-vision (df-vision + Gemini) | "${short}"${extra}`);
 }
 
 /** Extract text content from an MCP tool result */
@@ -106,7 +97,7 @@ export async function screenshot(client: MCPClient, elementUUID?: string): Promi
 }
 
 /**
- * Find an element using AI vision (ai_instruction strategy).
+ * Find an element using Stark vision (df-vision + Gemini).
  * Returns the synthetic ai-element UUID (e.g. "ai-element:540,960:bbox")
  * or throws if not found.
  *
@@ -118,90 +109,20 @@ export async function findElementByVision(
   description: string,
   existingScreenshot?: string | null
 ): Promise<string> {
-  if (Config.VISION_LOCATE_PROVIDER === "stark") {
-    logVisionLocateBackend("stark", "attempt", description);
-    const { starkLocateTapTarget } = await import("../vision/stark-locate.js");
-    const located = await starkLocateTapTarget(client, description, existingScreenshot);
-    logVisionLocateBackend(
-      "stark",
-      "success",
-      description,
-      `→ (${Math.round(located.x)}, ${Math.round(located.y)}) ${located.syntheticUuid}`
-    );
-    if (process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true") {
-      console.log(
-        `        [vision-debug] stark: "${description.slice(0, 60)}" -> (${located.x}, ${located.y})`
-      );
-    }
-    return located.syntheticUuid;
-  }
-
-  logVisionLocateBackend("appium_mcp", "attempt", description);
-  const result = await client.callTool("appium_find_element", {
-    strategy: "ai_instruction",
-    ai_instruction: description,
-  });
-  const text = extractText(result);
-
-  // Debug: log the raw response from appium-mcp for vision calls
+  logVisionLocate("attempt", description);
+  const { starkLocateTapTarget } = await import("../vision/stark-locate.js");
+  const located = await starkLocateTapTarget(client, description, existingScreenshot);
+  logVisionLocate(
+    "success",
+    description,
+    `→ (${Math.round(located.x)}, ${Math.round(located.y)}) ${located.syntheticUuid}`
+  );
   if (process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true") {
-    console.log(`        [vision-debug] response: ${text.slice(0, 300)}`);
+    console.log(
+      `        [vision-debug] stark: "${description.slice(0, 60)}" -> (${located.x}, ${located.y})`
+    );
   }
-
-  if (text.includes("Failed") || text.includes("Error") || text.includes("not found") || text.includes("not supported") || text.includes("not configured")) {
-    throw new Error(`Vision find failed for "${description}": ${text.slice(0, 200)}`);
-  }
-
-  let uuid = extractElementUUID(text);
-  if (!uuid) {
-    throw new Error(`Could not extract element UUID from vision response for "${description}": ${text.slice(0, 200)}`);
-  }
-
-  // appium-mcp AI vision returns coordinates in screenshot image space, which may
-  // differ from device pixel space (e.g. 540px screenshot vs 1080px device).
-  // Scale the ai-element coordinates so all consumers get device-pixel values.
-  if (uuid.startsWith("ai-element:")) {
-    uuid = await scaleAIElementUuid(client, uuid);
-  }
-
-  logVisionLocateBackend("appium_mcp", "success", description, `→ ${uuid}`);
-  return uuid;
-}
-
-/**
- * Scale ai-element coordinates from screenshot image space to device pixel space.
- * Rewrites the UUID string with scaled coordinates so all downstream consumers
- * (tapAtCoordinates, appium_click, LLM hints) use device pixels.
- */
-export async function scaleAIElementUuid(mcp: MCPClient, uuid: string): Promise<string> {
-  try {
-    const imageBase64 = await screenshot(mcp);
-    if (!imageBase64) return uuid;
-
-    const imgSize = pngDimensionsFromBase64(imageBase64);
-    if (!imgSize) return uuid;
-
-    const deviceSize = await getScreenSizeForStark(mcp, imageBase64);
-
-    // No scaling needed if resolutions match
-    if (imgSize.width === deviceSize.width && imgSize.height === deviceSize.height) return uuid;
-
-    const scaleX = deviceSize.width / imgSize.width;
-    const scaleY = deviceSize.height / imgSize.height;
-
-    // Parse: ai-element:x,y:bbox or ai-element:x,y:other
-    const body = uuid.slice("ai-element:".length);
-    const parts = body.split(":");
-    const [xStr, yStr] = parts[0].split(",");
-    const x = Math.round(Number(xStr) * scaleX);
-    const y = Math.round(Number(yStr) * scaleY);
-
-    // Rebuild with scaled coordinates, keep remaining parts
-    const rest = parts.slice(1).join(":");
-    return `ai-element:${x},${y}:${rest}`;
-  } catch {
-    return uuid;
-  }
+  return located.syntheticUuid;
 }
 
 /**
