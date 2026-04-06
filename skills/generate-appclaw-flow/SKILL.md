@@ -98,6 +98,37 @@ assertions:
   - verify Welcome is visible
 ```
 
+### Parallel Format (same flow, N devices)
+
+Add `parallel: N` to the metadata. The same flow runs on N devices simultaneously — useful for load/compatibility testing.
+
+```yaml
+name: youtube_parallel
+platform: android
+parallel: 2
+---
+- open YouTube app
+- search for "Appium 3.0"
+- assert "TestMu AI" is visible
+- done
+```
+
+### Suite Format (different flows across N workers)
+
+A suite YAML has a `flows:` list and optional `parallel: N`. Workers pick flows from a queue until all are done. If `parallel` is omitted, flows run sequentially on a single device.
+
+```yaml
+name: youtube_suite
+platform: android
+parallel: 2
+flows:
+  - flows/login.yaml
+  - flows/search.yaml
+  - flows/playback.yaml
+```
+
+Suite files use the **same `--flow` flag** as regular flows — the CLI detects the `flows:` key and routes to the suite runner.
+
 ### Natural Language Format (most readable)
 
 Steps are plain English — the parser converts them to structured actions.
@@ -127,6 +158,8 @@ You can freely mix natural language and structured steps in the same flow.
 | `description` | string | Human-readable description |
 | `platform` | `android` or `ios` | Target platform (optional — can be set at runtime) |
 | `env` | string | Environment name — resolves `.appclaw/env/<name>.yaml` for variable/secret bindings |
+| `parallel` | number | Run on N devices concurrently (single flow) or with N workers (suite). Omit for single-device |
+| `flows` | list of paths | Suite mode — list of flow files to distribute across workers |
 
 ---
 

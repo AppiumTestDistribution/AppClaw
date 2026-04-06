@@ -15,7 +15,7 @@ export interface ConnectedEvent {
 }
 export interface DeviceReadyEvent {
   event: "device_ready";
-  data: { platform: string; device?: string };
+  data: { platform: string; device?: string; mjpegUrl?: string };
 }
 export interface PlanEvent {
   event: "plan";
@@ -58,6 +58,7 @@ export interface FlowStepEvent {
     status: "running" | "passed" | "failed";
     error?: string;
     message?: string;
+    device?: string;
   };
 }
 export interface FlowDoneEvent {

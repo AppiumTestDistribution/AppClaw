@@ -144,6 +144,16 @@ export class DevicePanel {
     }
   }
 
+  /** Switch between single-device and multi-device live grid modes */
+  public setRunMode(mode: "single" | "multi", deviceCount: number): void {
+    const msg = { type: "setRunMode", mode, deviceCount };
+    if (this.webviewReady) {
+      this.panel.webview.postMessage(msg);
+    } else {
+      this.pendingMessages.push(msg);
+    }
+  }
+
   public dispose(): void {
     DevicePanel.currentPanel = undefined;
     this.panel.dispose();
@@ -420,6 +430,143 @@ export class DevicePanel {
     }
     .setup-step.active .setup-icon { animation: pulse 1.2s infinite; }
     .setup-step.pending { opacity: 0.4; }
+
+    /* ── Multi-device live grid ─────────────────────────────── */
+    .multi-live-grid {
+      display: none;
+      flex: 1;
+      min-width: 0;
+      padding: 8px;
+      gap: 8px;
+      overflow-y: auto;
+      background: #1a1a2e;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      grid-auto-rows: max-content;
+      align-content: start;
+    }
+    .multi-live-grid.active {
+      display: grid;
+    }
+
+    .device-live-frame {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+      transition: border-color 0.2s;
+    }
+    .device-live-frame.running { border-color: var(--vscode-textLink-foreground); }
+    .device-live-frame.passed  { border-color: var(--vscode-charts-green); }
+    .device-live-frame.failed  { border-color: var(--vscode-charts-red); }
+
+    .frame-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      font-size: 11px;
+    }
+    .frame-device-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .frame-platform-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); flex-shrink: 0; }
+    .frame-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--vscode-descriptionForeground); flex-shrink: 0; }
+    .device-live-frame.running .frame-status-dot { background: var(--vscode-textLink-foreground); animation: pulse 0.9s infinite; }
+    .device-live-frame.passed  .frame-status-dot { background: var(--vscode-charts-green); animation: none; }
+    .device-live-frame.failed  .frame-status-dot { background: var(--vscode-charts-red); animation: none; }
+
+    .frame-screen {
+      position: relative;
+      aspect-ratio: 9 / 19.5;
+      background: #111;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .frame-screen img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .frame-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.3);
+      font-size: 11px;
+    }
+
+    /* Step progress bar */
+    .frame-progress {
+      height: 3px;
+      background: var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
+    .frame-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--vscode-textLink-foreground);
+      transition: width 0.25s ease;
+    }
+    .device-live-frame.passed .frame-progress-fill { background: var(--vscode-charts-green); }
+    .device-live-frame.failed .frame-progress-fill { background: var(--vscode-charts-red); }
+
+    /* Per-device mini step log */
+    .frame-step-log {
+      max-height: 96px;
+      overflow-y: auto;
+      flex-shrink: 0;
+      background: var(--vscode-editor-background);
+      border-top: 1px solid var(--vscode-panel-border);
+    }
+    .frame-step-item {
+      padding: 2px 8px;
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      font-size: 10px;
+      line-height: 1.6;
+      color: var(--vscode-descriptionForeground);
+      border-bottom: 1px solid rgba(128,128,128,0.08);
+    }
+    .frame-step-item.running { color: var(--vscode-textLink-foreground); }
+    .frame-step-item.success { color: var(--vscode-charts-green); }
+    .frame-step-item.failed  { color: var(--vscode-charts-red); }
+    .frame-step-icon { flex-shrink: 0; width: 10px; text-align: center; }
+    .frame-step-label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: var(--vscode-font-family);
+    }
+
+    .frame-footer {
+      padding: 4px 8px;
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+      background: var(--vscode-editor-background);
+      border-top: 1px solid var(--vscode-panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .frame-result {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      text-align: right;
+    }
+    .device-live-frame.passed .frame-result  { color: var(--vscode-charts-green); font-weight: 600; }
+    .device-live-frame.failed .frame-result  { color: var(--vscode-charts-red); font-weight: 600; }
+    .device-live-frame.running .frame-result { color: var(--vscode-textLink-foreground); }
   </style>
 </head>
 <body>
@@ -443,6 +590,9 @@ export class DevicePanel {
         <img id="mjpegStream" style="display:none;" />
       </div>
     </div>
+
+    <!-- Multi-device live grid (parallel/suite runs) -->
+    <div class="multi-live-grid" id="multiLiveGrid"></div>
 
     <!-- Right: Controls + Step log -->
     <div class="controls-pane">
@@ -512,7 +662,185 @@ export class DevicePanel {
     const platAndroid = document.getElementById("platAndroid");
     const platIos = document.getElementById("platIos");
     const platformToggle = document.getElementById("platformToggle");
+    const multiLiveGrid = document.getElementById("multiLiveGrid");
     let selectedPlatform = ""; // "" = use settings default
+
+    // ── Multi-device state ──────────────────────────────────
+    let panelMode = "single"; // "single" | "multi"
+    let liveFrames = {};      // deviceName → { element, imgEl, state }
+
+    function enterMultiMode(deviceCount) {
+      panelMode = "multi";
+      liveFrames = {};
+      devicePane.style.display = "none";
+      // Hide controls pane in multi mode — grid takes full width
+      document.querySelector(".controls-pane").style.display = "none";
+      multiLiveGrid.classList.add("active");
+      multiLiveGrid.innerHTML = "";
+      for (var i = 0; i < deviceCount; i++) {
+        _addLiveFrame("Device " + (i + 1), "", null, "__placeholder_" + i);
+      }
+    }
+
+    function exitMultiMode() {
+      panelMode = "single";
+      liveFrames = {};
+      multiLiveGrid.classList.remove("active");
+      multiLiveGrid.innerHTML = "";
+      devicePane.style.display = "";
+      document.querySelector(".controls-pane").style.display = "";
+    }
+
+    function _addLiveFrame(deviceName, platform, mjpegUrl, key) {
+      var frame = document.createElement("div");
+      frame.className = "device-live-frame pending";
+      var platHtml = platform ? '<span class="frame-platform-badge">' + escapeHtml(platform) + '</span>' : '';
+      frame.innerHTML =
+        '<div class="frame-header">' +
+          '<span class="frame-status-dot"></span>' +
+          '<span class="frame-device-name">' + escapeHtml(deviceName) + '</span>' +
+          platHtml +
+        '</div>' +
+        '<div class="frame-screen">' +
+          '<div class="frame-placeholder">Connecting...</div>' +
+          '<img style="display:none" />' +
+        '</div>' +
+        '<div class="frame-progress"><div class="frame-progress-fill"></div></div>' +
+        '<div class="frame-step-log"></div>' +
+        '<div class="frame-footer">' +
+          '<span class="frame-steps">—</span>' +
+          '<span class="frame-result">Pending</span>' +
+        '</div>';
+      var imgEl = frame.querySelector("img");
+      if (mjpegUrl) {
+        imgEl.src = mjpegUrl + "?t=" + Date.now();
+        imgEl.style.display = "";
+        frame.querySelector(".frame-placeholder").style.display = "none";
+        frame.className = "device-live-frame running";
+      }
+      multiLiveGrid.appendChild(frame);
+      liveFrames[key || deviceName] = {
+        element: frame,
+        imgEl: imgEl,
+        state: "pending",
+        progressFillEl: frame.querySelector(".frame-progress-fill"),
+        stepLogEl: frame.querySelector(".frame-step-log"),
+      };
+    }
+
+    function updateLiveFrame(deviceName, platform, mjpegUrl) {
+      // Claim a placeholder or create a new card
+      var placeholderKey = null;
+      var keys = Object.keys(liveFrames);
+      for (var ki = 0; ki < keys.length; ki++) {
+        if (keys[ki].indexOf("__placeholder_") === 0 && liveFrames[keys[ki]].state === "pending") {
+          placeholderKey = keys[ki];
+          break;
+        }
+      }
+      if (placeholderKey) {
+        liveFrames[deviceName] = liveFrames[placeholderKey];
+        delete liveFrames[placeholderKey];
+      } else if (!liveFrames[deviceName]) {
+        _addLiveFrame(deviceName, platform, mjpegUrl);
+        return;
+      }
+      var entry = liveFrames[deviceName];
+      entry.state = "running";
+      entry.element.className = "device-live-frame running";
+      entry.element.querySelector(".frame-device-name").textContent = deviceName;
+      // Add/update platform badge
+      if (platform) {
+        var badge = entry.element.querySelector(".frame-platform-badge");
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "frame-platform-badge";
+          entry.element.querySelector(".frame-header").appendChild(badge);
+        }
+        badge.textContent = platform;
+      }
+      // Start MJPEG stream
+      if (mjpegUrl) {
+        entry.imgEl.src = mjpegUrl + "?t=" + Date.now();
+        entry.imgEl.style.display = "";
+        var ph = entry.element.querySelector(".frame-placeholder");
+        if (ph) { ph.style.display = "none"; }
+        // Fallback if stream fails
+        entry.imgEl.onerror = function() {
+          entry.imgEl.style.display = "none";
+          var phFallback = entry.element.querySelector(".frame-placeholder");
+          if (phFallback) { phFallback.style.display = ""; phFallback.textContent = "No stream"; }
+        };
+      }
+      entry.element.querySelector(".frame-result").textContent = "Running";
+    }
+
+    /** Find the key in liveFrames that best matches a device name */
+    function findFrameKey(name) {
+      if (liveFrames[name]) return name;
+      var keys = Object.keys(liveFrames);
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].indexOf("__placeholder_") === 0) continue;
+        if (keys[i].indexOf(name) !== -1 || name.indexOf(keys[i]) !== -1) return keys[i];
+      }
+      return null;
+    }
+
+    /** Add or update a step entry in the per-device mini step log */
+    function updateDeviceStep(deviceName, step, total, kind, target, status) {
+      var key = findFrameKey(deviceName);
+      if (!key) return;
+      var entry = liveFrames[key];
+      if (!entry) return;
+
+      // Update progress bar and step counter
+      if (total > 0 && entry.progressFillEl) {
+        entry.progressFillEl.style.width = Math.round((step / total) * 100) + "%";
+      }
+      entry.element.querySelector(".frame-steps").textContent = step + "/" + total + " steps";
+
+      // Add/update entry in mini step log
+      if (entry.stepLogEl) {
+        var safeKey = key.replace(/[^a-z0-9]/gi, "_");
+        var stepId = "fstep-" + safeKey + "-" + step;
+        var existing = entry.stepLogEl.querySelector("#" + stepId);
+        var icon = status === "running" ? "▶" : status === "passed" ? "✓" : "✗";
+        var label = escapeHtml(target || kind);
+        var cls = status === "running" ? "running" : status === "passed" ? "success" : "failed";
+        if (existing) {
+          existing.className = "frame-step-item " + cls;
+          existing.querySelector(".frame-step-icon").textContent = icon;
+        } else {
+          var item = document.createElement("div");
+          item.id = stepId;
+          item.className = "frame-step-item " + cls;
+          item.innerHTML = '<span class="frame-step-icon">' + icon + '</span><span class="frame-step-label">' + label + '</span>';
+          entry.stepLogEl.appendChild(item);
+          entry.stepLogEl.scrollTop = entry.stepLogEl.scrollHeight;
+        }
+      }
+    }
+
+    function finalizeLiveFrame(deviceName, success, stepsExecuted, stepsTotal, reason) {
+      var key = findFrameKey(deviceName) || deviceName;
+      var entry = liveFrames[key];
+      if (!entry) { return; }
+      entry.state = success ? "passed" : "failed";
+      entry.element.className = "device-live-frame " + entry.state;
+      entry.element.querySelector(".frame-steps").textContent = stepsExecuted + "/" + stepsTotal + " steps";
+      // Fill progress bar to completion
+      if (entry.progressFillEl) {
+        entry.progressFillEl.style.width = success
+          ? "100%"
+          : Math.round((stepsExecuted / Math.max(stepsTotal, 1)) * 100) + "%";
+      }
+      // Truncate long error messages — show full text on hover via title
+      var resultText = success ? "Passed" : (reason ? reason : "Failed");
+      var truncated = resultText.length > 50 ? resultText.substring(0, 50) + "…" : resultText;
+      var resultEl = entry.element.querySelector(".frame-result");
+      resultEl.textContent = truncated;
+      resultEl.title = resultText;
+    }
 
     function setPlatform(platform) {
       if (selectedPlatform === platform) {
@@ -698,6 +1026,7 @@ export class DevicePanel {
     }
 
     function resetPanel() {
+      if (panelMode === "multi") { exitMultiMode(); }
       statusDot.className = "status-dot";
       deviceName.textContent = "No device connected";
       platformBadge.style.display = "none";
@@ -795,22 +1124,34 @@ export class DevicePanel {
       const msg = event.data;
       debug("recv: " + JSON.stringify(msg).substring(0, 120));
 
+      // Mode switch — sent before each run to set single vs multi-device layout
+      if (msg.type === "setRunMode") {
+        if (msg.mode === "multi") {
+          enterMultiMode(msg.deviceCount);
+        } else {
+          exitMultiMode();
+        }
+        return;
+      }
+
       // Loading indicator — triggered immediately when flow/goal starts
       if (msg.type === "appclaw-loading") {
         statusDot.className = "status-dot";
         statusDot.style.animation = "pulse 1.2s infinite";
         deviceName.textContent = msg.label || "Starting...";
-        // Update left pane to show loading state
-        idleWelcome.innerHTML =
-          '<div class="idle-icon" style="animation:pulse 1.5s infinite;"><span class="spinner" style="width:28px;height:28px;border-width:3px;"></span></div>' +
-          '<div class="idle-title">Setting up device...</div>' +
-          '<div class="idle-subtitle">Launching MCP server and<br>connecting to your device</div>';
-        stepLog.innerHTML = '<div class="setup-progress" id="setupProgress">' +
-          '<div class="setup-step active"><span class="setup-icon"><span class="spinner"></span></span> Starting MCP server...</div>' +
-          '<div class="setup-step pending"><span class="setup-icon">&#9675;</span> Connecting to device</div>' +
-          '<div class="setup-step pending"><span class="setup-icon">&#9675;</span> Starting MJPEG stream</div>' +
-          '<div class="setup-step pending"><span class="setup-icon">&#9675;</span> Executing steps</div>' +
-          '</div>';
+        // In multi mode, skip left-pane update (grid is already shown)
+        if (panelMode !== "multi") {
+          idleWelcome.innerHTML =
+            '<div class="idle-icon" style="animation:pulse 1.5s infinite;"><span class="spinner" style="width:28px;height:28px;border-width:3px;"></span></div>' +
+            '<div class="idle-title">Setting up device...</div>' +
+            '<div class="idle-subtitle">Launching MCP server and<br>connecting to your device</div>';
+          stepLog.innerHTML = '<div class="setup-progress" id="setupProgress">' +
+            '<div class="setup-step active"><span class="setup-icon"><span class="spinner"></span></span> Starting MCP server...</div>' +
+            '<div class="setup-step pending"><span class="setup-icon">&#9675;</span> Connecting to device</div>' +
+            '<div class="setup-step pending"><span class="setup-icon">&#9675;</span> Starting MJPEG stream</div>' +
+            '<div class="setup-step pending"><span class="setup-icon">&#9675;</span> Executing steps</div>' +
+            '</div>';
+        }
         setRunning(true);
         return;
       }
@@ -819,7 +1160,8 @@ export class DevicePanel {
 
       switch (msg.event) {
         case "connected":
-          // MCP connected — update setup progress
+          // MCP connected — skip left-pane update in multi mode
+          if (panelMode === "multi") { break; }
           statusDot.style.animation = "";
           statusDot.className = "status-dot connected";
           deviceName.textContent = "Setting up...";
@@ -832,6 +1174,12 @@ export class DevicePanel {
           break;
 
         case "device_ready":
+          // Multi-device mode: update a live frame card
+          if (panelMode === "multi") {
+            updateLiveFrame(msg.data.device || msg.data.platform, msg.data.platform, msg.data.mjpegUrl);
+            break;
+          }
+          // Single-device mode: original behavior
           statusDot.className = "status-dot connected";
           deviceName.textContent = msg.data.device || "Device Ready";
           platformBadge.textContent = msg.data.platform;
@@ -951,6 +1299,13 @@ export class DevicePanel {
 
         case "flow_step":
           clearSetupProgress();
+          // Multi-device mode: route step to the correct device card
+          if (panelMode === "multi") {
+            if (msg.data.device) {
+              updateDeviceStep(msg.data.device, msg.data.step, msg.data.total, msg.data.kind, msg.data.target, msg.data.status);
+            }
+            break;
+          }
           if (msg.data.kind === "yaml" && msg.data.status === "passed") {
             // Show YAML in a pre-formatted block
             var yamlEntry = document.createElement("div");
@@ -999,8 +1354,41 @@ export class DevicePanel {
           );
           break;
 
+        case "suite_done":
+        case "parallel_done":
+          if (panelMode === "multi") {
+            setRunning(false);
+            var workers = msg.data.workers || [];
+            for (var wi = 0; wi < workers.length; wi++) {
+              var w = workers[wi];
+              finalizeLiveFrame(w.deviceName, w.success, w.stepsExecuted, w.stepsTotal, w.reason);
+            }
+            // Update header with pass/fail summary
+            var totalRun = msg.data.passedCount + msg.data.failedCount;
+            statusDot.style.animation = "";
+            if (msg.data.success) {
+              statusDot.className = "status-dot connected";
+              deviceName.textContent = "\u2713 " + msg.data.passedCount + "/" + totalRun + " passed";
+            } else {
+              statusDot.className = "status-dot error";
+              deviceName.textContent = msg.data.passedCount + "/" + totalRun + " passed \u2022 " + msg.data.failedCount + " failed";
+            }
+            // Keep results visible for 15s, then reset to idle
+            setTimeout(function() {
+              exitMultiMode();
+              statusDot.className = "status-dot";
+              statusDot.style.animation = "";
+              deviceName.textContent = "No device connected";
+              platformBadge.style.display = "none";
+              showIdleWelcome();
+            }, 15000);
+          }
+          break;
+
         case "flow_done":
         case "done":
+          // In multi mode, per-flow done events are handled by suite_done/parallel_done
+          if (panelMode === "multi") { break; }
           setRunning(false);
           if (msg.data && !msg.data.success) {
             statusDot.className = "status-dot error";

@@ -177,6 +177,41 @@ name: YouTube search
 
 Supported natural language patterns include: `open <app>`, `click/tap <element>`, `type "text"`, `scroll up/down`, `swipe left/right`, `scroll down until "X" is visible`, `wait N seconds`, `go back`, `press home`, `verify/assert <element> is visible`, `press enter`, and `done`. Questions like `"whats on the screen?"` or `"how many items are there?"` are answered via vision without executing any action.
 
+### Parallel & suite runs
+
+Run the same flow on N devices simultaneously, or distribute a suite of flows across N workers:
+
+**Same flow, N devices** — add `parallel: N` to the flow's metadata:
+```yaml
+name: youtube_parallel
+platform: android
+parallel: 2
+---
+- open YouTube app
+- search for "Appium 3.0"
+- assert "TestMu AI" is visible
+- done
+```
+```bash
+appclaw --flow youtube.yaml   # spins up 2 devices, runs flow on both concurrently
+```
+
+**Suite: different flows, N workers** — a suite YAML lists flows and a worker count:
+```yaml
+name: youtube_suite
+platform: android
+parallel: 2
+flows:
+  - flows/login.yaml
+  - flows/search.yaml
+  - flows/playback.yaml
+```
+```bash
+appclaw --flow youtube-suite.yaml   # 2 devices pull from queue until all 3 flows finish
+```
+
+The VS Code extension shows a **live multi-device grid** — each device card updates in real time with a per-device step log, progress bar, and pass/fail result. Failed flows can be re-run with **Re-run Failed** from the summary notification.
+
 ### Playground (interactive REPL)
 
 Build YAML flows interactively on a real device — type commands and watch them execute live:

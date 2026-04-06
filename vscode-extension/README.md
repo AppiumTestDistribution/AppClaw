@@ -5,10 +5,12 @@ AI-powered mobile automation agent — control Android & iOS devices from VS Cod
 ## Features
 
 - **Device Preview Panel** — see the device screen and step execution log in a webview
+- **Parallel Run Grid** — live multi-device grid for parallel/suite flows: per-device step log, progress bar, and pass/fail result per card
 - **Goal Runner** — enter natural language goals from the command palette or device panel
 - **Flow File CodeLens** — "Run Flow" / "Run Step" buttons on YAML flow files
 - **Sidebar** — Devices, Flows, and History tree views
 - **HITL Support** — respond to OTP/CAPTCHA prompts right in the webview
+- **Re-run Failed** — after a suite, re-run only the failed flows with one click
 
 ## Getting Started
 

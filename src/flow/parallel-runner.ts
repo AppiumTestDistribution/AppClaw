@@ -33,6 +33,7 @@ import type { RunYamlFlowOptions, RunYamlFlowResult } from "./run-yaml-flow.js";
 import type { ParsedFlow, ParsedSuite } from "./types.js";
 import { parseFlowYamlFile } from "./parse-yaml-flow.js";
 import { RunArtifactCollector, writeSuiteEntry } from "../report/writer.js";
+import { emitJson, isJsonMode } from "../json-emitter.js";
 import * as ui from "../ui/terminal.js";
 import chalk from "chalk";
 
@@ -105,22 +106,31 @@ async function discoverDevices(
 
 // ── Port allocation ─────────────────────────────────────────────────
 
-async function buildWorkerCaps(platform: Platform): Promise<Record<string, unknown>> {
+interface WorkerCapsResult {
+  caps: Record<string, unknown>;
+  mjpegUrl?: string;
+}
+
+async function buildWorkerCaps(platform: Platform): Promise<WorkerCapsResult> {
   if (platform === "android") {
     const [systemPort, mjpegPort] = await Promise.all([findFreePort(), findFreePort()]);
+    const mjpegUrl = `http://127.0.0.1:${mjpegPort}`;
     return {
-      "appium:systemPort": systemPort,
-      "appium:mjpegServerPort": mjpegPort,
-      "appium:mjpegScreenshotUrl": `http://127.0.0.1:${mjpegPort}`,
+      caps: {
+        "appium:systemPort": systemPort,
+        "appium:mjpegServerPort": mjpegPort,
+        "appium:mjpegScreenshotUrl": mjpegUrl,
+      },
+      mjpegUrl,
     };
   }
   if (platform === "ios") {
     const wdaPort = await findFreePort();
     return {
-      "appium:wdaLocalPort": wdaPort,
+      caps: { "appium:wdaLocalPort": wdaPort },
     };
   }
-  return {};
+  return { caps: {} };
 }
 
 // ── Worker execution ────────────────────────────────────────────────
@@ -150,12 +160,14 @@ async function runWorkerJob(
   // correct device regardless of appium-mcp's global select_device state.
   // Without this, concurrent workers race on the shared activeDevice global
   // in appium-mcp and both end up targeting the same physical device.
-  const workerCaps = await buildWorkerCaps(platform);
+  const { caps: workerCaps, mjpegUrl } = await buildWorkerCaps(platform);
   const deviceResult = await setupDevice(sharedMcp, {
     ...baseSetupArgs,
     cliUdid: device.udid,
     extraCaps: { "appium:udid": device.udid, ...workerCaps },
   });
+
+  emitJson({ event: "device_ready", data: { platform, device: deviceResult.deviceName, mjpegUrl } });
 
   const scopedMcp = deviceResult.scopedMcp;
 
@@ -174,11 +186,18 @@ async function runWorkerJob(
       job.suiteName,
     );
 
+    const deviceLabel = deviceResult.deviceName;
+    const workerOnFlowStep = isJsonMode()
+      ? (step: number, total: number, kind: string, target: string | undefined, status: "running" | "passed" | "failed", error?: string, message?: string) => {
+          emitJson({ event: "flow_step", data: { step, total, kind, target, status, error, message, device: deviceLabel } });
+        }
+      : undefined;
+
     const result = await runYamlFlow(
       scopedMcp,
       job.parsed.meta,
       job.parsed.steps,
-      { ...options, appResolver, artifactCollector, deviceUdid: deviceResult.deviceUdid },
+      { ...options, appResolver, artifactCollector, deviceUdid: deviceResult.deviceUdid, onFlowStep: workerOnFlowStep },
       job.parsed.phases,
     );
 

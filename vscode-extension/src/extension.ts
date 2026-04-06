@@ -378,6 +378,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       // Open device panel and show loading state immediately
       const panel = DevicePanel.createOrShow(context.extensionUri, bridge);
+      panel.setRunMode("single", 1);
       panel.showLoading("Running goal...");
 
       bridge.runGoal(goal);
@@ -420,10 +421,19 @@ export function activate(context: vscode.ExtensionContext): void {
         activeFlowFilePath = filePath;
         clearFlowDecorations();
 
-        // Detect suite YAMLs so suite_done can decorate + re-run
+        // Detect suite/parallel YAMLs — sets run mode and captures suite_done context
+        let runMode: "single" | "multi" = "single";
+        let deviceCount = 1;
         try {
           const content = fs.readFileSync(filePath, "utf8");
-          if (/^\s*flows\s*:/m.test(content)) {
+          const parallelMatch = content.match(/^\s*parallel\s*:\s*(\d+)/m);
+          if (parallelMatch) {
+            runMode = "multi";
+            deviceCount = parseInt(parallelMatch[1], 10);
+          } else if (/^\s*flows\s*:/m.test(content)) {
+            const flowLines = content.match(/^\s+-\s+\S+/gm);
+            runMode = "multi";
+            deviceCount = flowLines?.length ?? 2;
             lastSuiteFile = filePath;
             lastFailedFlows = [];
           }
@@ -436,6 +446,7 @@ export function activate(context: vscode.ExtensionContext): void {
         await vscode.window.showTextDocument(doc, vscode.ViewColumn.One, true);
 
         const panel = DevicePanel.createOrShow(context.extensionUri, bridge);
+        panel.setRunMode(runMode, deviceCount);
         panel.showLoading(`Running ${filePath.split("/").pop()}...`);
 
         bridge.runFlow(filePath);
