@@ -8,8 +8,8 @@
  * - Items can be sorted/grouped (e.g., booted devices first)
  */
 
-import readline from "node:readline";
-import { Writable } from "node:stream";
+import readline from 'node:readline';
+import { Writable } from 'node:stream';
 
 export interface PickerItem<T> {
   label: string;
@@ -37,44 +37,44 @@ export async function interactivePicker<T>(
   items: PickerItem<T>[],
   options: PickerOptions
 ): Promise<T> {
-  const {
-    prompt,
-    viewportSize = 10,
-    searchable = true,
-  } = options;
+  const { prompt, viewportSize = 10, searchable = true } = options;
 
   // Single item — auto-select
   if (items.length === 1) return items[0].value;
   // No items
-  if (items.length === 0) throw new Error("No items to pick from");
+  if (items.length === 0) throw new Error('No items to pick from');
 
   return new Promise((resolve) => {
     let selectedIndex = 0;
     let scrollOffset = 0;
-    let searchQuery = "";
+    let searchQuery = '';
     let filteredItems = items;
     let lastRenderedLineCount = 0;
     const maxVisible = Math.min(viewportSize, items.length);
 
     // Use a Writable that discards output to prevent readline from interfering with our rendering.
     // We handle all stdout writes ourselves.
-    const devNull = new Writable({ write(_c: any, _e: any, cb: () => void) { cb(); } });
+    const devNull = new Writable({
+      write(_c: any, _e: any, cb: () => void) {
+        cb();
+      },
+    });
     const rl = readline.createInterface({ input: process.stdin, output: devNull, terminal: false });
     if (process.stdin.setRawMode) process.stdin.setRawMode(true);
     readline.emitKeypressEvents(process.stdin);
 
     const formatItem = (item: PickerItem<T>, selected: boolean): string => {
-      const arrow = selected ? "\x1B[36m>\x1B[0m " : "  ";
+      const arrow = selected ? '\x1B[36m>\x1B[0m ' : '  ';
       const prefix = `  ${arrow}`;
 
-      let line = "";
+      let line = '';
       if (selected) {
         line += `\x1B[36m${item.label}\x1B[0m`;
       } else {
         line += item.label;
       }
       if (item.tag) {
-        const tagColor = item.tag.toLowerCase() === "booted" ? "\x1B[32m" : "\x1B[90m";
+        const tagColor = item.tag.toLowerCase() === 'booted' ? '\x1B[32m' : '\x1B[90m';
         line += ` ${tagColor}${item.tag}\x1B[0m`;
       }
       if (item.hint) {
@@ -88,10 +88,11 @@ export async function interactivePicker<T>(
         filteredItems = items;
       } else {
         const q = searchQuery.toLowerCase();
-        filteredItems = items.filter(item =>
-          item.label.toLowerCase().includes(q) ||
-          (item.tag?.toLowerCase().includes(q)) ||
-          (item.hint?.toLowerCase().includes(q))
+        filteredItems = items.filter(
+          (item) =>
+            item.label.toLowerCase().includes(q) ||
+            item.tag?.toLowerCase().includes(q) ||
+            item.hint?.toLowerCase().includes(q)
         );
       }
       selectedIndex = 0;
@@ -104,7 +105,7 @@ export async function interactivePicker<T>(
         process.stdout.write(`\x1B[${lastRenderedLineCount}A`);
       }
       // Clear everything from cursor to end of screen
-      process.stdout.write("\x1B[J");
+      process.stdout.write('\x1B[J');
 
       let lineCount = 0;
 
@@ -147,7 +148,7 @@ export async function interactivePicker<T>(
         const parts: string[] = [];
         if (above > 0) parts.push(`${above} more above`);
         if (below > 0) parts.push(`${below} more below`);
-        console.log(`    \x1B[90m${parts.join(" · ")}\x1B[0m`);
+        console.log(`    \x1B[90m${parts.join(' · ')}\x1B[0m`);
         lineCount++;
       }
 
@@ -160,36 +161,38 @@ export async function interactivePicker<T>(
     const onKeypress = (_str: string | undefined, key: readline.Key) => {
       if (!key) return;
 
-      if (key.name === "up") {
+      if (key.name === 'up') {
         if (selectedIndex > 0) {
           selectedIndex--;
           render();
         }
-      } else if (key.name === "down") {
+      } else if (key.name === 'down') {
         if (selectedIndex < filteredItems.length - 1) {
           selectedIndex++;
           render();
         }
-      } else if (key.name === "return") {
+      } else if (key.name === 'return') {
         if (filteredItems.length > 0) {
           cleanup();
           // Show final selection
           const selected = filteredItems[selectedIndex];
-          console.log(`  \x1B[32m✓\x1B[0m ${options.prompt} \x1B[36m${selected.label}\x1B[0m${selected.tag ? ` \x1B[32m${selected.tag}\x1B[0m` : ""}`);
+          console.log(
+            `  \x1B[32m✓\x1B[0m ${options.prompt} \x1B[36m${selected.label}\x1B[0m${selected.tag ? ` \x1B[32m${selected.tag}\x1B[0m` : ''}`
+          );
           resolve(selected.value);
         }
-      } else if (key.name === "c" && key.ctrl) {
+      } else if (key.name === 'c' && key.ctrl) {
         cleanup();
         process.exit(0);
-      } else if (key.name === "backspace") {
+      } else if (key.name === 'backspace') {
         if (searchQuery.length > 0) {
           searchQuery = searchQuery.slice(0, -1);
           updateFilter();
           render();
         }
-      } else if (key.name === "escape") {
+      } else if (key.name === 'escape') {
         if (searchQuery) {
-          searchQuery = "";
+          searchQuery = '';
           updateFilter();
           render();
         }
@@ -202,7 +205,7 @@ export async function interactivePicker<T>(
     };
 
     const cleanup = () => {
-      process.stdin.removeListener("keypress", onKeypress);
+      process.stdin.removeListener('keypress', onKeypress);
       if (process.stdin.setRawMode) process.stdin.setRawMode(false);
       rl.close();
       // Clear the picker UI before showing result
@@ -213,6 +216,6 @@ export async function interactivePicker<T>(
       if (process.stdin.isPaused()) process.stdin.resume();
     };
 
-    process.stdin.on("keypress", onKeypress);
+    process.stdin.on('keypress', onKeypress);
   });
 }

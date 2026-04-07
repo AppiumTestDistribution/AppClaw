@@ -81,7 +81,10 @@
         {
           "type": "object",
           "properties": {
-            "type": { "type": "string", "description": "Text to type. Supports ${secrets.X} and ${variables.X}" }
+            "type": {
+              "type": "string",
+              "description": "Text to type. Supports ${secrets.X} and ${variables.X}"
+            }
           },
           "required": ["type"],
           "additionalProperties": false
@@ -97,8 +100,15 @@
         {
           "type": "object",
           "properties": {
-            "waitUntil": { "type": "string", "description": "Wait for element/text to be visible, or 'screen loaded'" },
-            "timeout": { "type": "number", "description": "Timeout in seconds (default: 10)", "default": 10 }
+            "waitUntil": {
+              "type": "string",
+              "description": "Wait for element/text to be visible, or 'screen loaded'"
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Timeout in seconds (default: 10)",
+              "default": 10
+            }
           },
           "required": ["waitUntil"],
           "additionalProperties": false
@@ -106,8 +116,15 @@
         {
           "type": "object",
           "properties": {
-            "waitUntilGone": { "type": "string", "description": "Wait for element/text to disappear" },
-            "timeout": { "type": "number", "description": "Timeout in seconds (default: 10)", "default": 10 }
+            "waitUntilGone": {
+              "type": "string",
+              "description": "Wait for element/text to disappear"
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Timeout in seconds (default: 10)",
+              "default": 10
+            }
           },
           "required": ["waitUntilGone"],
           "additionalProperties": false
@@ -115,7 +132,10 @@
         {
           "type": "object",
           "properties": {
-            "assert": { "type": "string", "description": "Text/element to verify is visible on screen" }
+            "assert": {
+              "type": "string",
+              "description": "Text/element to verify is visible on screen"
+            }
           },
           "required": ["assert"],
           "additionalProperties": false
@@ -123,7 +143,10 @@
         {
           "type": "object",
           "properties": {
-            "verify": { "type": "string", "description": "Text/element to verify is visible (alias for assert)" }
+            "verify": {
+              "type": "string",
+              "description": "Text/element to verify is visible (alias for assert)"
+            }
           },
           "required": ["verify"],
           "additionalProperties": false
@@ -151,7 +174,10 @@
         {
           "type": "object",
           "properties": {
-            "getInfo": { "type": "string", "description": "Question about the current screen (uses vision)" }
+            "getInfo": {
+              "type": "string",
+              "description": "Question about the current screen (uses vision)"
+            }
           },
           "required": ["getInfo"],
           "additionalProperties": false
@@ -159,7 +185,10 @@
         {
           "type": "object",
           "properties": {
-            "done": { "type": "string", "description": "Final message to verify. Leave empty for unconditional pass." }
+            "done": {
+              "type": "string",
+              "description": "Final message to verify. Leave empty for unconditional pass."
+            }
           },
           "required": ["done"],
           "additionalProperties": false

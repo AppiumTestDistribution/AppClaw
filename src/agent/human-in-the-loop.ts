@@ -9,11 +9,11 @@
  * - Login credentials
  */
 
-import * as readline from "readline";
-import * as ui from "../ui/terminal.js";
+import * as readline from 'readline';
+import * as ui from '../ui/terminal.js';
 
 export interface HITLRequest {
-  type: "otp" | "captcha" | "choice" | "confirmation" | "input";
+  type: 'otp' | 'captcha' | 'choice' | 'confirmation' | 'input';
   question: string;
   options?: string[];
   timeout?: number; // ms, 0 = no timeout
@@ -41,7 +41,7 @@ export async function askUser(request: HITLRequest): Promise<HITLResponse> {
       timer = setTimeout(() => {
         rl.close();
         ui.printTimeout();
-        resolve({ answered: false, answer: "", timedOut: true });
+        resolve({ answered: false, answer: '', timedOut: true });
       }, request.timeout);
     }
 
@@ -69,24 +69,26 @@ export async function askUser(request: HITLRequest): Promise<HITLResponse> {
 export function classifyHITLRequest(question: string): HITLRequest {
   const lower = question.toLowerCase();
 
-  if (lower.includes("otp") || lower.includes("verification code") || lower.includes("2fa")) {
-    return { type: "otp", question, timeout: 120_000 }; // 2 min for OTP
+  if (lower.includes('otp') || lower.includes('verification code') || lower.includes('2fa')) {
+    return { type: 'otp', question, timeout: 120_000 }; // 2 min for OTP
   }
 
-  if (lower.includes("captcha")) {
-    return { type: "captcha", question, timeout: 60_000 };
+  if (lower.includes('captcha')) {
+    return { type: 'captcha', question, timeout: 60_000 };
   }
 
-  if (lower.includes("which") || lower.includes("choose") || lower.includes("select")) {
-    return { type: "choice", question };
+  if (lower.includes('which') || lower.includes('choose') || lower.includes('select')) {
+    return { type: 'choice', question };
   }
 
   if (
-    lower.includes("confirm") || lower.includes("delete") ||
-    lower.includes("proceed") || lower.includes("sure")
+    lower.includes('confirm') ||
+    lower.includes('delete') ||
+    lower.includes('proceed') ||
+    lower.includes('sure')
   ) {
-    return { type: "confirmation", question, options: ["Yes", "No"] };
+    return { type: 'confirmation', question, options: ['Yes', 'No'] };
   }
 
-  return { type: "input", question };
+  return { type: 'input', question };
 }

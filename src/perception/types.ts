@@ -25,13 +25,13 @@ export interface UIElement {
   /** Hint/placeholder text */
   hint: string;
   /** Suggested action for the LLM */
-  action: "tap" | "type" | "longpress" | "scroll" | "read";
+  action: 'tap' | 'type' | 'longpress' | 'scroll' | 'read';
   /** Parent element label for context */
   parent: string;
   /** Depth in the element tree */
   depth: number;
   /** Source platform */
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
 }
 
 /** Compact representation sent to the LLM — minimal tokens */
@@ -39,7 +39,7 @@ export interface CompactUIElement {
   text: string;
   id: string;
   center: [number, number];
-  action: UIElement["action"];
+  action: UIElement['action'];
   // Only included when non-default
   enabled?: false;
   /** true = ON, false = OFF (only shown for toggle/switch/checkbox elements) */
@@ -63,6 +63,6 @@ export interface ScreenState {
   /** Number of editable fields in the trimmed DOM (pre-computed by trimmer) */
   editableCount: number;
   screenshot?: string;
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
   raw: string;
 }

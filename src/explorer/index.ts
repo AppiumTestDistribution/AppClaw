@@ -11,16 +11,16 @@
  *   appclaw --explore <prd-text-or-file> --num-flows 5 --no-crawl
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import path from "path";
-import type { AppClawConfig } from "../config.js";
-import type { MCPClient } from "../mcp/types.js";
-import { buildModel, buildThinkingOptions } from "../llm/provider.js";
-import { analyzePRD } from "./prd-analyzer.js";
-import { crawlApp, type CrawlerOptions } from "./screen-crawler.js";
-import { generateFlows } from "./flow-generator.js";
-import type { ExplorerConfig, PRDAnalysis, ScreenGraph } from "./types.js";
-import * as ui from "../ui/terminal.js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import path from 'path';
+import type { AppClawConfig } from '../config.js';
+import type { MCPClient } from '../mcp/types.js';
+import { buildModel, buildThinkingOptions } from '../llm/provider.js';
+import { analyzePRD } from './prd-analyzer.js';
+import { crawlApp, type CrawlerOptions } from './screen-crawler.js';
+import { generateFlows } from './flow-generator.js';
+import type { ExplorerConfig, PRDAnalysis, ScreenGraph } from './types.js';
+import * as ui from '../ui/terminal.js';
 
 export interface ExplorerResult {
   success: boolean;
@@ -35,7 +35,7 @@ export interface ExplorerResult {
 export async function runExplorer(
   explorerConfig: ExplorerConfig,
   appConfig: AppClawConfig,
-  mcp?: MCPClient,
+  mcp?: MCPClient
 ): Promise<ExplorerResult> {
   const model = buildModel(appConfig);
   const thinkingOptions = buildThinkingOptions(appConfig);
@@ -43,13 +43,13 @@ export async function runExplorer(
   // Resolve PRD text — could be a file path or inline text
   let prdText = explorerConfig.prd;
   if (existsSync(prdText)) {
-    ui.printExplorerPhase("Read", `Loading PRD from ${prdText}`);
-    prdText = readFileSync(prdText, "utf-8");
+    ui.printExplorerPhase('Read', `Loading PRD from ${prdText}`);
+    prdText = readFileSync(prdText, 'utf-8');
   }
 
   // ─── Phase 1: THINK — Analyze PRD ──────────────────────
-  ui.printExplorerPhase("Think", "Analyzing PRD...");
-  ui.startSpinner("Analyzing PRD — extracting features and user journeys...", "think");
+  ui.printExplorerPhase('Think', 'Analyzing PRD...');
+  ui.startSpinner('Analyzing PRD — extracting features and user journeys...', 'think');
 
   let analysis: PRDAnalysis;
   try {
@@ -57,7 +57,7 @@ export async function runExplorer(
     ui.stopSpinner();
   } catch (err: any) {
     ui.stopSpinner();
-    ui.printError("PRD analysis failed", err?.message ?? String(err));
+    ui.printError('PRD analysis failed', err?.message ?? String(err));
     return { success: false, flowsGenerated: 0, outputDir: explorerConfig.outputDir, files: [] };
   }
 
@@ -68,7 +68,7 @@ export async function runExplorer(
   let screenGraph: ScreenGraph | undefined;
 
   if (explorerConfig.crawl && mcp) {
-    ui.printExplorerPhase("Explore", "Crawling app on device...");
+    ui.printExplorerPhase('Explore', 'Crawling app on device...');
 
     const crawlerOptions: CrawlerOptions = {
       maxScreens: explorerConfig.maxScreens,
@@ -83,14 +83,14 @@ export async function runExplorer(
       ui.printWarning(`Crawling failed: ${err?.message ?? err}. Continuing without screen data.`);
     }
   } else if (explorerConfig.crawl && !mcp) {
-    ui.printWarning("Crawling requested but no device connection. Generating flows from PRD only.");
+    ui.printWarning('Crawling requested but no device connection. Generating flows from PRD only.');
   } else {
-    ui.printExplorerPhase("Explore", "Skipped (--no-crawl). Generating flows from PRD only.");
+    ui.printExplorerPhase('Explore', 'Skipped (--no-crawl). Generating flows from PRD only.');
   }
 
   // ─── Phase 3: ACT — Generate flows ────────────────────
-  ui.printExplorerPhase("Act", `Generating ${explorerConfig.numFlows} test flows...`);
-  ui.startSpinner(`Generating ${explorerConfig.numFlows} flows...`, "act");
+  ui.printExplorerPhase('Act', `Generating ${explorerConfig.numFlows} test flows...`);
+  ui.startSpinner(`Generating ${explorerConfig.numFlows} flows...`, 'act');
 
   let flows;
   try {
@@ -99,12 +99,12 @@ export async function runExplorer(
       explorerConfig.numFlows,
       model,
       thinkingOptions,
-      screenGraph,
+      screenGraph
     );
     ui.stopSpinner();
   } catch (err: any) {
     ui.stopSpinner();
-    ui.printError("Flow generation failed", err?.message ?? String(err));
+    ui.printError('Flow generation failed', err?.message ?? String(err));
     return { success: false, flowsGenerated: 0, outputDir: explorerConfig.outputDir, files: [] };
   }
 
@@ -120,13 +120,13 @@ export async function runExplorer(
     // Sanitize name for filename
     const safeName = flow.name
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
       .slice(0, 60);
-    const filename = `${String(i + 1).padStart(2, "0")}-${safeName}.yaml`;
+    const filename = `${String(i + 1).padStart(2, '0')}-${safeName}.yaml`;
     const filepath = path.join(outputDir, filename);
 
-    writeFileSync(filepath, flow.yamlContent + "\n", "utf-8");
+    writeFileSync(filepath, flow.yamlContent + '\n', 'utf-8');
     savedFiles.push(filepath);
   }
 

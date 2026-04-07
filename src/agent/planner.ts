@@ -10,19 +10,21 @@
  *      "Send the message", "Open email app", "Check inbox"]
  */
 
-import { generateObject } from "ai";
-import { z } from "zod";
+import { generateObject } from 'ai';
+import { z } from 'zod';
 
 const planSchema = z.object({
-  isComplex: z.boolean().describe("Whether the goal needs decomposition"),
-  subGoals: z.array(
-    z.object({
-      goal: z.string().describe("A single, atomic sub-goal"),
-      app: z.string().optional().describe("Target app if known (package name or bundle ID)"),
-      dependsOn: z.number().optional().describe("Index of sub-goal this depends on (0-based)"),
-    })
-  ).describe("Ordered list of sub-goals"),
-  reasoning: z.string().describe("Why this decomposition was chosen"),
+  isComplex: z.boolean().describe('Whether the goal needs decomposition'),
+  subGoals: z
+    .array(
+      z.object({
+        goal: z.string().describe('A single, atomic sub-goal'),
+        app: z.string().optional().describe('Target app if known (package name or bundle ID)'),
+        dependsOn: z.number().optional().describe('Index of sub-goal this depends on (0-based)'),
+      })
+    )
+    .describe('Ordered list of sub-goals'),
+  reasoning: z.string().describe('Why this decomposition was chosen'),
 });
 
 export type GoalPlan = z.infer<typeof planSchema>;
@@ -32,7 +34,7 @@ export interface SubGoal {
   goal: string;
   app?: string;
   dependsOn?: number;
-  status: "pending" | "in_progress" | "completed" | "failed";
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
   result?: string;
 }
 
@@ -49,21 +51,21 @@ export interface PlannerResult {
 export async function decomposeGoal(
   goal: string,
   model: any,
-  providerOptions?: Record<string, any>,
+  providerOptions?: Record<string, any>
 ): Promise<PlannerResult> {
   const { object } = await generateObject({
     model,
     schema: planSchema,
     system: PLANNER_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: goal }],
+    messages: [{ role: 'user', content: goal }],
     ...(providerOptions ? { providerOptions } : {}),
   });
 
   if (!object.isComplex || object.subGoals.length <= 1) {
     return {
       isComplex: false,
-      subGoals: [{ index: 0, goal, status: "pending" }],
-      reasoning: "Simple goal — no decomposition needed",
+      subGoals: [{ index: 0, goal, status: 'pending' }],
+      reasoning: 'Simple goal — no decomposition needed',
     };
   }
 
@@ -74,7 +76,7 @@ export async function decomposeGoal(
       goal: sg.goal,
       app: sg.app,
       dependsOn: sg.dependsOn,
-      status: "pending" as const,
+      status: 'pending' as const,
     })),
     reasoning: object.reasoning,
   };
@@ -97,13 +99,13 @@ export function createPlanExecutor(subGoals: SubGoal[]) {
     },
 
     get progress(): string {
-      const done = subGoals.filter((sg) => sg.status === "completed").length;
+      const done = subGoals.filter((sg) => sg.status === 'completed').length;
       return `[${done}/${subGoals.length}]`;
     },
 
     markCompleted(result: string) {
       if (subGoals[currentIndex]) {
-        subGoals[currentIndex].status = "completed";
+        subGoals[currentIndex].status = 'completed';
         subGoals[currentIndex].result = result;
         currentIndex++;
       }
@@ -111,7 +113,7 @@ export function createPlanExecutor(subGoals: SubGoal[]) {
 
     markFailed(result: string) {
       if (subGoals[currentIndex]) {
-        subGoals[currentIndex].status = "failed";
+        subGoals[currentIndex].status = 'failed';
         subGoals[currentIndex].result = result;
         currentIndex++;
       }
@@ -123,12 +125,19 @@ export function createPlanExecutor(subGoals: SubGoal[]) {
 
     /** Get a summary of plan progress for the LLM context */
     getSummary(): string {
-      return subGoals.map((sg, i) => {
-        const status = sg.status === "completed" ? "✅" :
-                       sg.status === "failed" ? "❌" :
-                       sg.status === "in_progress" ? "▶️" : "⬜";
-        return `${status} ${i + 1}. ${sg.goal}${sg.result ? ` (${sg.result})` : ""}`;
-      }).join("\n");
+      return subGoals
+        .map((sg, i) => {
+          const status =
+            sg.status === 'completed'
+              ? '✅'
+              : sg.status === 'failed'
+                ? '❌'
+                : sg.status === 'in_progress'
+                  ? '▶️'
+                  : '⬜';
+          return `${status} ${i + 1}. ${sg.goal}${sg.result ? ` (${sg.result})` : ''}`;
+        })
+        .join('\n');
     },
   };
 }
@@ -136,13 +145,15 @@ export function createPlanExecutor(subGoals: SubGoal[]) {
 // ─── Mid-execution screen evaluator ────────────────────
 
 const screenEvalSchema = z.object({
-  status: z.enum(["done", "adapt", "continue"]).describe(
-    "done = the goal is already achieved on the current screen, " +
-    "adapt = the goal needs rewording because an overlay/popup/unexpected state appeared, " +
-    "continue = keep executing the current goal as-is"
-  ),
-  reason: z.string().describe("Brief explanation"),
-  adaptedGoal: z.string().optional().describe("Reworded goal if status=adapt"),
+  status: z
+    .enum(['done', 'adapt', 'continue'])
+    .describe(
+      'done = the goal is already achieved on the current screen, ' +
+        'adapt = the goal needs rewording because an overlay/popup/unexpected state appeared, ' +
+        'continue = keep executing the current goal as-is'
+    ),
+  reason: z.string().describe('Brief explanation'),
+  adaptedGoal: z.string().optional().describe('Reworded goal if status=adapt'),
 });
 
 const SCREEN_EVAL_PROMPT = `You are a mobile automation screen evaluator. You are given a sub-goal and the current screen DOM.
@@ -176,23 +187,25 @@ export async function evaluateScreen(
   model: any,
   currentGoal: string,
   currentDom: string,
-  providerOptions?: Record<string, any>,
+  providerOptions?: Record<string, any>
 ): Promise<{ adapt: boolean; adaptedGoal?: string; done?: boolean; reason: string } | null> {
   try {
     const { object } = await generateObject({
       model,
       schema: screenEvalSchema,
       system: SCREEN_EVAL_PROMPT,
-      messages: [{
-        role: "user",
-        content: `CURRENT GOAL: ${currentGoal}\n\nCURRENT SCREEN (DOM):\n${currentDom}`,
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: `CURRENT GOAL: ${currentGoal}\n\nCURRENT SCREEN (DOM):\n${currentDom}`,
+        },
+      ],
       ...(providerOptions ? { providerOptions } : {}),
     });
 
-    if (object.status === "continue") return null;
-    if (object.status === "done") return { adapt: false, done: true, reason: object.reason };
-    if (object.status === "adapt" && object.adaptedGoal) {
+    if (object.status === 'continue') return null;
+    if (object.status === 'done') return { adapt: false, done: true, reason: object.reason };
+    if (object.status === 'adapt' && object.adaptedGoal) {
       return { adapt: true, adaptedGoal: object.adaptedGoal, reason: object.reason };
     }
     return null;
@@ -204,13 +217,15 @@ export async function evaluateScreen(
 // ─── Screen-aware orchestrator ─────────────────────────
 
 const orchestratorSchema = z.object({
-  action: z.enum(["skip", "rewrite", "proceed"]).describe(
-    "skip = sub-goal is already achieved on current screen, " +
-    "rewrite = sub-goal needs rewording based on current screen state, " +
-    "proceed = execute sub-goal as-is"
-  ),
-  reason: z.string().describe("Brief explanation of the decision"),
-  rewrittenGoal: z.string().optional().describe("The reworded sub-goal (only if action=rewrite)"),
+  action: z
+    .enum(['skip', 'rewrite', 'proceed'])
+    .describe(
+      'skip = sub-goal is already achieved on current screen, ' +
+        'rewrite = sub-goal needs rewording based on current screen state, ' +
+        'proceed = execute sub-goal as-is'
+    ),
+  reason: z.string().describe('Brief explanation of the decision'),
+  rewrittenGoal: z.string().optional().describe('The reworded sub-goal (only if action=rewrite)'),
 });
 
 export type OrchestratorDecision = z.infer<typeof orchestratorSchema>;
@@ -226,7 +241,7 @@ export async function evaluateSubGoal(
   completedGoals: string[],
   currentScreenDOM: string,
   providerOptions?: Record<string, any>,
-  screenshot?: string,
+  screenshot?: string
 ): Promise<OrchestratorDecision> {
   // Build message content — include screenshot if available for visual verification
   const textContent = `OVERALL GOAL: ${overallGoal}
@@ -234,7 +249,7 @@ export async function evaluateSubGoal(
 CURRENT SUB-GOAL TO EVALUATE: ${subGoal}
 
 COMPLETED SUB-GOALS:
-${completedGoals.length > 0 ? completedGoals.map((g, i) => `${i + 1}. ${g}`).join("\n") : "(none)"}
+${completedGoals.length > 0 ? completedGoals.map((g, i) => `${i + 1}. ${g}`).join('\n') : '(none)'}
 
 CURRENT SCREEN STATE (DOM):
 ${currentScreenDOM}
@@ -243,19 +258,21 @@ Based on the current screen, should we SKIP this sub-goal (already done), REWRIT
 
   const messageContent: any[] = [];
   if (screenshot) {
-    messageContent.push({ type: "image", image: screenshot });
+    messageContent.push({ type: 'image', image: screenshot });
   }
-  messageContent.push({ type: "text", text: textContent });
+  messageContent.push({ type: 'text', text: textContent });
 
   const { object } = await generateObject({
     model,
     schema: orchestratorSchema,
     system: ORCHESTRATOR_SYSTEM_PROMPT,
     ...(providerOptions ? { providerOptions } : {}),
-    messages: [{
-      role: "user",
-      content: screenshot ? messageContent : textContent,
-    }],
+    messages: [
+      {
+        role: 'user',
+        content: screenshot ? messageContent : textContent,
+      },
+    ],
   });
 
   return object;
@@ -264,9 +281,18 @@ Based on the current screen, should we SKIP this sub-goal (already done), REWRIT
 // ─── Screen readiness check ──────────────────────────────
 
 const readinessSchema = z.object({
-  ready: z.boolean().describe("Whether the screen is in a clean state ready for the next sub-goal"),
-  issues: z.array(z.string()).describe("List of issues preventing readiness (e.g., 'keyboard is visible', 'autocomplete dropdown open', 'dialog blocking')"),
-  suggestedAction: z.string().optional().describe("Single action to resolve the most critical issue (e.g., 'tap the back button to dismiss keyboard', 'tap the suggestion to confirm input')"),
+  ready: z.boolean().describe('Whether the screen is in a clean state ready for the next sub-goal'),
+  issues: z
+    .array(z.string())
+    .describe(
+      "List of issues preventing readiness (e.g., 'keyboard is visible', 'autocomplete dropdown open', 'dialog blocking')"
+    ),
+  suggestedAction: z
+    .string()
+    .optional()
+    .describe(
+      "Single action to resolve the most critical issue (e.g., 'tap the back button to dismiss keyboard', 'tap the suggestion to confirm input')"
+    ),
 });
 
 export type ScreenReadiness = z.infer<typeof readinessSchema>;
@@ -282,7 +308,7 @@ export async function assessScreenReadiness(
   nextGoal: string,
   currentScreenDOM: string,
   providerOptions?: Record<string, any>,
-  screenshot?: string,
+  screenshot?: string
 ): Promise<ScreenReadiness> {
   const textContent = `JUST COMPLETED: ${completedGoal}
 NEXT SUB-GOAL: ${nextGoal}
@@ -299,9 +325,9 @@ Is the screen ready for the next sub-goal? Check for:
 
   const messageContent: any[] = [];
   if (screenshot) {
-    messageContent.push({ type: "image", image: screenshot });
+    messageContent.push({ type: 'image', image: screenshot });
   }
-  messageContent.push({ type: "text", text: textContent });
+  messageContent.push({ type: 'text', text: textContent });
 
   try {
     const { object } = await generateObject({
@@ -309,10 +335,12 @@ Is the screen ready for the next sub-goal? Check for:
       schema: readinessSchema,
       system: SCREEN_READINESS_PROMPT,
       ...(providerOptions ? { providerOptions } : {}),
-      messages: [{
-        role: "user",
-        content: screenshot ? messageContent : textContent,
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: screenshot ? messageContent : textContent,
+        },
+      ],
     });
     return object;
   } catch {

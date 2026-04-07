@@ -31,10 +31,10 @@ AI-powered mobile automation agent — control Android & iOS devices from VS Cod
 
 ## Agent Modes
 
-| Mode | Description |
-|------|-------------|
-| **Vision** (recommended) | Screenshot-first — uses AI vision to locate elements |
-| **DOM** | XML page source — works with any LLM, no vision setup needed |
+| Mode                     | Description                                                  |
+| ------------------------ | ------------------------------------------------------------ |
+| **Vision** (recommended) | Screenshot-first — uses AI vision to locate elements         |
+| **DOM**                  | XML page source — works with any LLM, no vision setup needed |
 
 ## Supported LLM Providers
 
@@ -46,15 +46,15 @@ AI-powered mobile automation agent — control Android & iOS devices from VS Cod
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `AppClaw: Run Goal` | Enter a natural language goal |
-| `AppClaw: Run Flow File` | Run the current YAML flow file |
-| `AppClaw: Run This Step` | Run a single step from a flow |
-| `AppClaw: Open Device Panel` | Open the device preview panel |
-| `AppClaw: Start Playground` | Interactive playground mode |
-| `AppClaw: Take Screenshot` | Capture the current device screen |
-| `AppClaw: Stop Execution` | Stop the running agent |
+| Command                      | Description                       |
+| ---------------------------- | --------------------------------- |
+| `AppClaw: Run Goal`          | Enter a natural language goal     |
+| `AppClaw: Run Flow File`     | Run the current YAML flow file    |
+| `AppClaw: Run This Step`     | Run a single step from a flow     |
+| `AppClaw: Open Device Panel` | Open the device preview panel     |
+| `AppClaw: Start Playground`  | Interactive playground mode       |
+| `AppClaw: Take Screenshot`   | Capture the current device screen |
+| `AppClaw: Stop Execution`    | Stop the running agent            |
 
 ## Configuration
 

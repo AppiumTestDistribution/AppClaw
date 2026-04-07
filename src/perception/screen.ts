@@ -3,18 +3,18 @@
  * detects platform, parses XML, filters elements.
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import { getPageSource, screenshot } from "../mcp/tools.js";
-import type { ScreenState } from "./types.js";
-import { parseAndroidPageSource } from "./android-parser.js";
-import { parseIOSPageSource } from "./ios-parser.js";
-import { filterElements } from "./element-filter.js";
-import { trimDOM } from "./dom-trimmer.js";
+import type { MCPClient } from '../mcp/types.js';
+import { getPageSource, screenshot } from '../mcp/tools.js';
+import type { ScreenState } from './types.js';
+import { parseAndroidPageSource } from './android-parser.js';
+import { parseIOSPageSource } from './ios-parser.js';
+import { filterElements } from './element-filter.js';
+import { trimDOM } from './dom-trimmer.js';
 
 /** Detect platform from page source XML content. */
-export function detectPlatform(pageSource: string): "android" | "ios" {
-  if (pageSource.includes("XCUIElementType")) return "ios";
-  return "android";
+export function detectPlatform(pageSource: string): 'android' | 'ios' {
+  if (pageSource.includes('XCUIElementType')) return 'ios';
+  return 'android';
 }
 
 /** Get the full screen state from the device via MCP tools. */
@@ -28,19 +28,19 @@ export async function getScreenState(
   parseLegacyElements: boolean = false
 ): Promise<ScreenState> {
   // Kick off page source and screenshot in parallel when both are needed
-  const pageSourcePromise = !skipPageSource ? getPageSource(mcp) : Promise.resolve("");
+  const pageSourcePromise = !skipPageSource ? getPageSource(mcp) : Promise.resolve('');
   const screenshotPromise = captureScreenshot
     ? screenshot(mcp).catch(() => undefined)
     : Promise.resolve(undefined);
 
   const [raw, screenshotData] = await Promise.all([pageSourcePromise, screenshotPromise]);
 
-  let elements: import("./types.js").UIElement[] = [];
-  let filtered: import("./types.js").CompactUIElement[] = [];
-  let dom = "";
+  let elements: import('./types.js').UIElement[] = [];
+  let filtered: import('./types.js').CompactUIElement[] = [];
+  let dom = '';
   let elementCount = 0;
   let editableCount = 0;
-  let platform: "android" | "ios" = "android";
+  let platform: 'android' | 'ios' = 'android';
 
   if (!skipPageSource && raw) {
     platform = detectPlatform(raw);
@@ -52,13 +52,20 @@ export async function getScreenState(
 
     // Legacy element parsing — only when recorder needs CompactUIElement[]
     if (parseLegacyElements) {
-      elements = platform === "android"
-        ? parseAndroidPageSource(raw)
-        : parseIOSPageSource(raw);
+      elements = platform === 'android' ? parseAndroidPageSource(raw) : parseIOSPageSource(raw);
 
       filtered = filterElements(elements, maxElements);
     }
   }
 
-  return { elements, filtered, dom, elementCount, editableCount, screenshot: screenshotData ?? undefined, platform, raw };
+  return {
+    elements,
+    filtered,
+    dom,
+    elementCount,
+    editableCount,
+    screenshot: screenshotData ?? undefined,
+    platform,
+    raw,
+  };
 }

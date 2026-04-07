@@ -8,37 +8,41 @@
  * Steps that don't match any regex pattern are sent to the LLM for interpretation.
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import { getPageSource } from "../mcp/tools.js";
-import { activateAppWithFallback } from "../mcp/activate-app.js";
-import { detectDeviceUdid, typeViaKeyboard } from "../mcp/keyboard.js";
-import { detectPlatform } from "../perception/screen.js";
-import { parseAndroidPageSource } from "../perception/android-parser.js";
-import { parseIOSPageSource } from "../perception/ios-parser.js";
-import type { UIElement } from "../perception/types.js";
+import type { MCPClient } from '../mcp/types.js';
+import { getPageSource } from '../mcp/tools.js';
+import { activateAppWithFallback } from '../mcp/activate-app.js';
+import { detectDeviceUdid, typeViaKeyboard } from '../mcp/keyboard.js';
+import { detectPlatform } from '../perception/screen.js';
+import { parseAndroidPageSource } from '../perception/android-parser.js';
+import { parseIOSPageSource } from '../perception/ios-parser.js';
+import type { UIElement } from '../perception/types.js';
 import {
   findByIdStrategies,
   findByVision,
   isAIElement,
   parseAIElementCoords,
   tapAtCoordinates,
-} from "../agent/element-finder.js";
-import { isVisionLocateEnabled, getStarkVisionApiKey, getStarkVisionModel } from "../vision/locate-enabled.js";
-import { Config } from "../config.js";
-import { screenshot } from "../mcp/tools.js";
-import { exec } from "child_process";
-import { promisify } from "util";
-import type { ActionResult } from "../llm/schemas.js";
+} from '../agent/element-finder.js';
+import {
+  isVisionLocateEnabled,
+  getStarkVisionApiKey,
+  getStarkVisionModel,
+} from '../vision/locate-enabled.js';
+import { Config } from '../config.js';
+import { screenshot } from '../mcp/tools.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import type { ActionResult } from '../llm/schemas.js';
 
 const execAsync = promisify(exec);
-import type { FlowMeta, FlowStep, FlowPhase, PhasedStep, PhaseResult } from "./types.js";
-import type { AppResolver } from "../agent/app-resolver.js";
-import type { RunArtifactCollector } from "../report/writer.js";
-import { resolveAppId } from "../agent/preprocessor.js";
-import { pngDimensionsFromBase64 } from "../vision/png-dimensions.js";
-import { getCachedScreenSize } from "../vision/window-size.js";
-import chalk from "chalk";
-import * as ui from "../ui/terminal.js";
+import type { FlowMeta, FlowStep, FlowPhase, PhasedStep, PhaseResult } from './types.js';
+import type { AppResolver } from '../agent/app-resolver.js';
+import type { RunArtifactCollector } from '../report/writer.js';
+import { resolveAppId } from '../agent/preprocessor.js';
+import { pngDimensionsFromBase64 } from '../vision/png-dimensions.js';
+import { getCachedScreenSize } from '../vision/window-size.js';
+import chalk from 'chalk';
+import * as ui from '../ui/terminal.js';
 
 /** Extract [x, y] coordinates from an action result message like 'Tapped "X" via vision at [320, 540]' */
 function extractCoordinates(message?: string): { x: number; y: number } | undefined {
@@ -48,7 +52,7 @@ function extractCoordinates(message?: string): { x: number; y: number } | undefi
   return undefined;
 }
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface RunYamlFlowOptions {
   stepDelayMs?: number;
@@ -61,7 +65,15 @@ export interface RunYamlFlowOptions {
   tapTargetMaxAttempts?: number;
   tapTargetPollIntervalMs?: number;
   /** Optional callback for each flow step execution (used by --json mode / IDE extensions) */
-  onFlowStep?: (step: number, total: number, kind: string, target: string | undefined, status: "running" | "passed" | "failed", error?: string, message?: string) => void;
+  onFlowStep?: (
+    step: number,
+    total: number,
+    kind: string,
+    target: string | undefined,
+    status: 'running' | 'passed' | 'failed',
+    error?: string,
+    message?: string
+  ) => void;
   /** Optional artifact collector for report generation. When set, screenshots are captured after each step. */
   artifactCollector?: RunArtifactCollector;
   /** Known device UDID from setup — avoids ADB re-detection (which fails when multiple devices are connected) */
@@ -91,50 +103,52 @@ export interface RunYamlFlowResult {
 /** Build the actual (non-redacted) label showing resolved values — for debug logging only. */
 function stepLabelResolved(step: FlowStep): string {
   switch (step.kind) {
-    case "type":
-      return `type "${step.text}"${step.target ? ` in "${step.target}"` : ""}`;
-    case "assert":
+    case 'type':
+      return `type "${step.text}"${step.target ? ` in "${step.target}"` : ''}`;
+    case 'assert':
       return `assert "${step.text}"`;
-    case "openApp":
+    case 'openApp':
       return `open "${step.query}"`;
     default:
-      return "";
+      return '';
   }
 }
 
 function stepLabel(step: FlowStep): string {
   if (step.verbatim) return step.verbatim;
   switch (step.kind) {
-    case "launchApp":
-      return "launchApp";
-    case "openApp":
+    case 'launchApp':
+      return 'launchApp';
+    case 'openApp':
       return `open "${step.query}"`;
-    case "wait":
+    case 'wait':
       return `wait ${step.seconds}s`;
-    case "waitUntil":
-      if (step.condition === "screenLoaded") return `wait until screen is loaded (${step.timeoutSeconds}s timeout)`;
-      if (step.condition === "gone") return `wait until "${step.text}" is gone (${step.timeoutSeconds}s timeout)`;
+    case 'waitUntil':
+      if (step.condition === 'screenLoaded')
+        return `wait until screen is loaded (${step.timeoutSeconds}s timeout)`;
+      if (step.condition === 'gone')
+        return `wait until "${step.text}" is gone (${step.timeoutSeconds}s timeout)`;
       return `wait until "${step.text}" is visible (${step.timeoutSeconds}s timeout)`;
-    case "tap":
+    case 'tap':
       return `tap "${step.label}"`;
-    case "type":
+    case 'type':
       return `type "${step.text.length > 40 ? `${step.text.slice(0, 37)}…` : step.text}"`;
-    case "enter":
-      return "enter";
-    case "back":
-      return "goBack";
-    case "home":
-      return "goHome";
-    case "swipe":
+    case 'enter':
+      return 'enter';
+    case 'back':
+      return 'goBack';
+    case 'home':
+      return 'goHome';
+    case 'swipe':
       return `swipe ${step.direction}`;
-    case "assert":
+    case 'assert':
       return `assert "${step.text}"`;
-    case "scrollAssert":
+    case 'scrollAssert':
       return `scroll ${step.direction} until "${step.text}"`;
-    case "getInfo":
+    case 'getInfo':
       return `getInfo "${step.query.length > 50 ? `${step.query.slice(0, 47)}…` : step.query}"`;
-    case "done":
-      return step.message ? `done (${step.message})` : "done";
+    case 'done':
+      return step.message ? `done (${step.message})` : 'done';
   }
 }
 
@@ -142,7 +156,7 @@ function scoreTapMatch(el: UIElement, needle: string): number {
   if (el.enabled === false) return -1;
   const n = needle.toLowerCase();
   const text = el.text.toLowerCase();
-  const hint = (el.hint ?? "").toLowerCase();
+  const hint = (el.hint ?? '').toLowerCase();
   const aid = el.accessibilityId.toLowerCase();
   const id = el.id.toLowerCase();
 
@@ -171,18 +185,22 @@ function scoreTapMatch(el: UIElement, needle: string): number {
 async function pressEnterKey(mcp: MCPClient): Promise<ActionResult> {
   // Strategy 1: cross-platform via appium_mobile_press_key
   try {
-    await mcp.callTool("appium_mobile_press_key", { key: "ENTER" });
-    return { success: true, message: "Pressed Enter" };
-  } catch { /* try next strategy */ }
+    await mcp.callTool('appium_mobile_press_key', { key: 'ENTER' });
+    return { success: true, message: 'Pressed Enter' };
+  } catch {
+    /* try next strategy */
+  }
 
   // Strategy 2: mobile: shell via appium_execute_script (Android)
   try {
-    await mcp.callTool("appium_execute_script", {
-      script: "mobile: shell",
-      args: [{ command: "input", args: ["keyevent", "66"] }],
+    await mcp.callTool('appium_execute_script', {
+      script: 'mobile: shell',
+      args: [{ command: 'input', args: ['keyevent', '66'] }],
     });
-    return { success: true, message: "Pressed Enter" };
-  } catch { /* try next strategy */ }
+    return { success: true, message: 'Pressed Enter' };
+  } catch {
+    /* try next strategy */
+  }
 
   // Strategy 3: ADB fallback (Android only)
   try {
@@ -192,9 +210,9 @@ async function pressEnterKey(mcp: MCPClient): Promise<ActionResult> {
       process.env.ANDROID_SDK_ROOT ||
       `${process.env.HOME}/Library/Android/sdk`;
     const adbPath = `${androidHome}/platform-tools/adb`;
-    const deviceFlag = udid ? `-s ${udid}` : "";
+    const deviceFlag = udid ? `-s ${udid}` : '';
     await execAsync(`${adbPath} ${deviceFlag} shell input keyevent 66`, { timeout: 5000 });
-    return { success: true, message: "Pressed Enter" };
+    return { success: true, message: 'Pressed Enter' };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, message: `Failed to press Enter: ${msg}` };
@@ -203,7 +221,7 @@ async function pressEnterKey(mcp: MCPClient): Promise<ActionResult> {
 
 /** Whether the flow should operate in full-vision mode (skip DOM). */
 function isVisionMode(): boolean {
-  return Config.AGENT_MODE === "vision" && isVisionLocateEnabled();
+  return Config.AGENT_MODE === 'vision' && isVisionLocateEnabled();
 }
 
 /** Try to tap an element using vision locate. Returns null if vision can't find it. */
@@ -225,21 +243,24 @@ async function tryTapByVision(mcp: MCPClient, label: string): Promise<ActionResu
     return null;
   }
 
-  await mcp.callTool("appium_click", { elementUUID: uuid });
+  await mcp.callTool('appium_click', { elementUUID: uuid });
   return { success: true, message: `Tapped "${label}" via vision` };
 }
 
 /** One DOM snapshot: find label and click. Returns null if no match / no UUID (caller may retry). */
 /** Returns: ActionResult on success, "no_match" if label not in DOM, null if matched but UUID failed */
-async function tryTapByLabelOnDom(mcp: MCPClient, label: string): Promise<ActionResult | "no_match" | null> {
+async function tryTapByLabelOnDom(
+  mcp: MCPClient,
+  label: string
+): Promise<ActionResult | 'no_match' | null> {
   const pageSource = await getPageSource(mcp);
   const platform = detectPlatform(pageSource);
   const elements =
-    platform === "android" ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
+    platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
 
   const scored = elements
-    .map(el => ({ el, s: scoreTapMatch(el, label) }))
-    .filter(x => x.s >= 0)
+    .map((el) => ({ el, s: scoreTapMatch(el, label) }))
+    .filter((x) => x.s >= 0)
     .sort((a, b) => {
       if (a.s !== b.s) return a.s - b.s;
       if (a.el.clickable !== b.el.clickable) return a.el.clickable ? -1 : 1;
@@ -247,12 +268,12 @@ async function tryTapByLabelOnDom(mcp: MCPClient, label: string): Promise<Action
     });
 
   const pick = scored[0]?.el;
-  if (!pick) return "no_match";
+  if (!pick) return 'no_match';
 
   const uuid = await findByIdStrategies(mcp, pick.accessibilityId || pick.id, pick.text);
   if (!uuid) return null;
 
-  await mcp.callTool("appium_click", { elementUUID: uuid });
+  await mcp.callTool('appium_click', { elementUUID: uuid });
   const coords = pick.center;
   return { success: true, message: `Tapped "${label}" at [${coords[0]}, ${coords[1]}]` };
 }
@@ -277,7 +298,7 @@ async function tapByLabel(
   // fall through to vision immediately (the element isn't text-based).
   for (let attempt = 0; attempt < poll.maxAttempts; attempt++) {
     const domTap = await tryTapByLabelOnDom(mcp, label);
-    if (domTap === "no_match") break;  // not in DOM at all — skip to vision
+    if (domTap === 'no_match') break; // not in DOM at all — skip to vision
     if (domTap) return domTap;
     if (attempt + 1 < poll.maxAttempts) {
       await sleep(poll.intervalMs);
@@ -293,8 +314,13 @@ async function tapByLabel(
   return { success: false, message: `No matching element for "${label}"` };
 }
 
-async function flowTypeText(mcp: MCPClient, text: string, target?: string, deviceUdid?: string): Promise<ActionResult> {
-  if (mcpDebug) ui.printAgentBullet(`[type] text="${text}", target=${target ?? "(none)"}`);
+async function flowTypeText(
+  mcp: MCPClient,
+  text: string,
+  target?: string,
+  deviceUdid?: string
+): Promise<ActionResult> {
+  if (mcpDebug) ui.printAgentBullet(`[type] text="${text}", target=${target ?? '(none)'}`);
   // ── If a target field is specified, tap it first to focus ──
   if (target) {
     const tapResult = await tapByLabel(mcp, target, { maxAttempts: 10, intervalMs: 300 });
@@ -308,18 +334,18 @@ async function flowTypeText(mcp: MCPClient, text: string, target?: string, devic
   if (isVisionMode()) {
     // If no target was specified, use vision to find and tap an input field
     if (!target) {
-      const visionUuid = await findByVision(mcp, "text input field, search box, or editable area");
+      const visionUuid = await findByVision(mcp, 'text input field, search box, or editable area');
       if (visionUuid) {
         if (isAIElement(visionUuid)) {
           const coords = parseAIElementCoords(visionUuid);
           if (coords) await tapAtCoordinates(mcp, coords.x, coords.y);
         } else {
-          await mcp.callTool("appium_click", { elementUUID: visionUuid });
+          await mcp.callTool('appium_click', { elementUUID: visionUuid });
         }
       }
     }
     // Type via keyboard (preferred on Android)
-    const udid = deviceUdid ?? await detectDeviceUdid();
+    const udid = deviceUdid ?? (await detectDeviceUdid());
     if (udid) {
       const kb = await typeViaKeyboard(text, udid);
       if (kb.success) {
@@ -329,26 +355,28 @@ async function flowTypeText(mcp: MCPClient, text: string, target?: string, devic
     }
     // Fallback: try set_value if we have a vision-located element
     if (!target) {
-      const visionUuid = await findByVision(mcp, "text input field, search box, or editable area");
+      const visionUuid = await findByVision(mcp, 'text input field, search box, or editable area');
       if (visionUuid && !isAIElement(visionUuid)) {
-        await mcp.callTool("appium_clear_element", { elementUUID: visionUuid }).catch(() => {});
-        const setResult = await mcp.callTool("appium_set_value", { elementUUID: visionUuid, text });
+        await mcp.callTool('appium_clear_element', { elementUUID: visionUuid }).catch(() => {});
+        const setResult = await mcp.callTool('appium_set_value', { elementUUID: visionUuid, text });
         const setText =
-          setResult.content?.map((c: { type: string; text?: string }) => (c.type === "text" ? c.text : "")).join("") ?? "";
-        if (!setText.toLowerCase().includes("error") && !setText.toLowerCase().includes("failed")) {
+          setResult.content
+            ?.map((c: { type: string; text?: string }) => (c.type === 'text' ? c.text : ''))
+            .join('') ?? '';
+        if (!setText.toLowerCase().includes('error') && !setText.toLowerCase().includes('failed')) {
           return { success: true, message: `Typed "${text}" via vision` };
         }
       }
     }
-    return { success: false, message: "Could not type text in vision mode" };
+    return { success: false, message: 'Could not type text in vision mode' };
   }
 
   // ── DOM mode ──
   const pageSource = await getPageSource(mcp);
   const platform = detectPlatform(pageSource);
 
-  if (platform === "android") {
-    const udid = deviceUdid ?? await detectDeviceUdid();
+  if (platform === 'android') {
+    const udid = deviceUdid ?? (await detectDeviceUdid());
     const kb = await typeViaKeyboard(text, udid ?? undefined);
     if (kb.success) {
       const msg = target ? `Typed "${text}" in "${target}" via keyboard input` : kb.message;
@@ -357,22 +385,27 @@ async function flowTypeText(mcp: MCPClient, text: string, target?: string, devic
   }
 
   const elements =
-    platform === "android" ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
-  const editable = elements.find(e => e.editable && e.enabled !== false);
+    platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
+  const editable = elements.find((e) => e.editable && e.enabled !== false);
   if (!editable) {
-    return { success: false, message: "No editable field found for type" };
+    return { success: false, message: 'No editable field found for type' };
   }
-  const uuid = await findByIdStrategies(mcp, editable.accessibilityId || editable.id, editable.text);
+  const uuid = await findByIdStrategies(
+    mcp,
+    editable.accessibilityId || editable.id,
+    editable.text
+  );
   if (!uuid) {
-    return { success: false, message: "Could not resolve editable element" };
+    return { success: false, message: 'Could not resolve editable element' };
   }
-  await mcp.callTool("appium_click", { elementUUID: uuid });
-  await mcp.callTool("appium_clear_element", { elementUUID: uuid }).catch(() => {});
-  const setResult = await mcp.callTool("appium_set_value", { elementUUID: uuid, text });
+  await mcp.callTool('appium_click', { elementUUID: uuid });
+  await mcp.callTool('appium_clear_element', { elementUUID: uuid }).catch(() => {});
+  const setResult = await mcp.callTool('appium_set_value', { elementUUID: uuid, text });
   const setText =
-    setResult.content?.map((c: { type: string; text?: string }) => (c.type === "text" ? c.text : "")).join("") ??
-    "";
-  if (setText.toLowerCase().includes("error") || setText.toLowerCase().includes("failed")) {
+    setResult.content
+      ?.map((c: { type: string; text?: string }) => (c.type === 'text' ? c.text : ''))
+      .join('') ?? '';
+  if (setText.toLowerCase().includes('error') || setText.toLowerCase().includes('failed')) {
     return { success: false, message: setText.slice(0, 200) };
   }
   return { success: true, message: `Typed "${text}"` };
@@ -381,22 +414,22 @@ async function flowTypeText(mcp: MCPClient, text: string, target?: string, devic
 /** Check DOM for text match across element fields. */
 function domContainsText(elements: UIElement[], needle: string): boolean {
   const n = needle.toLowerCase();
-  return elements.some(el => {
-    const fields = [el.text, el.hint ?? "", el.accessibilityId, el.id];
-    return fields.some(f => f.toLowerCase().includes(n));
+  return elements.some((el) => {
+    const fields = [el.text, el.hint ?? '', el.accessibilityId, el.id];
+    return fields.some((f) => f.toLowerCase().includes(n));
   });
 }
 
 /** Find an element whose text/hint/id contains the given needle (case-insensitive). */
 function findElement(elements: UIElement[], needle: string): UIElement | undefined {
   const n = needle.toLowerCase();
-  return elements.find(el => {
-    const fields = [el.text, el.hint ?? "", el.accessibilityId, el.id];
-    return fields.some(f => f.toLowerCase().includes(n));
+  return elements.find((el) => {
+    const fields = [el.text, el.hint ?? '', el.accessibilityId, el.id];
+    return fields.some((f) => f.toLowerCase().includes(n));
   });
 }
 
-type SpatialRelation = "below" | "above" | "left of" | "right of";
+type SpatialRelation = 'below' | 'above' | 'left of' | 'right of';
 
 interface SpatialAssertion {
   subjectText: string;
@@ -412,11 +445,12 @@ interface SpatialAssertion {
  */
 function parseSpatialAssertion(assertion: string): SpatialAssertion | null {
   // Patterns: "[if] [the text] <subject> is (below|above|left of|right of) [the text] <anchor>"
-  const re = /^(?:if\s+)?(?:the\s+text\s+)?["']?(.+?)["']?\s+is\s+(below|above|left\s+of|right\s+of)\s+(?:the\s+text\s+)?["']?(.+?)["']?$/i;
+  const re =
+    /^(?:if\s+)?(?:the\s+text\s+)?["']?(.+?)["']?\s+is\s+(below|above|left\s+of|right\s+of)\s+(?:the\s+text\s+)?["']?(.+?)["']?$/i;
   const match = assertion.match(re);
   if (!match) return null;
 
-  const relation = match[2].toLowerCase().replace(/\s+/g, " ") as SpatialRelation;
+  const relation = match[2].toLowerCase().replace(/\s+/g, ' ') as SpatialRelation;
   return {
     subjectText: match[1].trim(),
     relation,
@@ -458,28 +492,28 @@ function evaluateSpatialRelation(
   const [ax, ay] = anchor.center;
 
   let satisfied = false;
-  let actual = "";
+  let actual = '';
 
   switch (spatial.relation) {
-    case "below":
+    case 'below':
       satisfied = sy > ay;
       actual = satisfied
         ? `"${spatial.subjectText}" is below "${spatial.anchorText}"`
         : `"${spatial.subjectText}" is actually above "${spatial.anchorText}", not below`;
       break;
-    case "above":
+    case 'above':
       satisfied = sy < ay;
       actual = satisfied
         ? `"${spatial.subjectText}" is above "${spatial.anchorText}"`
         : `"${spatial.subjectText}" is actually below "${spatial.anchorText}", not above`;
       break;
-    case "left of":
+    case 'left of':
       satisfied = sx < ax;
       actual = satisfied
         ? `"${spatial.subjectText}" is left of "${spatial.anchorText}"`
         : `"${spatial.subjectText}" is actually right of "${spatial.anchorText}", not left`;
       break;
-    case "right of":
+    case 'right of':
       satisfied = sx > ax;
       actual = satisfied
         ? `"${spatial.subjectText}" is right of "${spatial.anchorText}"`
@@ -494,7 +528,7 @@ function evaluateSpatialRelation(
 async function getScreenElements(mcp: MCPClient): Promise<UIElement[]> {
   const pageSource = await getPageSource(mcp);
   const platform = detectPlatform(pageSource);
-  return platform === "android"
+  return platform === 'android'
     ? parseAndroidPageSource(pageSource)
     : parseIOSPageSource(pageSource);
 }
@@ -505,16 +539,16 @@ const ASSERT_DOM_POLLS_BEFORE_VISION = 3;
  * Vision-based assertion: take a screenshot and ask the LLM
  * "Is this visible on screen?" — returns a true yes/no answer.
  */
-const mcpDebug = process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true";
+const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
 
 async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
   const apiKey = getStarkVisionApiKey();
   if (!apiKey) {
-    if (mcpDebug) ui.printWarning("[vision-assert] No API key configured, skipping vision assert");
+    if (mcpDebug) ui.printWarning('[vision-assert] No API key configured, skipping vision assert');
     return false;
   }
 
-  const { StarkVisionClient } = (await import("df-vision")).default;
+  const { StarkVisionClient } = (await import('df-vision')).default;
   const client = new StarkVisionClient({
     apiKey,
     model: getStarkVisionModel(),
@@ -531,29 +565,42 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (attempt > 0) await sleep(500); // brief pause before retry
 
-    if (mcpDebug) ui.printAgentBullet(`[vision-assert] Taking screenshot for: "${text}"${attempt > 0 ? ` (retry ${attempt})` : ""}`);
+    if (mcpDebug)
+      ui.printAgentBullet(
+        `[vision-assert] Taking screenshot for: "${text}"${attempt > 0 ? ` (retry ${attempt})` : ''}`
+      );
     const imageBase64 = await screenshot(mcp);
     if (!imageBase64) {
-      if (mcpDebug) ui.printWarning("[vision-assert] Failed to capture screenshot");
+      if (mcpDebug) ui.printWarning('[vision-assert] Failed to capture screenshot');
       continue;
     }
-    if (mcpDebug) ui.printAgentBullet(`[vision-assert] Screenshot captured (${Math.round(imageBase64.length / 1024)}KB)`);
+    if (mcpDebug)
+      ui.printAgentBullet(
+        `[vision-assert] Screenshot captured (${Math.round(imageBase64.length / 1024)}KB)`
+      );
 
-    if (mcpDebug) ui.printAgentBullet(`[vision-assert] Asking LLM: is "${text}" visible? (model: ${getStarkVisionModel()})`);
+    if (mcpDebug)
+      ui.printAgentBullet(
+        `[vision-assert] Asking LLM: is "${text}" visible? (model: ${getStarkVisionModel()})`
+      );
     const visT0 = performance.now();
     const response = await client.isElementVisible(imageBase64, query, true);
     const visElapsed = Math.round(performance.now() - visT0);
-    if (mcpDebug) ui.printAgentBullet(`[vision-assert] LLM response (${visElapsed}ms): ${response}`);
+    if (mcpDebug)
+      ui.printAgentBullet(`[vision-assert] LLM response (${visElapsed}ms): ${response}`);
 
     // Parse structured JSON response first (e.g. { conditionSatisfied: true/false })
     // Strip markdown code fences if present (```json ... ```)
     let result = false;
-    const jsonStr = response.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    const jsonStr = response
+      .replace(/^```(?:json)?\s*\n?/i, '')
+      .replace(/\n?```\s*$/i, '')
+      .trim();
     try {
       const parsed = JSON.parse(jsonStr);
-      if (typeof parsed.conditionSatisfied === "boolean") {
+      if (typeof parsed.conditionSatisfied === 'boolean') {
         result = parsed.conditionSatisfied;
-      } else if (typeof parsed.visible === "boolean") {
+      } else if (typeof parsed.visible === 'boolean') {
         result = parsed.visible;
       } else {
         const lower = jsonStr.toLowerCase();
@@ -565,13 +612,13 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
     }
 
     if (result) {
-      console.log(`  ${chalk.green("[vision-assert] Verdict: VISIBLE ✓")}`);
+      console.log(`  ${chalk.green('[vision-assert] Verdict: VISIBLE ✓')}`);
       return true;
     }
 
     // Only log NOT VISIBLE on final attempt
     if (attempt === maxAttempts - 1) {
-      console.log(`  ${chalk.red("[vision-assert] Verdict: NOT VISIBLE ✗")}`);
+      console.log(`  ${chalk.red('[vision-assert] Verdict: NOT VISIBLE ✗')}`);
     }
   }
 
@@ -607,7 +654,11 @@ async function assertTextVisible(
       return { success: true, message: `Verified "${text}" is visible (via vision)` };
     }
     // Grab screen elements for the failure message
-    try { lastElements = await getScreenElements(mcp); } catch { /* ignore */ }
+    try {
+      lastElements = await getScreenElements(mcp);
+    } catch {
+      /* ignore */
+    }
   } else {
     // ── DOM-first mode ──
     const domPolls = useVision ? ASSERT_DOM_POLLS_BEFORE_VISION : poll.maxAttempts;
@@ -629,15 +680,17 @@ async function assertTextVisible(
   }
 
   // Build a summary of what's actually on screen
-  const screenTexts = lastElements
-    .map(el => el.text)
-    .filter(t => t.length > 0);
+  const screenTexts = lastElements.map((el) => el.text).filter((t) => t.length > 0);
   const uniqueTexts = [...new Set(screenTexts)];
-  const screenSummary = uniqueTexts.length > 0
-    ? `\n    Screen contains: ${uniqueTexts.join(" | ")}`
-    : "\n    Screen: (no text elements found)";
+  const screenSummary =
+    uniqueTexts.length > 0
+      ? `\n    Screen contains: ${uniqueTexts.join(' | ')}`
+      : '\n    Screen: (no text elements found)';
 
-  return { success: false, message: `Assertion failed: "${text}" not found on screen${screenSummary}` };
+  return {
+    success: false,
+    message: `Assertion failed: "${text}" not found on screen${screenSummary}`,
+  };
 }
 
 /**
@@ -648,7 +701,7 @@ async function assertTextVisible(
 async function scrollUntilVisible(
   mcp: MCPClient,
   text: string,
-  direction: "up" | "down" | "left" | "right",
+  direction: 'up' | 'down' | 'left' | 'right',
   maxScrolls: number,
   poll: FlowTapPollOptions
 ): Promise<ActionResult> {
@@ -677,7 +730,7 @@ async function scrollUntilVisible(
   }
 
   for (let scroll = 0; scroll < maxScrolls; scroll++) {
-    await mcp.callTool("appium_scroll", { direction });
+    await mcp.callTool('appium_scroll', { direction });
     await sleep(800);
 
     if (await isVisible()) {
@@ -689,14 +742,17 @@ async function scrollUntilVisible(
   }
 
   // Show what's on screen after exhausting all scrolls
-  let screenSummary = "";
+  let screenSummary = '';
   try {
     const elements = await getScreenElements(mcp);
-    const uniqueTexts = [...new Set(elements.map(el => el.text).filter(t => t.length > 0))];
-    screenSummary = uniqueTexts.length > 0
-      ? `\n    Screen contains: ${uniqueTexts.join(" | ")}`
-      : "\n    Screen: (no text elements found)";
-  } catch { /* ignore */ }
+    const uniqueTexts = [...new Set(elements.map((el) => el.text).filter((t) => t.length > 0))];
+    screenSummary =
+      uniqueTexts.length > 0
+        ? `\n    Screen contains: ${uniqueTexts.join(' | ')}`
+        : '\n    Screen: (no text elements found)';
+  } catch {
+    /* ignore */
+  }
 
   return {
     success: false,
@@ -710,7 +766,7 @@ async function scrollUntilVisible(
  */
 async function waitUntilCondition(
   mcp: MCPClient,
-  condition: "visible" | "gone" | "screenLoaded",
+  condition: 'visible' | 'gone' | 'screenLoaded',
   text: string | undefined,
   timeoutSeconds: number,
   poll: FlowTapPollOptions
@@ -718,9 +774,9 @@ async function waitUntilCondition(
   const pollMs = 500;
   const deadline = Date.now() + timeoutSeconds * 1000;
 
-  if (condition === "screenLoaded") {
+  if (condition === 'screenLoaded') {
     // Wait until two consecutive DOM snapshots are identical (screen stable)
-    let prevSnapshot = "";
+    let prevSnapshot = '';
     let stableCount = 0;
     const stableThreshold = 2; // need 2 consecutive matches
     while (Date.now() < deadline) {
@@ -728,7 +784,10 @@ async function waitUntilCondition(
       if (prevSnapshot && pageSource === prevSnapshot) {
         stableCount++;
         if (stableCount >= stableThreshold) {
-          return { success: true, message: `Screen loaded (stable after ${stableCount + 1} checks)` };
+          return {
+            success: true,
+            message: `Screen loaded (stable after ${stableCount + 1} checks)`,
+          };
         }
       } else {
         stableCount = 0;
@@ -759,17 +818,17 @@ async function waitUntilCondition(
       }
     }
 
-    if (condition === "visible" && found) {
+    if (condition === 'visible' && found) {
       return { success: true, message: `"${text}" appeared on screen` };
     }
-    if (condition === "gone" && !found) {
+    if (condition === 'gone' && !found) {
       return { success: true, message: `"${text}" is no longer on screen` };
     }
 
     await sleep(pollMs);
   }
 
-  if (condition === "visible") {
+  if (condition === 'visible') {
     return { success: false, message: `"${text}" did not appear within ${timeoutSeconds}s` };
   }
   return { success: false, message: `"${text}" did not disappear within ${timeoutSeconds}s` };
@@ -781,22 +840,22 @@ export async function executeStep(
   meta: FlowMeta,
   appResolver: AppResolver | undefined,
   tapPoll: FlowTapPollOptions,
-  deviceUdid?: string,
+  deviceUdid?: string
 ): Promise<ActionResult> {
   switch (step.kind) {
-    case "launchApp": {
+    case 'launchApp': {
       const id = meta.appId?.trim();
       if (!id) {
-        return { success: false, message: "launchApp requires appId in the YAML header" };
+        return { success: false, message: 'launchApp requires appId in the YAML header' };
       }
       const r = await activateAppWithFallback(mcp, id);
       return { success: r.success, message: r.message };
     }
-    case "openApp": {
+    case 'openApp': {
       if (!appResolver) {
         return {
           success: false,
-          message: "open … app steps need the installed-apps list (internal: pass AppResolver)",
+          message: 'open … app steps need the installed-apps list (internal: pass AppResolver)',
         };
       }
       const pkg = resolveAppId(step.query, appResolver);
@@ -807,37 +866,41 @@ export async function executeStep(
         };
       }
       const r = await activateAppWithFallback(mcp, pkg);
-      return { success: r.success, message: r.success ? `Launched ${step.query} (${pkg})` : r.message };
+      return {
+        success: r.success,
+        message: r.success ? `Launched ${step.query} (${pkg})` : r.message,
+      };
     }
-    case "wait":
+    case 'wait':
       await sleep(Math.round(step.seconds * 1000));
       return { success: true, message: `Waited ${step.seconds}s` };
-    case "waitUntil":
+    case 'waitUntil':
       return waitUntilCondition(mcp, step.condition, step.text, step.timeoutSeconds, tapPoll);
-    case "tap":
+    case 'tap':
       return tapByLabel(mcp, step.label, tapPoll);
-    case "type":
+    case 'type':
       return flowTypeText(mcp, step.text, step.target, deviceUdid);
-    case "enter":
+    case 'enter':
       return pressEnterKey(mcp);
-    case "back":
-      await mcp.callTool("appium_mobile_press_key", { key: "BACK" });
-      return { success: true, message: "Back" };
-    case "home":
-      await mcp.callTool("appium_mobile_press_key", { key: "HOME" });
-      return { success: true, message: "Home" };
-    case "swipe": {
+    case 'back':
+      await mcp.callTool('appium_mobile_press_key', { key: 'BACK' });
+      return { success: true, message: 'Back' };
+    case 'home':
+      await mcp.callTool('appium_mobile_press_key', { key: 'HOME' });
+      return { success: true, message: 'Home' };
+    case 'swipe': {
       // appium_scroll only supports up/down; use appium_swipe for left/right
       const dir = step.direction;
       const count = step.repeat ?? 1;
-      const toolName = (dir === "left" || dir === "right") ? "appium_swipe" : "appium_scroll";
-      let lastError = "";
+      const toolName = dir === 'left' || dir === 'right' ? 'appium_swipe' : 'appium_scroll';
+      let lastError = '';
       for (let i = 0; i < count; i++) {
         const result = await mcp.callTool(toolName, { direction: dir });
         const text =
-          result.content?.map((c: { type: string; text?: string }) => (c.type === "text" ? c.text : "")).join("") ??
-          "";
-        const bad = text.toLowerCase().includes("error") || text.toLowerCase().includes("failed");
+          result.content
+            ?.map((c: { type: string; text?: string }) => (c.type === 'text' ? c.text : ''))
+            .join('') ?? '';
+        const bad = text.toLowerCase().includes('error') || text.toLowerCase().includes('failed');
         if (bad) {
           lastError = text.slice(0, 200);
           return { success: false, message: lastError };
@@ -849,41 +912,48 @@ export async function executeStep(
         message: count > 1 ? `Swiped ${dir} ${count} times` : `Swiped ${dir}`,
       };
     }
-    case "assert":
+    case 'assert':
       return assertTextVisible(mcp, step.text, tapPoll);
-    case "scrollAssert":
+    case 'scrollAssert':
       return scrollUntilVisible(mcp, step.text, step.direction, step.maxScrolls, tapPoll);
-    case "getInfo": {
+    case 'getInfo': {
       const infoApiKey = getStarkVisionApiKey();
       if (!infoApiKey) {
-        return { success: false, message: "getInfo requires LLM_API_KEY (Gemini)" };
+        return { success: false, message: 'getInfo requires LLM_API_KEY (Gemini)' };
       }
       const infoImage = await screenshot(mcp);
       if (!infoImage) {
-        return { success: false, message: "Failed to capture screenshot for getInfo" };
+        return { success: false, message: 'Failed to capture screenshot for getInfo' };
       }
-      const { StarkVisionClient: InfoClient } = (await import("df-vision")).default;
-      const infoClient = new InfoClient({ apiKey: infoApiKey, model: getStarkVisionModel(), disableThinking: true });
+      const { StarkVisionClient: InfoClient } = (await import('df-vision')).default;
+      const infoClient = new InfoClient({
+        apiKey: infoApiKey,
+        model: getStarkVisionModel(),
+        disableThinking: true,
+      });
       const infoResponse = await infoClient.getElementInfo(infoImage, step.query, true);
       try {
-        const infoParsed = JSON.parse(infoResponse.replace(/(^```json\s*|```\s*$)/g, "").trim());
+        const infoParsed = JSON.parse(infoResponse.replace(/(^```json\s*|```\s*$)/g, '').trim());
         const answer = infoParsed.answer || infoResponse;
         return { success: true, message: answer };
       } catch {
         return { success: true, message: infoResponse };
       }
     }
-    case "done": {
+    case 'done': {
       // When done has a message, treat it as an assertion — verify the claim
       // is true on screen before declaring success. A bare `done` (no message)
       // passes unconditionally.
       if (step.message) {
         const verification = await assertTextVisible(mcp, step.message, tapPoll);
         if (!verification.success) {
-          return { success: false, message: `done assertion failed: "${step.message}" not verified on screen` };
+          return {
+            success: false,
+            message: `done assertion failed: "${step.message}" not verified on screen`,
+          };
         }
       }
-      return { success: true, message: step.message ?? "done" };
+      return { success: true, message: step.message ?? 'done' };
     }
   }
 }
@@ -902,14 +972,14 @@ async function executePhase(
   stepDelayMs: number,
   globalStepOffset: number,
   globalTotal: number,
-  onFlowStep: RunYamlFlowOptions["onFlowStep"],
+  onFlowStep: RunYamlFlowOptions['onFlowStep'],
   artifactCollector?: RunArtifactCollector,
-  deviceUdid?: string,
+  deviceUdid?: string
 ): Promise<PhaseResult> {
   const phaseLabels: Record<FlowPhase, string> = {
-    setup: "Setup",
-    test: "Test",
-    assertion: "Assertions",
+    setup: 'Setup',
+    test: 'Test',
+    assertion: 'Assertions',
   };
 
   ui.printAgentBullet(`── ${phaseLabels[phase]} ──`);
@@ -921,7 +991,7 @@ async function executePhase(
     const globalN = globalStepOffset + i + 1;
 
     // Debug: show resolved value when secrets are redacted
-    if (mcpDebug && step.verbatim?.includes("***")) {
+    if (mcpDebug && step.verbatim?.includes('***')) {
       const resolved = stepLabelResolved(step);
       if (resolved) ui.printAgentBullet(`[debug] resolved → ${resolved}`);
     }
@@ -930,20 +1000,30 @@ async function executePhase(
     artifactCollector?.startStep(globalIdx);
 
     // Capture "before" screenshot for interactive steps (tap, type, swipe)
-    const isInteractive = step.kind === "tap" || step.kind === "type" || step.kind === "swipe";
+    const isInteractive = step.kind === 'tap' || step.kind === 'type' || step.kind === 'swipe';
     let beforeImg: string | null = null;
     let beforeDims: { width: number; height: number } | undefined;
     if (artifactCollector && isInteractive) {
       try {
         beforeImg = await screenshot(mcp);
         if (beforeImg) beforeDims = pngDimensionsFromBase64(beforeImg) ?? undefined;
-      } catch { /* non-critical */ }
+      } catch {
+        /* non-critical */
+      }
     }
 
-    onFlowStep?.(globalN, globalTotal, step.kind, label, "running");
+    onFlowStep?.(globalN, globalTotal, step.kind, label, 'running');
     const result = await executeStep(mcp, step, meta, appResolver, tapPoll, deviceUdid);
     ui.printFlowStep(globalN, globalTotal, label, result.success);
-    onFlowStep?.(globalN, globalTotal, step.kind, label, result.success ? "passed" : "failed", result.success ? undefined : result.message, result.message);
+    onFlowStep?.(
+      globalN,
+      globalTotal,
+      step.kind,
+      label,
+      result.success ? 'passed' : 'failed',
+      result.success ? undefined : result.message,
+      result.message
+    );
 
     // Capture screenshot and record step for report artifacts
     if (artifactCollector) {
@@ -955,7 +1035,7 @@ async function executePhase(
         verbatim: step.verbatim,
         target: label,
         phase,
-        status: result.success ? "passed" : "failed",
+        status: result.success ? 'passed' : 'failed',
         error: result.success ? undefined : result.message,
         message: result.message,
         tapCoordinates: tapCoords,
@@ -972,7 +1052,9 @@ async function executePhase(
           const dims = pngDimensionsFromBase64(img) ?? undefined;
           artifactCollector.attachScreenshot(globalIdx, img, dims);
         }
-      } catch { /* non-critical */ }
+      } catch {
+        /* non-critical */
+      }
     }
 
     executed++;
@@ -988,7 +1070,7 @@ async function executePhase(
       };
     }
 
-    if (step.kind === "done") break;
+    if (step.kind === 'done') break;
     if (i < steps.length - 1) await sleep(stepDelayMs);
   }
 
@@ -1005,7 +1087,7 @@ export async function runYamlFlow(
   meta: FlowMeta,
   inputSteps: FlowStep[],
   options: RunYamlFlowOptions = {},
-  phases?: PhasedStep[],
+  phases?: PhasedStep[]
 ): Promise<RunYamlFlowResult> {
   const stepDelayMs = options.stepDelayMs ?? 500;
   const appResolver = options.appResolver;
@@ -1014,12 +1096,12 @@ export async function runYamlFlow(
     intervalMs: options.tapTargetPollIntervalMs ?? DEFAULT_TAP_POLL_MS,
   };
 
-  const title = meta.name?.trim() || meta.appId || "YAML flow";
-  const isPhased = phases && phases.some(p => p.phase !== "test");
+  const title = meta.name?.trim() || meta.appId || 'YAML flow';
+  const isPhased = phases && phases.some((p) => p.phase !== 'test');
 
   // ── Phased execution (setup → steps → assertions) ──
   if (isPhased && phases) {
-    const phaseOrder: FlowPhase[] = ["setup", "test", "assertion"];
+    const phaseOrder: FlowPhase[] = ['setup', 'test', 'assertion'];
     const grouped = new Map<FlowPhase, FlowStep[]>();
     for (const phase of phaseOrder) {
       grouped.set(phase, []);
@@ -1029,12 +1111,12 @@ export async function runYamlFlow(
     }
 
     // Auto-append done step to assertions (or test if no assertions)
-    const assertionSteps = grouped.get("assertion")!;
-    const testSteps = grouped.get("test")!;
+    const assertionSteps = grouped.get('assertion')!;
+    const testSteps = grouped.get('test')!;
     const lastPhaseSteps = assertionSteps.length > 0 ? assertionSteps : testSteps;
     const lastStep = lastPhaseSteps[lastPhaseSteps.length - 1];
-    if (!lastStep || lastStep.kind !== "done") {
-      lastPhaseSteps.push({ kind: "done" });
+    if (!lastStep || lastStep.kind !== 'done') {
+      lastPhaseSteps.push({ kind: 'done' });
     }
 
     const totalSteps = phaseOrder.reduce((sum, p) => sum + (grouped.get(p)?.length ?? 0), 0);
@@ -1052,9 +1134,18 @@ export async function runYamlFlow(
       if (steps.length === 0) continue;
 
       const result = await executePhase(
-        mcp, phase, steps, meta, appResolver, tapPoll,
-        stepDelayMs, globalOffset, totalSteps, options.onFlowStep,
-        options.artifactCollector, options.deviceUdid,
+        mcp,
+        phase,
+        steps,
+        meta,
+        appResolver,
+        tapPoll,
+        stepDelayMs,
+        globalOffset,
+        totalSteps,
+        options.onFlowStep,
+        options.artifactCollector,
+        options.deviceUdid
       );
       phaseResults.push(result);
       totalExecuted += result.stepsExecuted;
@@ -1064,7 +1155,7 @@ export async function runYamlFlow(
         ui.printReplayResult(totalExecuted - 1, totalSteps, 0);
         ui.printError(
           `Flow stopped during ${phase} phase at step ${result.failedAt}`,
-          result.reason,
+          result.reason
         );
         return {
           success: false,
@@ -1090,8 +1181,8 @@ export async function runYamlFlow(
   // ── Flat execution (legacy — all steps treated as "test") ──
   let steps = inputSteps;
   const lastStep = steps[steps.length - 1];
-  if (!lastStep || lastStep.kind !== "done") {
-    steps = [...steps, { kind: "done" }];
+  if (!lastStep || lastStep.kind !== 'done') {
+    steps = [...steps, { kind: 'done' }];
   }
 
   const total = steps.length;
@@ -1103,7 +1194,7 @@ export async function runYamlFlow(
     const label = stepLabel(step);
     const n = i + 1;
 
-    if (mcpDebug && step.verbatim?.includes("***")) {
+    if (mcpDebug && step.verbatim?.includes('***')) {
       const resolved = stepLabelResolved(step);
       if (resolved) ui.printAgentBullet(`[debug] resolved → ${resolved}`);
     }
@@ -1111,20 +1202,30 @@ export async function runYamlFlow(
     options.artifactCollector?.startStep(i);
 
     // Capture "before" screenshot for interactive steps (tap, type, swipe)
-    const isInteractiveFlat = step.kind === "tap" || step.kind === "type" || step.kind === "swipe";
+    const isInteractiveFlat = step.kind === 'tap' || step.kind === 'type' || step.kind === 'swipe';
     let beforeImgFlat: string | null = null;
     let beforeDimsFlat: { width: number; height: number } | undefined;
     if (options.artifactCollector && isInteractiveFlat) {
       try {
         beforeImgFlat = await screenshot(mcp);
         if (beforeImgFlat) beforeDimsFlat = pngDimensionsFromBase64(beforeImgFlat) ?? undefined;
-      } catch { /* non-critical */ }
+      } catch {
+        /* non-critical */
+      }
     }
 
-    options.onFlowStep?.(n, total, step.kind, stepLabel(step), "running");
+    options.onFlowStep?.(n, total, step.kind, stepLabel(step), 'running');
     const result = await executeStep(mcp, step, meta, appResolver, tapPoll, options.deviceUdid);
     ui.printFlowStep(n, total, label, result.success);
-    options.onFlowStep?.(n, total, step.kind, stepLabel(step), result.success ? "passed" : "failed", result.success ? undefined : result.message, result.message);
+    options.onFlowStep?.(
+      n,
+      total,
+      step.kind,
+      stepLabel(step),
+      result.success ? 'passed' : 'failed',
+      result.success ? undefined : result.message,
+      result.message
+    );
 
     // Capture screenshot and record step for report artifacts
     if (options.artifactCollector) {
@@ -1135,8 +1236,8 @@ export async function runYamlFlow(
         kind: step.kind,
         verbatim: step.verbatim,
         target: label,
-        phase: "test",
-        status: result.success ? "passed" : "failed",
+        phase: 'test',
+        status: result.success ? 'passed' : 'failed',
         error: result.success ? undefined : result.message,
         message: result.message,
         tapCoordinates: tapCoords,
@@ -1153,7 +1254,9 @@ export async function runYamlFlow(
           const dims = pngDimensionsFromBase64(img) ?? undefined;
           options.artifactCollector.attachScreenshot(i, img, dims);
         }
-      } catch { /* non-critical */ }
+      } catch {
+        /* non-critical */
+      }
     }
 
     executed++;
@@ -1170,7 +1273,7 @@ export async function runYamlFlow(
       };
     }
 
-    if (step.kind === "done") {
+    if (step.kind === 'done') {
       ui.printReplayResult(executed, total, 0);
       return {
         success: true,

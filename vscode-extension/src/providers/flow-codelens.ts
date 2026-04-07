@@ -5,8 +5,8 @@
  * Supports both flat (steps:) and phased (setup:/steps:/assertions:) formats.
  */
 
-import * as vscode from "vscode";
-import * as path from "path";
+import * as vscode from 'vscode';
+import * as path from 'path';
 
 /** Matches section keys that contain runnable steps */
 const SECTION_KEY = /^\s*(setup|steps|assertions)\s*:/;
@@ -30,8 +30,8 @@ export class FlowCodeLensProvider implements vscode.CodeLensProvider {
     if (/^\s*flows\s*:/m.test(text)) {
       lenses.push(
         new vscode.CodeLens(topRange, {
-          title: "$(play) Run Suite",
-          command: "appclaw.runFlow",
+          title: '$(play) Run Suite',
+          command: 'appclaw.runFlow',
           arguments: [document.uri],
         })
       );
@@ -45,8 +45,8 @@ export class FlowCodeLensProvider implements vscode.CodeLensProvider {
           const range = new vscode.Range(i, 0, i, 0);
           lenses.push(
             new vscode.CodeLens(range, {
-              title: "$(play) Run",
-              command: "appclaw.runFlow",
+              title: '$(play) Run',
+              command: 'appclaw.runFlow',
               arguments: [vscode.Uri.file(flowPath)],
             })
           );
@@ -63,20 +63,20 @@ export class FlowCodeLensProvider implements vscode.CodeLensProvider {
     // Top-of-file: Run entire flow
     lenses.push(
       new vscode.CodeLens(topRange, {
-        title: "$(play) Run Flow",
-        command: "appclaw.runFlow",
+        title: '$(play) Run Flow',
+        command: 'appclaw.runFlow',
         arguments: [document.uri],
       })
     );
 
     // Per-step CodeLens — find lines under setup:/steps:/assertions:
     let inSection = false;
-    let currentSection = "";
+    let currentSection = '';
     let stepIndex = 0;
     const sectionLabels: Record<string, string> = {
-      setup: "Setup",
-      steps: "Step",
-      assertions: "Assert",
+      setup: 'Setup',
+      steps: 'Step',
+      assertions: 'Assert',
     };
 
     for (let i = 0; i < document.lineCount; i++) {
@@ -88,29 +88,34 @@ export class FlowCodeLensProvider implements vscode.CodeLensProvider {
         currentSection = sectionMatch[1];
         // Add section header lens
         const range = new vscode.Range(i, 0, i, 0);
-        const icon = currentSection === "assertions" ? "$(beaker)" : currentSection === "setup" ? "$(gear)" : "$(play)";
+        const icon =
+          currentSection === 'assertions'
+            ? '$(beaker)'
+            : currentSection === 'setup'
+              ? '$(gear)'
+              : '$(play)';
         lenses.push(
           new vscode.CodeLens(range, {
             title: `${icon} ${sectionLabels[currentSection]} Phase`,
-            command: "",
+            command: '',
           })
         );
         continue;
       }
 
       // Left-aligned non-empty line after a section means we've left it
-      if (inSection && /^\S/.test(line) && line.trim() !== "") {
+      if (inSection && /^\S/.test(line) && line.trim() !== '') {
         inSection = false;
       }
 
       if (inSection && STEP_LINE.test(line)) {
         stepIndex++;
         const range = new vscode.Range(i, 0, i, 0);
-        const prefix = sectionLabels[currentSection] || "Step";
+        const prefix = sectionLabels[currentSection] || 'Step';
         lenses.push(
           new vscode.CodeLens(range, {
             title: `$(debug-start) ${prefix} ${stepIndex}`,
-            command: "appclaw.runFlowStep",
+            command: 'appclaw.runFlowStep',
             arguments: [document.uri, stepIndex],
           })
         );

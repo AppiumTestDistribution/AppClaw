@@ -151,18 +151,20 @@ appclaw --flow examples/flows/google-search.yaml
 Flows support both structured and natural language syntax:
 
 **Structured:**
+
 ```yaml
 appId: com.android.settings
 name: Turn on WiFi
 ---
 - launchApp
 - wait: 2
-- tap: "Connections"
-- tap: "Wi-Fi"
-- done: "Wi-Fi turned on"
+- tap: 'Connections'
+- tap: 'Wi-Fi'
+- done: 'Wi-Fi turned on'
 ```
 
 **Natural language:**
+
 ```yaml
 name: YouTube search
 ---
@@ -182,6 +184,7 @@ Supported natural language patterns include: `open <app>`, `click/tap <element>`
 Run the same flow on N devices simultaneously, or distribute a suite of flows across N workers:
 
 **Same flow, N devices** — add `parallel: N` to the flow's metadata:
+
 ```yaml
 name: youtube_parallel
 platform: android
@@ -192,11 +195,13 @@ parallel: 2
 - assert "TestMu AI" is visible
 - done
 ```
+
 ```bash
 appclaw --flow youtube.yaml   # spins up 2 devices, runs flow on both concurrently
 ```
 
 **Suite: different flows, N workers** — a suite YAML lists flows and a worker count:
+
 ```yaml
 name: youtube_suite
 platform: android
@@ -206,6 +211,7 @@ flows:
   - flows/search.yaml
   - flows/playback.yaml
 ```
+
 ```bash
 appclaw --flow youtube-suite.yaml   # 2 devices pull from queue until all 3 flows finish
 ```
@@ -227,6 +233,7 @@ appclaw --playground --platform ios --device-type simulator --device "iPhone 17 
 ```
 
 Features:
+
 - Type natural-language commands that execute immediately on the device
 - Steps accumulate as you go
 - Export to a YAML flow file anytime
@@ -268,28 +275,29 @@ appclaw --plan "Copy the weather and send it on Slack"
 
 All configuration is via `.env`:
 
-| Variable | Default | Description |
-|---|---|---|
-| **Platform** | | |
-| `PLATFORM` | (prompt) | Target platform: `android` or `ios` |
-| `DEVICE_TYPE` | (prompt) | iOS device type: `simulator` or `real` |
-| `DEVICE_UDID` | (auto) | Device UDID — skips device picker |
-| `DEVICE_NAME` | (auto) | Device name — partial match (e.g. `iPhone 17 Pro`) |
-| **LLM** | | |
-| `LLM_PROVIDER` | `gemini` | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`) |
-| `LLM_API_KEY` | — | API key for your provider |
-| `LLM_MODEL` | (auto) | Model override (e.g. `gemini-3.1-flash-lite-preview`, `claude-sonnet-4-20250514`) |
-| `AGENT_MODE` | `vision` | `dom` (XML locators) or `vision` (screenshot-first) |
-| **Agent** | | |
-| `MAX_STEPS` | `30` | Max steps per goal |
-| `STEP_DELAY` | `500` | Milliseconds between steps |
-| `LLM_THINKING` | `off` | Extended thinking/reasoning (`on` or `off`) |
-| `LLM_THINKING_BUDGET` | `1024` | Token budget for extended thinking |
-| `SHOW_TOKEN_USAGE` | `false` | Print token usage and cost per step |
+| Variable              | Default  | Description                                                                       |
+| --------------------- | -------- | --------------------------------------------------------------------------------- |
+| **Platform**          |          |                                                                                   |
+| `PLATFORM`            | (prompt) | Target platform: `android` or `ios`                                               |
+| `DEVICE_TYPE`         | (prompt) | iOS device type: `simulator` or `real`                                            |
+| `DEVICE_UDID`         | (auto)   | Device UDID — skips device picker                                                 |
+| `DEVICE_NAME`         | (auto)   | Device name — partial match (e.g. `iPhone 17 Pro`)                                |
+| **LLM**               |          |                                                                                   |
+| `LLM_PROVIDER`        | `gemini` | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`)                  |
+| `LLM_API_KEY`         | —        | API key for your provider                                                         |
+| `LLM_MODEL`           | (auto)   | Model override (e.g. `gemini-3.1-flash-lite-preview`, `claude-sonnet-4-20250514`) |
+| `AGENT_MODE`          | `vision` | `dom` (XML locators) or `vision` (screenshot-first)                               |
+| **Agent**             |          |                                                                                   |
+| `MAX_STEPS`           | `30`     | Max steps per goal                                                                |
+| `STEP_DELAY`          | `500`    | Milliseconds between steps                                                        |
+| `LLM_THINKING`        | `off`    | Extended thinking/reasoning (`on` or `off`)                                       |
+| `LLM_THINKING_BUDGET` | `1024`   | Token budget for extended thinking                                                |
+| `SHOW_TOKEN_USAGE`    | `false`  | Print token usage and cost per step                                               |
 
 ## How It Works
 
 Each step, AppClaw:
+
 1. **Perceives** — reads the device screen (UI elements or screenshot)
 2. **Reasons** — sends the goal + screen state to an LLM, which decides the next action
 3. **Acts** — executes the action (tap, type, swipe, launch app, etc.)
@@ -297,26 +305,26 @@ Each step, AppClaw:
 
 ### Agent Actions
 
-| Action | Description |
-|---|---|
-| `tap` | Tap an element |
-| `type` | Type text into an input |
-| `scroll` / `swipe` | Scroll or swipe gesture |
-| `launch` | Open an app |
-| `back` / `home` | Navigation buttons |
-| `long_press` / `double_tap` | Touch gestures |
-| `find_and_tap` | Scroll to find, then tap |
-| `ask_user` | Pause for user input (OTP, CAPTCHA) |
-| `done` | Goal complete |
+| Action                      | Description                         |
+| --------------------------- | ----------------------------------- |
+| `tap`                       | Tap an element                      |
+| `type`                      | Type text into an input             |
+| `scroll` / `swipe`          | Scroll or swipe gesture             |
+| `launch`                    | Open an app                         |
+| `back` / `home`             | Navigation buttons                  |
+| `long_press` / `double_tap` | Touch gestures                      |
+| `find_and_tap`              | Scroll to find, then tap            |
+| `ask_user`                  | Pause for user input (OTP, CAPTCHA) |
+| `done`                      | Goal complete                       |
 
 ### Failure Recovery
 
-| Mechanism | What it does |
-|---|---|
-| **Stuck detection** | Detects repeated screens/actions, injects recovery hints |
-| **Checkpointing** | Saves known-good states for rollback |
-| **Human-in-the-loop** | Pauses for OTP, CAPTCHA, or ambiguous choices |
-| **Action retry** | Feeds failures back to the LLM for re-planning |
+| Mechanism             | What it does                                             |
+| --------------------- | -------------------------------------------------------- |
+| **Stuck detection**   | Detects repeated screens/actions, injects recovery hints |
+| **Checkpointing**     | Saves known-good states for rollback                     |
+| **Human-in-the-loop** | Pauses for OTP, CAPTCHA, or ambiguous choices            |
+| **Action retry**      | Feeds failures back to the LLM for re-planning           |
 
 ## CLI Reference
 
@@ -360,10 +368,10 @@ npx skills add AppiumTestDistribution/appclaw
 
 This installs two skills:
 
-| Skill | What it does |
-|---|---|
+| Skill                   | What it does                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `generate-appclaw-flow` | Generates YAML flow files — knows the exact step syntax, natural language patterns, phased formats, and variable interpolation |
-| `use-appclaw-cli` | Helps run flows, configure `.env`, set up devices, choose vision providers, and troubleshoot |
+| `use-appclaw-cli`       | Helps run flows, configure `.env`, set up devices, choose vision providers, and troubleshoot                                   |
 
 Skills are auto-discovered if you're working inside a clone of this repo.
 

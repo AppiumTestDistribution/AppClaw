@@ -6,7 +6,7 @@
 export interface PRDAnalysis {
   appName: string;
   appId?: string;
-  platform: "android" | "ios" | "unknown";
+  platform: 'android' | 'ios' | 'unknown';
   features: AppFeature[];
   userJourneys: UserJourney[];
   reasoning: string;
@@ -25,7 +25,7 @@ export interface UserJourney {
   /** Ordered high-level steps */
   steps: string[];
   /** Priority: higher = more important to test */
-  priority: "high" | "medium" | "low";
+  priority: 'high' | 'medium' | 'low';
 }
 
 /** A screen discovered during device crawling */
@@ -45,7 +45,7 @@ export interface CrawledScreen {
 
 export interface TappableElement {
   label: string;
-  type: "button" | "link" | "input" | "tab" | "icon" | "other";
+  type: 'button' | 'link' | 'input' | 'tab' | 'icon' | 'other';
   bounds?: string;
 }
 

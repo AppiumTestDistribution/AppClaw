@@ -14,6 +14,7 @@ You are an expert mobile automation engineer with deep Appium and real-device ex
 ## Prerequisites
 
 AppClaw requires:
+
 - **Node.js** 18+
 - **A connected device** — USB Android, Android emulator, iOS simulator, or real iOS device
 - **An LLM API key** (except for Ollama which runs locally)
@@ -37,6 +38,7 @@ appclaw --version
 ```
 
 From a local clone, use `npm start` instead of `appclaw`:
+
 ```sh
 npm start -- --help
 npm start "Open Settings"
@@ -84,6 +86,7 @@ appclaw --flow tests/flows/youtube-phased.yaml --env dev
 ```
 
 **Flags:**
+
 - `--env <name>` — select environment file (`.appclaw/env/<name>.yaml`) for variable/secret resolution
 
 **No LLM key needed** unless the flow has steps that fall back to LLM parsing (unrecognized natural language).
@@ -108,13 +111,13 @@ appclaw --explore prd.txt --no-crawl --num-flows 3
 appclaw --explore "Settings app" --output-dir my-flows --max-screens 15 --max-depth 4
 ```
 
-| Flag | Default | Purpose |
-|---|---|---|
-| `--num-flows <N>` | 5 | Number of flows to generate |
-| `--no-crawl` | false | Skip device crawling (PRD-only analysis) |
-| `--output-dir <dir>` | `generated-flows` | Where to write generated YAML files |
-| `--max-screens <N>` | 10 | Max screens to crawl |
-| `--max-depth <N>` | 3 | Max navigation depth during crawl |
+| Flag                 | Default           | Purpose                                  |
+| -------------------- | ----------------- | ---------------------------------------- |
+| `--num-flows <N>`    | 5                 | Number of flows to generate              |
+| `--no-crawl`         | false             | Skip device crawling (PRD-only analysis) |
+| `--output-dir <dir>` | `generated-flows` | Where to write generated YAML files      |
+| `--max-screens <N>`  | 10                | Max screens to crawl                     |
+| `--max-depth <N>`    | 3                 | Max navigation depth during crawl        |
 
 ### 5. Record & Replay
 
@@ -197,30 +200,30 @@ cp .env.example .env
 
 ### LLM Setup (required for agent/explorer/planner modes)
 
-| Variable | Default | Options |
-|---|---|---|
+| Variable       | Default     | Options                                           |
+| -------------- | ----------- | ------------------------------------------------- |
 | `LLM_PROVIDER` | `anthropic` | `anthropic`, `openai`, `gemini`, `groq`, `ollama` |
-| `LLM_API_KEY` | — | Your provider's API key (not needed for Ollama) |
-| `LLM_MODEL` | auto | Override model ID (see defaults below) |
+| `LLM_API_KEY`  | —           | Your provider's API key (not needed for Ollama)   |
+| `LLM_MODEL`    | auto        | Override model ID (see defaults below)            |
 
 **Default models per provider:**
 
-| Provider | Default Model |
-|---|---|
+| Provider    | Default Model              |
+| ----------- | -------------------------- |
 | `anthropic` | `claude-sonnet-4-20250514` |
-| `openai` | `gpt-4o` |
-| `gemini` | `gemini-2.0-flash` |
-| `groq` | `llama-3.3-70b-versatile` |
-| `ollama` | `llama3.2` |
+| `openai`    | `gpt-4o`                   |
+| `gemini`    | `gemini-2.0-flash`         |
+| `groq`      | `llama-3.3-70b-versatile`  |
+| `ollama`    | `llama3.2`                 |
 
 ### Agent Mode & Vision
 
 Two strategies for finding elements on screen:
 
-| Setup | `AGENT_MODE` | Best For |
-|---|---|---|
-| **DOM mode** | `dom` | Standard apps with good accessibility labels. Uses XML page source. Works with any LLM. |
-| **Vision mode** | `vision` | Custom views, canvas-rendered UI, games. Screenshot-first with AI vision. |
+| Setup           | `AGENT_MODE` | Best For                                                                                |
+| --------------- | ------------ | --------------------------------------------------------------------------------------- |
+| **DOM mode**    | `dom`        | Standard apps with good accessibility labels. Uses XML page source. Works with any LLM. |
+| **Vision mode** | `vision`     | Custom views, canvas-rendered UI, games. Screenshot-first with AI vision.               |
 
 #### DOM Mode (simplest)
 
@@ -267,24 +270,24 @@ VISION_MODE=fallback    # always | fallback | never
 
 ### Tuning Parameters
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `MAX_STEPS` | 30 | Max steps per goal before stopping |
-| `STEP_DELAY` | 500 | Milliseconds between steps |
-| `MAX_ELEMENTS` | 40 | Max interactive elements per screen capture |
-| `MAX_HISTORY_STEPS` | 10 | Previous steps kept in LLM context |
-| `LLM_THINKING` | `on` | Extended thinking/reasoning (`on` or `off`) |
-| `LLM_THINKING_BUDGET` | 128 | Token budget for thinking |
-| `LLM_SCREENSHOT_MAX_EDGE_PX` | 0 | Downscale screenshots for LLM (try 384 or 768 to reduce cost) |
-| `SHOW_TOKEN_USAGE` | `false` | Print token usage and cost per step |
+| Variable                     | Default | Purpose                                                       |
+| ---------------------------- | ------- | ------------------------------------------------------------- |
+| `MAX_STEPS`                  | 30      | Max steps per goal before stopping                            |
+| `STEP_DELAY`                 | 500     | Milliseconds between steps                                    |
+| `MAX_ELEMENTS`               | 40      | Max interactive elements per screen capture                   |
+| `MAX_HISTORY_STEPS`          | 10      | Previous steps kept in LLM context                            |
+| `LLM_THINKING`               | `on`    | Extended thinking/reasoning (`on` or `off`)                   |
+| `LLM_THINKING_BUDGET`        | 128     | Token budget for thinking                                     |
+| `LLM_SCREENSHOT_MAX_EDGE_PX` | 0       | Downscale screenshots for LLM (try 384 or 768 to reduce cost) |
+| `SHOW_TOKEN_USAGE`           | `false` | Print token usage and cost per step                           |
 
 ### MCP Transport
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `MCP_TRANSPORT` | `stdio` | `stdio` (auto-launches appium-mcp) or `sse` (connect to running server) |
-| `MCP_HOST` | `localhost` | SSE transport: hostname |
-| `MCP_PORT` | `8080` | SSE transport: port |
+| Variable        | Default     | Purpose                                                                 |
+| --------------- | ----------- | ----------------------------------------------------------------------- |
+| `MCP_TRANSPORT` | `stdio`     | `stdio` (auto-launches appium-mcp) or `sse` (connect to running server) |
+| `MCP_HOST`      | `localhost` | SSE transport: hostname                                                 |
+| `MCP_PORT`      | `8080`      | SSE transport: port                                                     |
 
 **stdio** (default) — AppClaw spawns `npx appium-mcp@latest` as a subprocess. No manual server setup.
 
@@ -303,12 +306,14 @@ Records successful trajectories to `~/.appclaw/trajectories.json` and reuses the
 ## Safety Policy
 
 **Safe without approval:**
+
 - `appclaw --help`, `appclaw --version`
 - `appclaw --flow` (YAML execution — predictable, no LLM)
 - `appclaw --report` (read-only report server)
 - Reading `.env`, `.appclaw/env/`, flow YAML files
 
 **Ask before executing:**
+
 - `appclaw "goal"` (agent mode — uses LLM credits, takes actions on device)
 - `appclaw --explore` (LLM credits + device crawling)
 - `appclaw --record` (agent mode + saves recording)
@@ -322,49 +327,49 @@ Why: agent and explorer modes consume LLM API credits and take real actions on t
 
 ### Device Issues
 
-| Problem | Diagnosis | Fix |
-|---|---|---|
-| "No devices found" | `adb devices` / `xcrun simctl list devices` | Connect device, boot emulator/simulator |
-| Android not detected | Check `ANDROID_HOME` | `export ANDROID_HOME=$HOME/Library/Android/sdk` |
-| iOS simulator WDA failure | WDA cache issue | Delete `~/.cache/appium-mcp/wda/` and retry |
-| iOS real device WDA | Signing required | Follow appium-xcuitest-driver real device setup guide |
-| Wrong device selected | Multiple devices connected | Use `--udid` or `--device` to specify |
+| Problem                   | Diagnosis                                   | Fix                                                   |
+| ------------------------- | ------------------------------------------- | ----------------------------------------------------- |
+| "No devices found"        | `adb devices` / `xcrun simctl list devices` | Connect device, boot emulator/simulator               |
+| Android not detected      | Check `ANDROID_HOME`                        | `export ANDROID_HOME=$HOME/Library/Android/sdk`       |
+| iOS simulator WDA failure | WDA cache issue                             | Delete `~/.cache/appium-mcp/wda/` and retry           |
+| iOS real device WDA       | Signing required                            | Follow appium-xcuitest-driver real device setup guide |
+| Wrong device selected     | Multiple devices connected                  | Use `--udid` or `--device` to specify                 |
 
 ### MCP Connection Issues
 
-| Problem | Fix |
-|---|---|
-| "Failed to connect to MCP" | Check that `npx appium-mcp@latest` runs standalone |
-| SSE connection refused | Verify `MCP_HOST` and `MCP_PORT` match running server |
-| Tool call timeout | Check device USB/network, restart appium-mcp |
+| Problem                    | Fix                                                   |
+| -------------------------- | ----------------------------------------------------- |
+| "Failed to connect to MCP" | Check that `npx appium-mcp@latest` runs standalone    |
+| SSE connection refused     | Verify `MCP_HOST` and `MCP_PORT` match running server |
+| Tool call timeout          | Check device USB/network, restart appium-mcp          |
 
 ### Vision Issues
 
-| Problem | Fix |
-|---|---|
-| Stark vision fails | Verify `GEMINI_API_KEY` or `STARK_VISION_API_KEY` is set and valid |
-| appium-mcp vision fails | Check all `AI_VISION_*` vars are set; verify the API URL is reachable |
-| Vision returns wrong coordinates | Try `AI_VISION_COORD_TYPE=absolute` for Gemini |
-| Element not found (DOM or vision) | Enable vision fallback: `VISION_MODE=fallback` |
+| Problem                           | Fix                                                                   |
+| --------------------------------- | --------------------------------------------------------------------- |
+| Stark vision fails                | Verify `GEMINI_API_KEY` or `STARK_VISION_API_KEY` is set and valid    |
+| appium-mcp vision fails           | Check all `AI_VISION_*` vars are set; verify the API URL is reachable |
+| Vision returns wrong coordinates  | Try `AI_VISION_COORD_TYPE=absolute` for Gemini                        |
+| Element not found (DOM or vision) | Enable vision fallback: `VISION_MODE=fallback`                        |
 
 ### Flow Execution Issues
 
-| Problem | Fix |
-|---|---|
-| "Undefined secret" | Export the shell variable: `export VAR_NAME=value` |
-| "Undefined variable" | Add the key to `.appclaw/env/<name>.yaml` under `variables:` |
-| `launchApp` fails | Set `appId` in the YAML header |
-| Tap misses element | Use more specific label text; enable vision fallback |
-| Natural language step not recognized | Use structured syntax instead (e.g., `tap: "Login"`) |
+| Problem                              | Fix                                                          |
+| ------------------------------------ | ------------------------------------------------------------ |
+| "Undefined secret"                   | Export the shell variable: `export VAR_NAME=value`           |
+| "Undefined variable"                 | Add the key to `.appclaw/env/<name>.yaml` under `variables:` |
+| `launchApp` fails                    | Set `appId` in the YAML header                               |
+| Tap misses element                   | Use more specific label text; enable vision fallback         |
+| Natural language step not recognized | Use structured syntax instead (e.g., `tap: "Login"`)         |
 
 ### LLM Issues
 
-| Problem | Fix |
-|---|---|
-| "API key required" | Set `LLM_API_KEY` in `.env` |
-| Model not found | Check `LLM_MODEL` matches provider's model ID |
-| High cost | Use cheaper models (`gemini-2.0-flash`, `gpt-4o-mini`), reduce `LLM_THINKING_BUDGET`, set `LLM_SCREENSHOT_MAX_EDGE_PX=384` |
-| Stuck in loop | Stuck detection kicks in after 3 repeated screens. Increase `MAX_STEPS` or simplify the goal |
+| Problem            | Fix                                                                                                                        |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| "API key required" | Set `LLM_API_KEY` in `.env`                                                                                                |
+| Model not found    | Check `LLM_MODEL` matches provider's model ID                                                                              |
+| High cost          | Use cheaper models (`gemini-2.0-flash`, `gpt-4o-mini`), reduce `LLM_THINKING_BUDGET`, set `LLM_SCREENSHOT_MAX_EDGE_PX=384` |
+| Stuck in loop      | Stuck detection kicks in after 3 repeated screens. Increase `MAX_STEPS` or simplify the goal                               |
 
 ---
 

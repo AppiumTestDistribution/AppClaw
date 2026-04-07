@@ -3,17 +3,17 @@
  * Score, dedupe, and compact UI elements for LLM context.
  */
 
-import type { UIElement, CompactUIElement } from "./types.js";
+import type { UIElement, CompactUIElement } from './types.js';
 
 /** Element types that have meaningful checked/unchecked states */
 function isToggleType(type: string): boolean {
   const lower = type.toLowerCase();
   return (
-    lower.includes("switch") ||
-    lower.includes("toggle") ||
-    lower.includes("checkbox") ||
-    lower.includes("radio") ||
-    lower.includes("checked")
+    lower.includes('switch') ||
+    lower.includes('toggle') ||
+    lower.includes('checkbox') ||
+    lower.includes('radio') ||
+    lower.includes('checked')
   );
 }
 
@@ -56,10 +56,7 @@ function scoreElement(el: UIElement): number {
  * Deduplicates elements by center coordinates (within tolerance),
  * scores them, and returns the top N as compact elements.
  */
-export function filterElements(
-  elements: UIElement[],
-  limit: number
-): CompactUIElement[] {
+export function filterElements(elements: UIElement[], limit: number): CompactUIElement[] {
   // Deduplicate by center coordinates (5px tolerance)
   const seen = new Map<string, UIElement>();
   for (const el of elements) {

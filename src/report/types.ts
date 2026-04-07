@@ -4,11 +4,11 @@
  * No database. Everything is stored as flat JSON files under `.appclaw/runs/`.
  */
 
-import type { FlowPhase, FlowMeta } from "../flow/types.js";
+import type { FlowPhase, FlowMeta } from '../flow/types.js';
 
 /* ─── Per-step artifact ──────────────────────────────────── */
 
-export type StepStatus = "passed" | "failed" | "skipped";
+export type StepStatus = 'passed' | 'failed' | 'skipped';
 
 export interface StepArtifact {
   /** 0-based step index */
@@ -56,7 +56,7 @@ export interface RunManifest {
   /** Total duration in ms */
   durationMs: number;
   /** Resolved platform */
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
   /** Device name or UDID (if known) */
   device?: string;
   /** Overall result */
@@ -92,7 +92,7 @@ export interface RunIndexEntry {
   runId: string;
   flowFile: string;
   flowName?: string;
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
   startedAt: string;
   durationMs: number;
   success: boolean;
@@ -110,7 +110,7 @@ export interface RunIndexEntry {
 export interface SuiteEntry {
   suiteId: string;
   suiteName?: string;
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
   startedAt: string;
   durationMs: number;
   /** Ordered list of run IDs that belong to this suite */

@@ -4,7 +4,7 @@
  */
 
 export function pngDimensionsFromBase64(base64: string): { width: number; height: number } | null {
-  const buf = Buffer.from(base64, "base64");
+  const buf = Buffer.from(base64, 'base64');
   if (buf.length < 24) return null;
 
   // PNG: read IHDR chunk

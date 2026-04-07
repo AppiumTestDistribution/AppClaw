@@ -3,21 +3,18 @@
  * goal input, and step execution log.
  */
 
-import * as vscode from "vscode";
-import { AppclawBridge } from "../bridge";
+import * as vscode from 'vscode';
+import { AppclawBridge } from '../bridge';
 
 export class DevicePanel {
   public static currentPanel: DevicePanel | undefined;
-  private static readonly viewType = "appclaw.devicePanel";
+  private static readonly viewType = 'appclaw.devicePanel';
 
   private readonly panel: vscode.WebviewPanel;
   private readonly bridge: AppclawBridge;
   private disposables: vscode.Disposable[] = [];
 
-  public static createOrShow(
-    extensionUri: vscode.Uri,
-    bridge: AppclawBridge
-  ): DevicePanel {
+  public static createOrShow(extensionUri: vscode.Uri, bridge: AppclawBridge): DevicePanel {
     const column = vscode.ViewColumn.Beside;
 
     if (DevicePanel.currentPanel) {
@@ -25,16 +22,11 @@ export class DevicePanel {
       return DevicePanel.currentPanel;
     }
 
-    const panel = vscode.window.createWebviewPanel(
-      DevicePanel.viewType,
-      "AppClaw Device",
-      column,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [extensionUri],
-      }
-    );
+    const panel = vscode.window.createWebviewPanel(DevicePanel.viewType, 'AppClaw Device', column, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [extensionUri],
+    });
 
     DevicePanel.currentPanel = new DevicePanel(panel, bridge);
     return DevicePanel.currentPanel;
@@ -48,11 +40,11 @@ export class DevicePanel {
     this.bridge = bridge;
 
     // Read MJPEG config from settings
-    const config = vscode.workspace.getConfiguration("appclaw");
-    const mjpegEnabled = config.get<boolean>("mjpegEnabled", true);
-    const mjpegHost = config.get<string>("mjpegHost", "127.0.0.1");
-    const mjpegPortAndroid = config.get<number>("mjpegPortAndroid", 7810);
-    const mjpegPortIos = config.get<number>("mjpegPortIos", 9100);
+    const config = vscode.workspace.getConfiguration('appclaw');
+    const mjpegEnabled = config.get<boolean>('mjpegEnabled', true);
+    const mjpegHost = config.get<string>('mjpegHost', '127.0.0.1');
+    const mjpegPortAndroid = config.get<number>('mjpegPortAndroid', 7810);
+    const mjpegPortIos = config.get<number>('mjpegPortIos', 9100);
 
     this.panel.webview.html = this.getHtml({
       mjpegEnabled,
@@ -63,20 +55,20 @@ export class DevicePanel {
 
     // Forward ALL bridge events to webview
     const forwardEvent = (event: any) => {
-      const msg = { type: "appclaw-event", event: event.event, data: event.data };
+      const msg = { type: 'appclaw-event', event: event.event, data: event.data };
       if (this.webviewReady) {
         this.panel.webview.postMessage(msg);
       } else {
         this.pendingMessages.push(msg);
       }
     };
-    bridge.on("event", forwardEvent);
+    bridge.on('event', forwardEvent);
 
     // Handle messages from webview
     this.panel.webview.onDidReceiveMessage(
       async (message) => {
         switch (message.command) {
-          case "webviewReady":
+          case 'webviewReady':
             // Webview signals it's ready — flush buffered messages
             this.webviewReady = true;
             for (const msg of this.pendingMessages) {
@@ -84,42 +76,46 @@ export class DevicePanel {
             }
             this.pendingMessages = [];
             break;
-          case "runGoal": {
+          case 'runGoal': {
             const goalArgs: string[] = [];
-            if (message.platform) { goalArgs.push("--platform", message.platform); }
+            if (message.platform) {
+              goalArgs.push('--platform', message.platform);
+            }
             this.bridge.runGoal(message.goal, goalArgs);
             break;
           }
-          case "startPlayground": {
+          case 'startPlayground': {
             const pgArgs: string[] = [];
-            if (message.platform) { pgArgs.push("--platform", message.platform); }
+            if (message.platform) {
+              pgArgs.push('--platform', message.platform);
+            }
             this.bridge.startPlayground(pgArgs);
             break;
           }
-          case "sendCommand":
+          case 'sendCommand':
             this.bridge.sendCommand(message.text);
             break;
-          case "exportFlow": {
+          case 'exportFlow': {
             const defaultUri = vscode.Uri.file(
-              require("path").join(
-                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || require("os").homedir(),
+              require('path').join(
+                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || require('os').homedir(),
                 `flow-${Date.now()}.yaml`
               )
             );
             const uri = await vscode.window.showSaveDialog({
               defaultUri,
-              filters: { "YAML files": ["yaml", "yml"] },
-              title: "Export Flow",
+              filters: { 'YAML files': ['yaml', 'yml'] },
+              title: 'Export Flow',
             });
             if (uri) {
               this.bridge.sendCommand(`/export ${uri.fsPath}`);
             }
             break;
           }
-          case "sendInput":
+          case 'sendInput':
             this.bridge.sendInput(message.text);
             break;
-          case "stop":
+          case 'stop':
             this.bridge.stop();
             break;
         }
@@ -128,15 +124,19 @@ export class DevicePanel {
       this.disposables
     );
 
-    this.panel.onDidDispose(() => {
-      bridge.removeListener("event", forwardEvent);
-      this.dispose();
-    }, null, this.disposables);
+    this.panel.onDidDispose(
+      () => {
+        bridge.removeListener('event', forwardEvent);
+        this.dispose();
+      },
+      null,
+      this.disposables
+    );
   }
 
   /** Show a loading state immediately when a flow/goal is triggered */
   public showLoading(label: string): void {
-    const msg = { type: "appclaw-loading", label };
+    const msg = { type: 'appclaw-loading', label };
     if (this.webviewReady) {
       this.panel.webview.postMessage(msg);
     } else {
@@ -145,8 +145,8 @@ export class DevicePanel {
   }
 
   /** Switch between single-device and multi-device live grid modes */
-  public setRunMode(mode: "single" | "multi", deviceCount: number): void {
-    const msg = { type: "setRunMode", mode, deviceCount };
+  public setRunMode(mode: 'single' | 'multi', deviceCount: number): void {
+    const msg = { type: 'setRunMode', mode, deviceCount };
     if (this.webviewReady) {
       this.panel.webview.postMessage(msg);
     } else {

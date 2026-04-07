@@ -3,7 +3,7 @@ name: Google Search
 ---
 - launchApp
 - wait: 2
-- tap: "Click on login button"
-- type: "Click on Veritical Swiping"
-- type: "Swipe up"
-- done: "Search results loaded"
+- tap: 'Click on login button'
+- type: 'Click on Veritical Swiping'
+- type: 'Swipe up'
+- done: 'Search results loaded'

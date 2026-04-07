@@ -9,33 +9,37 @@
  * - Action recording
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import { findElement, isMCPError, extractText } from "../mcp/tools.js";
-import { typeViaKeyboard, detectDeviceUdid, pressEnterKey } from "../mcp/keyboard.js";
-import type { LLMProvider, AgentContext, ToolCallDecision } from "../llm/provider.js";
-import type { ActionResult } from "../llm/schemas.js";
-import { getScreenState } from "../perception/screen.js";
-import { diffScreen, computeScreenHash } from "../perception/screen-diff.js";
-import { createStuckDetector } from "./stuck.js";
-import { createRecoveryEngine } from "./recovery.js";
-import { askUser, classifyHITLRequest } from "./human-in-the-loop.js";
-import { tapAtCoordinates, isAIElement, parseAIElementCoords } from "./element-finder.js";
-import { findElementByVision } from "../mcp/tools.js";
-import { Config } from "../config.js";
-import { isVisionLocateEnabled } from "../vision/locate-enabled.js";
-import { getCachedScreenSize } from "../vision/window-size.js";
-import type { ActionRecorder } from "../recording/recorder.js";
-import type { AppResolver } from "./app-resolver.js";
-import { preprocessAction, resolveAppId } from "./preprocessor.js";
-import { activateAppWithFallback } from "../mcp/activate-app.js";
-import { MODEL_PRICING } from "../constants.js";
-import * as ui from "../ui/terminal.js";
-import { EpisodicRecorder } from "../memory/recorder.js";
-import { loadStore } from "../memory/store.js";
-import { retrieveTrajectories, formatExperienceForPrompt } from "../memory/retriever.js";
-import { extractScreenLabels, extractGoalKeywords, extractAppIdFromText } from "../memory/fingerprint.js";
+import type { MCPClient } from '../mcp/types.js';
+import { findElement, isMCPError, extractText } from '../mcp/tools.js';
+import { typeViaKeyboard, detectDeviceUdid, pressEnterKey } from '../mcp/keyboard.js';
+import type { LLMProvider, AgentContext, ToolCallDecision } from '../llm/provider.js';
+import type { ActionResult } from '../llm/schemas.js';
+import { getScreenState } from '../perception/screen.js';
+import { diffScreen, computeScreenHash } from '../perception/screen-diff.js';
+import { createStuckDetector } from './stuck.js';
+import { createRecoveryEngine } from './recovery.js';
+import { askUser, classifyHITLRequest } from './human-in-the-loop.js';
+import { tapAtCoordinates, isAIElement, parseAIElementCoords } from './element-finder.js';
+import { findElementByVision } from '../mcp/tools.js';
+import { Config } from '../config.js';
+import { isVisionLocateEnabled } from '../vision/locate-enabled.js';
+import { getCachedScreenSize } from '../vision/window-size.js';
+import type { ActionRecorder } from '../recording/recorder.js';
+import type { AppResolver } from './app-resolver.js';
+import { preprocessAction, resolveAppId } from './preprocessor.js';
+import { activateAppWithFallback } from '../mcp/activate-app.js';
+import { MODEL_PRICING } from '../constants.js';
+import * as ui from '../ui/terminal.js';
+import { EpisodicRecorder } from '../memory/recorder.js';
+import { loadStore } from '../memory/store.js';
+import { retrieveTrajectories, formatExperienceForPrompt } from '../memory/retriever.js';
+import {
+  extractScreenLabels,
+  extractGoalKeywords,
+  extractAppIdFromText,
+} from '../memory/fingerprint.js';
 
-const mcpDebug = process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true";
+const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
 
 export interface AgentOptions {
   goal: string;
@@ -49,14 +53,18 @@ export interface AgentOptions {
   maxSteps?: number;
   stepDelay?: number;
   maxElements?: number;
-  visionMode?: "always" | "fallback" | "never";
+  visionMode?: 'always' | 'fallback' | 'never';
   /** Optional recorder — pass to record actions for replay */
   recorder?: ActionRecorder;
   /** Model name for token cost calculation */
   modelName?: string;
   onStep?: (event: StepEvent) => void;
   /** Callback to evaluate screen state and potentially rewrite the goal mid-execution */
-  screenEvaluator?: (currentDom: string, currentGoal: string, step: number) => Promise<ScreenEvaluation | null>;
+  screenEvaluator?: (
+    currentDom: string,
+    currentGoal: string,
+    step: number
+  ) => Promise<ScreenEvaluation | null>;
 }
 
 export interface ScreenEvaluation {
@@ -99,9 +107,7 @@ export interface StepRecord {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function runAgent(options: AgentOptions): Promise<AgentResult> {
-  let {
-    goal,
-  } = options;
+  let { goal } = options;
   const {
     mcp,
     llm,
@@ -109,9 +115,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     maxSteps = 30,
     stepDelay = 500,
     maxElements = 80,
-    visionMode = "fallback",
+    visionMode = 'fallback',
     recorder,
-    modelName = "unknown",
+    modelName = 'unknown',
     onStep,
     screenEvaluator,
   } = options;
@@ -121,17 +127,20 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   const history: StepRecord[] = [];
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
-  let prevDom = "";
-  let lastResult = "";
-  let detectedPlatform: "android" | "ios" = "android";
+  let prevDom = '';
+  let lastResult = '';
+  let detectedPlatform: 'android' | 'ios' = 'android';
   let postActionScreenshot: string | undefined; // Screenshot captured after previous action
-  let cachedPostScreen: import("../perception/types.js").ScreenState | undefined; // Reuse post-action screen as next step's perception
+  let cachedPostScreen: import('../perception/types.js').ScreenState | undefined; // Reuse post-action screen as next step's perception
   const triedSelectors: string[] = []; // Track selectors the LLM has tried (for stuck recovery)
 
   // ── Proactive negative cache ──────────────────────────
   // Tracks which selectors failed on which screen (by hash).
   // Injected into every LLM call so the model avoids repeating known-bad actions.
-  const screenFailures = new Map<string, Array<{ selector: string; action: string; error: string }>>();
+  const screenFailures = new Map<
+    string,
+    Array<{ selector: string; action: string; error: string }>
+  >();
 
   // Detect device UDID for keyboard input (ADB-based typing on Android)
   const deviceUdid = await detectDeviceUdid();
@@ -139,7 +148,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
   // ── Episodic Memory ──────────────────────────────────
   // Cross-session trajectory store: remembers winning actions from previous runs.
-  const episodicEnabled = Config.EPISODIC_MEMORY === "on";
+  const episodicEnabled = Config.EPISODIC_MEMORY === 'on';
   const episodicStorePath = Config.EPISODIC_MEMORY_PATH || undefined;
   const episodicRecorder = episodicEnabled
     ? new EpisodicRecorder(goal, detectedPlatform, Config.AGENT_MODE, episodicStorePath)
@@ -163,8 +172,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     try {
       const preResult = await preprocessAction(goal, mcp, appResolver);
       if (preResult.handled) {
-        ui.printPreprocessor(preResult.message ?? "");
-        lastResult = preResult.message ?? "";
+        ui.printPreprocessor(preResult.message ?? '');
+        lastResult = preResult.message ?? '';
         // Feed preprocessor result to episodic recorder for app ID detection
         if (episodicRecorder && lastResult) {
           const appIdFromResult = extractAppIdFromText(lastResult);
@@ -179,19 +188,19 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
   for (let step = 0; step < maxSteps; step++) {
     if (step === 0) {
-      ui.printAgentBullet("Pulling UI state from the device");
-      ui.printAgentBullet("Consulting the agent model for the next action");
+      ui.printAgentBullet('Pulling UI state from the device');
+      ui.printAgentBullet('Consulting the agent model for the next action');
     }
-    ui.startSpinner("Reasoning…", agentSpinDetail);
+    ui.startSpinner('Reasoning…', agentSpinDetail);
 
     // ─── 1. PERCEIVE ─────────────────────────────────────
     const captureScreenshot =
-      visionMode === "always" ||
-      (visionMode === "fallback" && llm.supportsVision) ||
+      visionMode === 'always' ||
+      (visionMode === 'fallback' && llm.supportsVision) ||
       isVisionLocateEnabled() ||
-      Config.AGENT_MODE === "vision";
+      Config.AGENT_MODE === 'vision';
 
-    const skipPageSource = Config.AGENT_MODE === "vision";
+    const skipPageSource = Config.AGENT_MODE === 'vision';
 
     let screen;
     // Reuse the post-action screen from the previous step when available.
@@ -203,7 +212,13 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       cachedPostScreen = undefined;
     } else {
       try {
-        screen = await getScreenState(mcp, maxElements, captureScreenshot, skipPageSource, !!recorder);
+        screen = await getScreenState(
+          mcp,
+          maxElements,
+          captureScreenshot,
+          skipPageSource,
+          !!recorder
+        );
       } catch (err) {
         ui.stopSpinner();
         ui.printError(`Step ${step + 1}: Failed to get screen state`, String(err));
@@ -241,7 +256,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
             ui.stopSpinner();
             ui.printGoalSuccess(step + 1, evaluation.reason);
             const pricing = MODEL_PRICING[modelName] ?? [0, 0];
-            const cost = (totalInputTokens / 1_000_000) * pricing[0] + (totalOutputTokens / 1_000_000) * pricing[1];
+            const cost =
+              (totalInputTokens / 1_000_000) * pricing[0] +
+              (totalOutputTokens / 1_000_000) * pricing[1];
             ui.printTokenSummary(totalInputTokens, totalOutputTokens, cost, modelName);
             return {
               success: true,
@@ -257,18 +274,26 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
             // Only accept adaptations that handle overlays (tap a suggestion, dismiss a dialog).
             const adapted = evaluation.adaptedGoal;
             const adaptedLower = adapted.toLowerCase();
-            const isNavigation = /\b(launch|open|go\s*back|compose\s*button|navigate|re-enter|start\s*over|redo|go\s*to)\b/i.test(adaptedLower);
-            const isMultiStep = adapted.includes(", then ") || adapted.includes(" and then ") || adapted.split(",").length > 2;
+            const isNavigation =
+              /\b(launch|open|go\s*back|compose\s*button|navigate|re-enter|start\s*over|redo|go\s*to)\b/i.test(
+                adaptedLower
+              );
+            const isMultiStep =
+              adapted.includes(', then ') ||
+              adapted.includes(' and then ') ||
+              adapted.split(',').length > 2;
 
             if (isNavigation || isMultiStep) {
               ui.stopSpinner();
-              ui.printWarning(`Rejected adaptation: "${adapted.slice(0, 80)}" — keeping original goal`);
-              ui.startSpinner("Reasoning…", agentSpinDetail);
+              ui.printWarning(
+                `Rejected adaptation: "${adapted.slice(0, 80)}" — keeping original goal`
+              );
+              ui.startSpinner('Reasoning…', agentSpinDetail);
             } else {
               ui.stopSpinner();
               ui.printInfo(`Goal adapted: ${adapted}`);
               goal = adapted;
-              ui.startSpinner("Reasoning…", agentSpinDetail);
+              ui.startSpinner('Reasoning…', agentSpinDetail);
             }
           }
         }
@@ -278,7 +303,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     }
 
     // ─── 3. STUCK DETECTION + RECOVERY ───────────────────
-    stuck.recordAction(history.at(-1)?.action ?? "start", screenHash);
+    stuck.recordAction(history.at(-1)?.action ?? 'start', screenHash);
     let stuckHint: string | undefined;
 
     if (stuck.isStuck(goal)) {
@@ -291,31 +316,33 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
       // Add DOM-aware hint showing untried interactive elements
       const domHint = stuck.getDOMRecoveryHint(goal, screen.dom, triedSelectors);
-      stuckHint += "\n\n" + domHint;
+      stuckHint += '\n\n' + domHint;
 
       // iOS-specific navigation hints — iOS has no hardware back button
-      if (detectedPlatform === "ios") {
-        stuckHint += "\n\niOS HINT: There is NO hardware back button. To go back, look for a '< Back' or '< [label]' button in the top navigation bar, or use go_back (swipe from left edge). To dismiss overlays, look for 'Done', 'Cancel', or 'X' buttons.";
+      if (detectedPlatform === 'ios') {
+        stuckHint +=
+          "\n\niOS HINT: There is NO hardware back button. To go back, look for a '< Back' or '< [label]' button in the top navigation bar, or use go_back (swipe from left edge). To dismiss overlays, look for 'Done', 'Cancel', or 'X' buttons.";
       }
 
       if (alternatives.length > 0) {
-        stuckHint += "\n\nSuggested alternatives:\n" +
-          alternatives.map((a, i) => `${i + 1}. ${a}`).join("\n");
+        stuckHint +=
+          '\n\nSuggested alternatives:\n' + alternatives.map((a, i) => `${i + 1}. ${a}`).join('\n');
       }
 
       if (stuck.getStuckCount() >= 6) {
-        ui.printRecovery("Attempting rollback...");
+        ui.printRecovery('Attempting rollback...');
         const rollbackResult = await recovery.rollback(mcp);
         stuckHint += `\n\n${rollbackResult.message}`;
         stuck.reset();
       }
-      ui.startSpinner("Reasoning…", agentSpinDetail);
+      ui.startSpinner('Reasoning…', agentSpinDetail);
     }
 
     // ─── 4. REASON (LLM call) ────────────────────────────
     // Use post-action screenshot from previous step if available (shows result of last action)
     // Otherwise use the screenshot captured during perception
-    const screenshotForLLM = postActionScreenshot ?? (captureScreenshot ? screen.screenshot : undefined);
+    const screenshotForLLM =
+      postActionScreenshot ?? (captureScreenshot ? screen.screenshot : undefined);
     postActionScreenshot = undefined; // Reset — will be set again after this step's action
 
     // ── Build proactive negative cache for this screen ──
@@ -324,10 +351,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     if (failures && failures.length > 0) {
       const failLines = failures
         .slice(-10) // Cap at 10 most recent failures on this screen
-        .map(f => `  ✗ ${f.action}("${f.selector}") → ${f.error}`)
-        .join("\n");
-      failedOnScreen =
-        `FAILED ON THIS SCREEN (do NOT repeat these — they will fail again):\n${failLines}`;
+        .map((f) => `  ✗ ${f.action}("${f.selector}") → ${f.error}`)
+        .join('\n');
+      failedOnScreen = `FAILED ON THIS SCREEN (do NOT repeat these — they will fail again):\n${failLines}`;
     }
 
     // ── Episodic memory: retrieve past experience ──────
@@ -341,7 +367,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       if (screenLabels.length === 0) screenLabels = goalKeywords;
       const matches = retrieveTrajectories(episodicStore, {
         platform: screen.platform,
-        appId: episodicRecorder.currentAppId || "",
+        appId: episodicRecorder.currentAppId || '',
         currentScreenLabels: screenLabels,
         goalKeywords,
         agentMode: Config.AGENT_MODE,
@@ -350,7 +376,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       if (matches.length > 0) {
         pastExperience = formatExperienceForPrompt(matches);
         episodicRecorder.trackInjectedTrajectories(matches);
-        ui.printAgentBullet(`Episodic memory: injecting ${matches.length} past experience(s) (score: ${matches[0].score.toFixed(2)})`);
+        ui.printAgentBullet(
+          `Episodic memory: injecting ${matches.length} past experience(s) (score: ${matches[0].score.toFixed(2)})`
+        );
       }
     }
 
@@ -378,7 +406,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         onTextStart() {
           streamingStarted = true;
           ui.stopSpinner();
-          ui.startStreaming("Reasoning");
+          ui.startStreaming('Reasoning');
         },
         onTextChunk(text) {
           ui.streamChunk(text);
@@ -388,21 +416,21 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         },
       });
     } catch (err: any) {
-      const errName = err?.name ?? "";
-      const errMsg = err?.message ?? "";
+      const errName = err?.name ?? '';
+      const errMsg = err?.message ?? '';
       if (
-        errName.includes("UnsupportedModel") ||
-        errName.includes("AuthenticationError") ||
-        errName.includes("API_KEY") ||
-        errMsg.includes("API key") ||
-        errMsg.includes("is not found") ||
-        errMsg.includes("NOT_FOUND") ||
+        errName.includes('UnsupportedModel') ||
+        errName.includes('AuthenticationError') ||
+        errName.includes('API_KEY') ||
+        errMsg.includes('API key') ||
+        errMsg.includes('is not found') ||
+        errMsg.includes('NOT_FOUND') ||
         err?.statusCode === 401 ||
         err?.statusCode === 404
       ) {
         ui.stopStreaming();
         ui.stopSpinner();
-        ui.printError("Fatal LLM error", err.message ?? String(err));
+        ui.printError('Fatal LLM error', err.message ?? String(err));
         return {
           success: false,
           reason: `Fatal LLM error: ${err.message ?? err}`,
@@ -421,7 +449,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     const llmElapsed = Math.round(performance.now() - llmT0);
     ui.stopSpinner();
     if (mcpDebug) {
-      console.log(`        ${ui.theme.dim("llm")} ${ui.theme.info("getDecision")} ${ui.theme.dim(`${llmElapsed}ms`)}`);
+      console.log(
+        `        ${ui.theme.dim('llm')} ${ui.theme.info('getDecision')} ${ui.theme.dim(`${llmElapsed}ms`)}`
+      );
     }
 
     // If reasoning text is available but wasn't streamed live, show it now
@@ -449,8 +479,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     }
 
     // ─── 5. DONE? ────────────────────────────────────────
-    if (decision.toolName === "done") {
-      const reason = (decision.args.reason as string) ?? "Goal completed";
+    if (decision.toolName === 'done') {
+      const reason = (decision.args.reason as string) ?? 'Goal completed';
 
       // ── Post-done verification ──────────────────────────
       // Guards against the LLM hallucinating goal completion.
@@ -462,7 +492,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
           const verifyScreen = await getScreenState(mcp, maxElements, true, skipPageSource, false);
           if (verifyScreen.screenshot) {
             const verifyDecision = await llm.getDecision({
-              goal: `VERIFICATION: The agent claims the goal "${goal}" is achieved because: "${reason}". ` +
+              goal:
+                `VERIFICATION: The agent claims the goal "${goal}" is achieved because: "${reason}". ` +
                 `Look at the screenshot carefully. Is the goal ACTUALLY achieved? ` +
                 `If YES → call "done" with the same reason. ` +
                 `If NO → call the appropriate action tool to continue working toward the goal. ` +
@@ -473,7 +504,12 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
               dom: verifyScreen.dom,
               screenshot: verifyScreen.screenshot,
               lastResult: `Agent called done with reason: "${reason}". Verifying...`,
-              screenChanges: { changed: false, addedCount: 0, removedCount: 0, summary: "Verification step" },
+              screenChanges: {
+                changed: false,
+                addedCount: 0,
+                removedCount: 0,
+                summary: 'Verification step',
+              },
               platform: detectedPlatform,
             });
 
@@ -482,7 +518,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
               totalOutputTokens += verifyDecision.usage.outputTokens;
             }
 
-            if (verifyDecision.toolName !== "done") {
+            if (verifyDecision.toolName !== 'done') {
               // Verification rejected — the goal is NOT actually achieved
               ui.printWarning(`Done rejected by verification — continuing`);
               lastResult =
@@ -494,7 +530,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
               cachedPostScreen = verifyScreen;
               history.push({
                 step,
-                action: "done_rejected",
+                action: 'done_rejected',
                 decision,
                 result: lastResult,
                 screenHash,
@@ -514,7 +550,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
       ui.printGoalSuccess(step + 1, reason);
       const pricing = MODEL_PRICING[modelName] ?? [0, 0];
-      const cost = (totalInputTokens / 1_000_000) * pricing[0] + (totalOutputTokens / 1_000_000) * pricing[1];
+      const cost =
+        (totalInputTokens / 1_000_000) * pricing[0] + (totalOutputTokens / 1_000_000) * pricing[1];
       ui.printTokenSummary(totalInputTokens, totalOutputTokens, cost, modelName);
       return {
         success: true,
@@ -526,24 +563,24 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     }
 
     // ─── 6. HUMAN-IN-THE-LOOP? ───────────────────────────
-    if (decision.toolName === "ask_user") {
-      const question = (decision.args.question as string) ?? "Need input";
+    if (decision.toolName === 'ask_user') {
+      const question = (decision.args.question as string) ?? 'Need input';
       const hitlRequest = classifyHITLRequest(question);
       const hitlResponse = await askUser(hitlRequest);
 
       if (hitlResponse.timedOut) {
-        lastResult = "User input timed out";
+        lastResult = 'User input timed out';
       } else if (hitlResponse.answered) {
         lastResult = `User answered: ${hitlResponse.answer}`;
       } else {
-        lastResult = "User provided no input";
+        lastResult = 'User provided no input';
       }
 
       llm.feedToolResult(lastResult);
 
       history.push({
         step,
-        action: "ask_user",
+        action: 'ask_user',
         decision,
         result: lastResult,
         screenHash,
@@ -557,13 +594,20 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     let result: ActionResult;
 
     if (isMetaTool(decision.toolName)) {
-      result = await executeMetaTool(mcp, decision, appResolver, deviceUdid, detectedPlatform, screenshotForLLM);
+      result = await executeMetaTool(
+        mcp,
+        decision,
+        appResolver,
+        deviceUdid,
+        detectedPlatform,
+        screenshotForLLM
+      );
     } else {
       // Forward directly to MCP — appium tools, skills, everything
       result = await executeMCPTool(mcp, decision);
     }
 
-    lastResult = `${decision.toolName} → ${result.success ? "OK" : "FAILED"}: ${result.message}`;
+    lastResult = `${decision.toolName} → ${result.success ? 'OK' : 'FAILED'}: ${result.message}`;
 
     // ── Record failure in negative cache ──────────────────
     // Only track failures with a selector — these are the ones the LLM
@@ -574,7 +618,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       const existing = screenFailures.get(screenHash) ?? [];
       // Avoid duplicate entries for the same selector+action on this screen
       const isDuplicate = existing.some(
-        f => f.selector === sel && f.action === decision.toolName
+        (f) => f.selector === sel && f.action === decision.toolName
       );
       if (!isDuplicate) {
         existing.push({
@@ -593,16 +637,11 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
     // ── Episodic memory: record step ────────────────────
     if (episodicRecorder) {
-      episodicRecorder.recordStep(
-        screen.dom,
-        decision.toolName,
-        decision.args,
-        result.success
-      );
+      episodicRecorder.recordStep(screen.dom, decision.toolName, decision.args, result.success);
     }
 
     // When find_element succeeds, extract the UUID and make it prominent
-    if (decision.toolName === "appium_find_element" && result.success) {
+    if (decision.toolName === 'appium_find_element' && result.success) {
       // Check for ai-element synthetic UUID first
       const aiMatch = result.message.match(/(ai-element:[^\s]+)/);
       if (aiMatch) {
@@ -625,7 +664,13 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     // visually verify the result and handle unexpected states.
     await sleep(stepDelay); // Wait for UI to settle
     try {
-      const postScreen = await getScreenState(mcp, maxElements, captureScreenshot, skipPageSource, !!recorder);
+      const postScreen = await getScreenState(
+        mcp,
+        maxElements,
+        captureScreenshot,
+        skipPageSource,
+        !!recorder
+      );
 
       // Store screenshot for the next LLM turn — the LLM will SEE
       // the visual result of its action before deciding the next move
@@ -635,8 +680,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
       if (skipPageSource) {
         // ── Vision mode: no DOM diff, force LLM to verify via screenshot ──
-        const wasTyping = decision.toolName === "find_and_type";
-        const wasClicking = decision.toolName === "find_and_click";
+        const wasTyping = decision.toolName === 'find_and_type';
+        const wasClicking = decision.toolName === 'find_and_click';
         if (wasTyping) {
           lastResult += `\n>> ⛔ STOP. You just typed text. Before your next action, you MUST examine the screenshot:`;
           lastResult += `\n>>   1. Do you see a SUGGESTION DROPDOWN or CONTACT LIST? → You MUST tap the correct suggestion NOW.`;
@@ -658,10 +703,10 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
           lastResult += `\n>> SCREEN_AFTER_ACTION: ${postDiff.summary}`;
           const newTexts = extractNewElements(screen.dom, postScreen.dom);
           if (newTexts.length > 0) {
-            lastResult += `\n>> NEW_ELEMENTS_APPEARED: ${newTexts.join(", ")}`;
+            lastResult += `\n>> NEW_ELEMENTS_APPEARED: ${newTexts.join(', ')}`;
 
             // After typing, new elements are likely autocomplete/suggestions that MUST be handled
-            const wasTyping = decision.toolName === "find_and_type";
+            const wasTyping = decision.toolName === 'find_and_type';
             if (wasTyping) {
               lastResult += `\n>> ⛔ STOP — DO NOT call "done" yet. New elements appeared after typing. You MUST handle them first:`;
               lastResult += `\n>>   - Tap the correct suggestion/item from the dropdown`;
@@ -702,16 +747,23 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
     recorder?.record(step, decision as any, screen.filtered, lastResult);
 
-    onStep?.({ step, decision, result, elementsCount: screen.elementCount, screenshot: postActionScreenshot });
+    onStep?.({
+      step,
+      decision,
+      result,
+      elementsCount: screen.elementCount,
+      screenshot: postActionScreenshot,
+    });
   }
 
   ui.printGoalFailed(`Max steps (${maxSteps}) reached`);
   const pricing = MODEL_PRICING[modelName] ?? [0, 0];
-  const cost = (totalInputTokens / 1_000_000) * pricing[0] + (totalOutputTokens / 1_000_000) * pricing[1];
+  const cost =
+    (totalInputTokens / 1_000_000) * pricing[0] + (totalOutputTokens / 1_000_000) * pricing[1];
   ui.printTokenSummary(totalInputTokens, totalOutputTokens, cost, modelName);
   return {
     success: false,
-    reason: "Max steps reached",
+    reason: 'Max steps reached',
     stepsUsed: maxSteps,
     history,
     totalTokens: { input: totalInputTokens, output: totalOutputTokens, cost },
@@ -721,12 +773,12 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 // ─── Meta-tool detection ──────────────────────────────────
 
 const META_TOOLS = new Set([
-  "find_and_click",
-  "find_and_type",
-  "launch_app",
-  "go_back",
-  "go_home",
-  "press_enter",
+  'find_and_click',
+  'find_and_type',
+  'launch_app',
+  'go_back',
+  'go_home',
+  'press_enter',
 ]);
 
 function isMetaTool(name: string): boolean {
@@ -740,7 +792,7 @@ async function executeMetaTool(
   decision: ToolCallDecision,
   appResolver?: AppResolver,
   deviceUdid?: string | null,
-  platform: "android" | "ios" = "android",
+  platform: 'android' | 'ios' = 'android',
   /** Reusable screenshot from the current step (avoids redundant capture in vision locate) */
   currentScreenshot?: string
 ): Promise<ActionResult> {
@@ -758,7 +810,7 @@ async function executeMetaTool(
       return { x: Math.round(tapX), y: Math.round(tapY) };
     }
     try {
-      const starkVision = (await import("df-vision")).default;
+      const starkVision = (await import('df-vision')).default;
       // scaleCoordinates expects [y, x] in 0-1000 normalized space
       const bbox = starkVision.scaleCoordinates([tapY, tapX] as [number, number], deviceSize);
       return { x: Math.round(bbox.center.x), y: Math.round(bbox.center.y) };
@@ -775,10 +827,10 @@ async function executeMetaTool(
     const args = decision.args;
 
     switch (decision.toolName) {
-      case "find_and_click": {
-        const isVisionMode = Config.AGENT_MODE === "vision";
+      case 'find_and_click': {
+        const isVisionMode = Config.AGENT_MODE === 'vision';
         // In vision mode, force ai_instruction regardless of what the LLM chose
-        const strategy = isVisionMode ? "ai_instruction" : args.strategy as string;
+        const strategy = isVisionMode ? 'ai_instruction' : (args.strategy as string);
         const selector = args.selector as string;
         const bounds = args.bounds as string | undefined;
         const tapX = args.tapX as number | undefined;
@@ -794,8 +846,14 @@ async function executeMetaTool(
             const scaled = await scaleLLMCoords(tapX, tapY);
             const tapped = await tapAtCoordinates(mcp, scaled.x, scaled.y);
             if (tapped) {
-              if (mcpDebug) console.log(`        [fast-tap] LLM (${Math.round(tapX)},${Math.round(tapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`);
-              return { success: true, message: `Clicked "${selector.slice(0, 60)}" via LLM coordinates at [${scaled.x},${scaled.y}]` };
+              if (mcpDebug)
+                console.log(
+                  `        [fast-tap] LLM (${Math.round(tapX)},${Math.round(tapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`
+                );
+              return {
+                success: true,
+                message: `Clicked "${selector.slice(0, 60)}" via LLM coordinates at [${scaled.x},${scaled.y}]`,
+              };
             }
             attempts.push(`llm_coords [${scaled.x},${scaled.y}]: tap failed`);
             // Fall through to vision locate as backup
@@ -806,15 +864,20 @@ async function executeMetaTool(
               const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
               // Pass the UUID (ai-element: or standard) directly to appium_click
               // appium-mcp handles ai-element: UUIDs natively with coordinate tapping
-              const clickResult = await mcp.callTool("appium_click", { elementUUID: visionUuid });
+              const clickResult = await mcp.callTool('appium_click', { elementUUID: visionUuid });
               if (!isMCPError(clickResult)) {
                 const coords = parseAIElementCoords(visionUuid);
-                const coordInfo = coords ? ` at [${coords.x},${coords.y}]` : "";
-                return { success: true, message: `Clicked "${selector.slice(0, 60)}" via AI vision${coordInfo}` };
+                const coordInfo = coords ? ` at [${coords.x},${coords.y}]` : '';
+                return {
+                  success: true,
+                  message: `Clicked "${selector.slice(0, 60)}" via AI vision${coordInfo}`,
+                };
               }
-              attempts.push("ai_vision: click failed");
+              attempts.push('ai_vision: click failed');
             } catch (err) {
-              attempts.push(`ai_vision: ${err instanceof Error ? err.message.slice(0, 60) : "not found"}`);
+              attempts.push(
+                `ai_vision: ${err instanceof Error ? err.message.slice(0, 60) : 'not found'}`
+              );
             }
           }
 
@@ -826,13 +889,19 @@ async function executeMetaTool(
               const cy = Math.round((parseInt(coordMatch[2]) + parseInt(coordMatch[4])) / 2);
               const tapped = await tapAtCoordinates(mcp, cx, cy);
               if (tapped) {
-                return { success: true, message: `Tapped "${selector.slice(0, 60)}" at coordinates [${cx},${cy}]` };
+                return {
+                  success: true,
+                  message: `Tapped "${selector.slice(0, 60)}" at coordinates [${cx},${cy}]`,
+                };
               }
-              attempts.push("coordinates: tap failed");
+              attempts.push('coordinates: tap failed');
             }
           }
 
-          return { success: false, message: `Vision failed for "${selector.slice(0, 60)}": ${attempts.join(", ")}` };
+          return {
+            success: false,
+            message: `Vision failed for "${selector.slice(0, 60)}": ${attempts.join(', ')}`,
+          };
         }
 
         // ══ DOM MODE: DOM locators first, vision as fallback ══
@@ -840,7 +909,7 @@ async function executeMetaTool(
         // Strategy 1: Use the LLM's chosen strategy
         try {
           const uuid = await findElement(mcp, strategy as any, selector);
-          const clickResult = await mcp.callTool("appium_click", { elementUUID: uuid });
+          const clickResult = await mcp.callTool('appium_click', { elementUUID: uuid });
           if (!isMCPError(clickResult)) {
             return { success: true, message: `Clicked "${selector.slice(0, 60)}" via ${strategy}` };
           }
@@ -851,19 +920,22 @@ async function executeMetaTool(
 
         // Strategy 2: Try alternate ID strategies
         const fallbackStrategies: Array<{ s: string; v: string }> = [];
-        if (strategy !== "accessibility id") {
-          fallbackStrategies.push({ s: "accessibility id", v: selector });
+        if (strategy !== 'accessibility id') {
+          fallbackStrategies.push({ s: 'accessibility id', v: selector });
         }
-        if (strategy !== "id") {
-          fallbackStrategies.push({ s: "id", v: selector });
+        if (strategy !== 'id') {
+          fallbackStrategies.push({ s: 'id', v: selector });
         }
 
         for (const fb of fallbackStrategies) {
           try {
             const uuid = await findElement(mcp, fb.s as any, fb.v);
-            const clickResult = await mcp.callTool("appium_click", { elementUUID: uuid });
+            const clickResult = await mcp.callTool('appium_click', { elementUUID: uuid });
             if (!isMCPError(clickResult)) {
-              return { success: true, message: `Clicked "${selector.slice(0, 60)}" via fallback ${fb.s}` };
+              return {
+                success: true,
+                message: `Clicked "${selector.slice(0, 60)}" via fallback ${fb.s}`,
+              };
             }
             attempts.push(`${fb.s}: click failed`);
           } catch {
@@ -875,15 +947,18 @@ async function executeMetaTool(
         if (isVisionLocateEnabled()) {
           try {
             const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
-            const clickResult = await mcp.callTool("appium_click", { elementUUID: visionUuid });
+            const clickResult = await mcp.callTool('appium_click', { elementUUID: visionUuid });
             if (!isMCPError(clickResult)) {
               const coords = parseAIElementCoords(visionUuid);
-              const coordInfo = coords ? ` at [${coords.x},${coords.y}]` : "";
-              return { success: true, message: `Clicked "${selector.slice(0, 60)}" via AI vision${coordInfo}` };
+              const coordInfo = coords ? ` at [${coords.x},${coords.y}]` : '';
+              return {
+                success: true,
+                message: `Clicked "${selector.slice(0, 60)}" via AI vision${coordInfo}`,
+              };
             }
-            attempts.push("ai_vision: click failed");
+            attempts.push('ai_vision: click failed');
           } catch {
-            attempts.push("ai_vision: not found");
+            attempts.push('ai_vision: not found');
           }
         }
 
@@ -895,21 +970,27 @@ async function executeMetaTool(
             const cy = Math.round((parseInt(coordMatch[2]) + parseInt(coordMatch[4])) / 2);
             const tapped = await tapAtCoordinates(mcp, cx, cy);
             if (tapped) {
-              return { success: true, message: `Tapped "${selector.slice(0, 60)}" at coordinates [${cx},${cy}]` };
+              return {
+                success: true,
+                message: `Tapped "${selector.slice(0, 60)}" at coordinates [${cx},${cy}]`,
+              };
             }
-            attempts.push("coordinates: tap failed");
+            attempts.push('coordinates: tap failed');
           }
         }
 
-        return { success: false, message: `All strategies failed for "${selector.slice(0, 60)}": ${attempts.join(", ")}` };
+        return {
+          success: false,
+          message: `All strategies failed for "${selector.slice(0, 60)}": ${attempts.join(', ')}`,
+        };
       }
 
-      case "find_and_type": {
-        const isVisionModeType = Config.AGENT_MODE === "vision";
+      case 'find_and_type': {
+        const isVisionModeType = Config.AGENT_MODE === 'vision';
         // In vision mode, force ai_instruction regardless of what the LLM chose
-        const strategy = isVisionModeType ? "ai_instruction" : args.strategy as string;
+        const strategy = isVisionModeType ? 'ai_instruction' : (args.strategy as string);
         const selector = args.selector as string;
-        const text = (args.text as string) ?? "";
+        const text = (args.text as string) ?? '';
         const typeBounds = args.bounds as string | undefined;
         const typeTapX = args.tapX as number | undefined;
         const typeTapY = args.tapY as number | undefined;
@@ -926,7 +1007,10 @@ async function executeMetaTool(
             const tapped = await tapAtCoordinates(mcp, scaled.x, scaled.y);
             if (tapped) {
               tappedViaVision = true;
-              if (mcpDebug) console.log(`        [fast-tap] LLM (${Math.round(typeTapX)},${Math.round(typeTapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`);
+              if (mcpDebug)
+                console.log(
+                  `        [fast-tap] LLM (${Math.round(typeTapX)},${Math.round(typeTapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`
+                );
             }
           }
 
@@ -934,23 +1018,27 @@ async function executeMetaTool(
             try {
               const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
               // Use appium_click which natively handles ai-element: UUIDs
-              const clickResult = await mcp.callTool("appium_click", { elementUUID: visionUuid });
+              const clickResult = await mcp.callTool('appium_click', { elementUUID: visionUuid });
               if (!isMCPError(clickResult)) {
                 tappedViaVision = true;
               }
-            } catch { /* continue */ }
+            } catch {
+              /* continue */
+            }
           }
         } else {
           // ══ DOM MODE: DOM locators first ══
           try {
             uuid = await findElement(mcp, strategy as any, selector);
           } catch {
-            const fbStrategies = ["accessibility id", "id"].filter(s => s !== strategy);
+            const fbStrategies = ['accessibility id', 'id'].filter((s) => s !== strategy);
             for (const fb of fbStrategies) {
               try {
                 uuid = await findElement(mcp, fb as any, selector);
                 break;
-              } catch { /* continue */ }
+              } catch {
+                /* continue */
+              }
             }
           }
 
@@ -958,11 +1046,13 @@ async function executeMetaTool(
           if (!uuid && isVisionLocateEnabled()) {
             try {
               const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
-              const clickResult = await mcp.callTool("appium_click", { elementUUID: visionUuid });
+              const clickResult = await mcp.callTool('appium_click', { elementUUID: visionUuid });
               if (!isMCPError(clickResult)) {
                 tappedViaVision = true;
               }
-            } catch { /* continue */ }
+            } catch {
+              /* continue */
+            }
           }
         }
 
@@ -976,9 +1066,12 @@ async function executeMetaTool(
           }
         } else if (uuid) {
           // Click the found element to focus/navigate
-          await mcp.callTool("appium_click", { elementUUID: uuid });
+          await mcp.callTool('appium_click', { elementUUID: uuid });
         } else if (!tappedViaVision) {
-          return { success: false, message: `Could not find element "${selector.slice(0, 60)}" with any strategy` };
+          return {
+            success: false,
+            message: `Could not find element "${selector.slice(0, 60)}" with any strategy`,
+          };
         }
 
         // Brief delay — clicking often triggers screen transitions
@@ -989,42 +1082,52 @@ async function executeMetaTool(
 
         // Clear existing text if we have an active element
         if (activeUuid) {
-          await mcp.callTool("appium_clear_element", { elementUUID: activeUuid }).catch(() => {});
+          await mcp.callTool('appium_clear_element', { elementUUID: activeUuid }).catch(() => {});
         }
 
-        if (platform === "android") {
+        if (platform === 'android') {
           // Android: type via ADB keyboard input (sends key events to focused element)
           const kbResult = await typeViaKeyboard(text, deviceUdid ?? undefined);
           if (kbResult.success) {
-            return { success: true, message: `Typed "${text}" into "${selector.slice(0, 60)}" via keyboard input. NOTE: Check the screen — if autocomplete suggestions appeared, tap the correct one or press Enter to confirm before proceeding.` };
+            return {
+              success: true,
+              message: `Typed "${text}" into "${selector.slice(0, 60)}" via keyboard input. NOTE: Check the screen — if autocomplete suggestions appeared, tap the correct one or press Enter to confirm before proceeding.`,
+            };
           }
         }
 
         // iOS (primary) / Android (fallback): use appium_set_value on the active element
         if (activeUuid) {
-          const setResult = await mcp.callTool("appium_set_value", {
-            elementUUID: activeUuid, text
-          }).catch(() => null);
+          const setResult = await mcp
+            .callTool('appium_set_value', {
+              elementUUID: activeUuid,
+              text,
+            })
+            .catch(() => null);
           if (setResult && !isMCPError(setResult)) {
-            return { success: true, message: `Typed "${text}" into "${selector.slice(0, 60)}". NOTE: Check the screen — if autocomplete suggestions appeared, tap the correct one or press Enter to confirm before proceeding.` };
+            return {
+              success: true,
+              message: `Typed "${text}" into "${selector.slice(0, 60)}". NOTE: Check the screen — if autocomplete suggestions appeared, tap the correct one or press Enter to confirm before proceeding.`,
+            };
           }
         }
 
         return {
           success: false,
-          message: `Could not type "${text}" into "${selector.slice(0, 60)}". ` +
-            (platform === "android"
-              ? "ADB keyboard input and appium_set_value both failed."
-              : "appium_set_value failed on active element."),
+          message:
+            `Could not type "${text}" into "${selector.slice(0, 60)}". ` +
+            (platform === 'android'
+              ? 'ADB keyboard input and appium_set_value both failed.'
+              : 'appium_set_value failed on active element.'),
         };
       }
 
-      case "launch_app": {
-        let appId = (args.appId as string) ?? "";
+      case 'launch_app': {
+        let appId = (args.appId as string) ?? '';
         if (!appId) {
-          return { success: false, message: "No appId provided for launch_app" };
+          return { success: false, message: 'No appId provided for launch_app' };
         }
-        if (appResolver && !appId.includes(".")) {
+        if (appResolver && !appId.includes('.')) {
           const resolved = resolveAppId(appId, appResolver);
           if (resolved) appId = resolved;
         }
@@ -1036,31 +1139,34 @@ async function executeMetaTool(
         };
       }
 
-      case "go_back":
-        await mcp.callTool("appium_mobile_press_key", { key: "BACK" });
-        return { success: true, message: "Went back" };
+      case 'go_back':
+        await mcp.callTool('appium_mobile_press_key', { key: 'BACK' });
+        return { success: true, message: 'Went back' };
 
-      case "go_home":
-        await mcp.callTool("appium_mobile_press_key", { key: "HOME" });
-        return { success: true, message: "Went home" };
+      case 'go_home':
+        await mcp.callTool('appium_mobile_press_key', { key: 'HOME' });
+        return { success: true, message: 'Went home' };
 
-      case "press_enter": {
+      case 'press_enter': {
         // Strategy 1: ADB keyevent (most reliable on Android)
-        if (platform === "android") {
+        if (platform === 'android') {
           const enterResult = await pressEnterKey(deviceUdid ?? undefined);
           if (enterResult.success) {
-            return { success: true, message: "Pressed Enter" };
+            return { success: true, message: 'Pressed Enter' };
           }
         }
         // Strategy 2: Appium execute script fallback
         try {
-          await mcp.callTool("appium_execute_script", {
-            script: "mobile: shell",
-            args: [{ command: "input", args: ["keyevent", "66"] }],
+          await mcp.callTool('appium_execute_script', {
+            script: 'mobile: shell',
+            args: [{ command: 'input', args: ['keyevent', '66'] }],
           });
-          return { success: true, message: "Pressed Enter" };
+          return { success: true, message: 'Pressed Enter' };
         } catch {
-          return { success: false, message: "Failed to press Enter — both ADB and Appium script failed" };
+          return {
+            success: false,
+            message: 'Failed to press Enter — both ADB and Appium script failed',
+          };
         }
       }
 
@@ -1080,21 +1186,19 @@ async function executeMetaTool(
  * Forward any tool call directly to the MCP server.
  * No hardcoded tool names — whatever the LLM calls, we forward.
  */
-async function executeMCPTool(
-  mcp: MCPClient,
-  decision: ToolCallDecision
-): Promise<ActionResult> {
+async function executeMCPTool(mcp: MCPClient, decision: ToolCallDecision): Promise<ActionResult> {
   try {
     const result = await mcp.callTool(decision.toolName, decision.args);
-    const text = result.content
-      ?.map((c: any) => (c.type === "text" ? c.text : ""))
-      .filter(Boolean)
-      .join(" ") ?? "";
+    const text =
+      result.content
+        ?.map((c: any) => (c.type === 'text' ? c.text : ''))
+        .filter(Boolean)
+        .join(' ') ?? '';
 
     const isError =
-      text.toLowerCase().includes("error") ||
-      text.toLowerCase().includes("failed") ||
-      text.toLowerCase().includes("not found");
+      text.toLowerCase().includes('error') ||
+      text.toLowerCase().includes('failed') ||
+      text.toLowerCase().includes('not found');
 
     return {
       success: !isError,
@@ -1114,8 +1218,8 @@ function formatArgs(decision: ToolCallDecision): string {
   const parts: string[] = [];
 
   const visionUi =
-    Config.AGENT_MODE === "vision" &&
-    (decision.toolName === "find_and_click" || decision.toolName === "find_and_type");
+    Config.AGENT_MODE === 'vision' &&
+    (decision.toolName === 'find_and_click' || decision.toolName === 'find_and_type');
   if (visionUi && args.selector) {
     const s = String(args.selector);
     const short = s.length > 90 ? `${s.slice(0, 90)}…` : s;
@@ -1132,7 +1236,7 @@ function formatArgs(decision: ToolCallDecision): string {
   if (args.key) parts.push(`key="${args.key}"`);
   if (args.id) parts.push(`id="${args.id}"`);
 
-  return parts.length > 0 ? ` ${parts.join(" ")}` : "";
+  return parts.length > 0 ? ` ${parts.join(' ')}` : '';
 }
 
 // ─── Post-action screen analysis ───────────────────────────
@@ -1175,7 +1279,7 @@ const UUID_RE = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/
  * Returns null if no active element or the call fails.
  */
 async function getActiveElementUuid(mcp: MCPClient): Promise<string | null> {
-  const result = await mcp.callTool("appium_get_active_element", {}).catch(() => null);
+  const result = await mcp.callTool('appium_get_active_element', {}).catch(() => null);
   if (!result || isMCPError(result)) return null;
   const match = extractText(result).match(UUID_RE);
   return match ? match[1] : null;

@@ -1,886 +1,970 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AppClaw Demo</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      width: 360px;
-      height: 760px;
-      margin: 0;
-      background: #09090b;
-      font-family: 'Inter', sans-serif;
-      overflow: hidden;
-    }
-
-    .phone-frame {
-      width: 100%;
-      height: 100%;
-      background: #1a1a1f;
-      border-radius: 44px;
-      border: 3px solid #2a2a30;
-      position: relative;
-      overflow: hidden;
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.05),
-        0 25px 60px rgba(0,0,0,0.5),
-        0 0 80px rgba(59,130,246,0.08);
-    }
-
-    /* Notch */
-    .notch {
-      position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 150px;
-      height: 30px;
-      background: #1a1a1f;
-      border-radius: 0 0 20px 20px;
-      z-index: 10;
-    }
-
-    /* Status bar */
-    .status-bar {
-      height: 48px;
-      padding: 12px 24px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13px;
-      font-weight: 600;
-      color: #fafafa;
-      position: relative;
-      z-index: 5;
-    }
-
-    .status-bar .time { font-size: 14px; }
-    .status-icons { display: flex; gap: 5px; align-items: center; font-size: 11px; }
-    .status-icons span { opacity: 0.8; }
-
-    /* Screen content */
-    .screen {
-      height: calc(100% - 48px);
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* ===== WhatsApp-like Chat Screen ===== */
-    .chat-app {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      background: #0b141a;
-    }
-
-    .chat-header {
-      background: #1f2c34;
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .chat-back {
-      color: #00a884;
-      font-size: 18px;
-    }
-
-    .chat-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #00a884, #128c7e);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: 700;
-      font-size: 15px;
-    }
-
-    .chat-name {
-      color: #e9edef;
-      font-weight: 600;
-      font-size: 15px;
-    }
-
-    .chat-status {
-      color: #8696a0;
-      font-size: 12px;
-    }
-
-    .chat-messages {
-      flex: 1;
-      padding: 12px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      justify-content: flex-end;
-    }
-
-    .message {
-      max-width: 75%;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 13.5px;
-      line-height: 1.4;
-      opacity: 0;
-      transform: translateY(10px);
-    }
-
-    .message.received {
-      background: #1f2c34;
-      color: #e9edef;
-      align-self: flex-start;
-      border-top-left-radius: 0;
-    }
-
-    .message.sent {
-      background: #005c4b;
-      color: #e9edef;
-      align-self: flex-end;
-      border-top-right-radius: 0;
-    }
-
-    .message.visible {
-      opacity: 1;
-      transform: translateY(0);
-      transition: all 0.3s ease;
-    }
-
-    .message .time-stamp {
-      font-size: 10px;
-      color: rgba(255,255,255,0.45);
-      text-align: right;
-      margin-top: 2px;
-    }
-
-    .chat-input-bar {
-      padding: 8px 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .chat-input {
-      flex: 1;
-      background: #1f2c34;
-      border: none;
-      border-radius: 24px;
-      padding: 10px 16px;
-      color: #e9edef;
-      font-size: 14px;
-      font-family: 'Inter', sans-serif;
-      outline: none;
-      min-height: 40px;
-    }
-
-    .chat-input::placeholder { color: #8696a0; }
-
-    .send-btn {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #00a884;
-      border: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: transform 0.15s;
-    }
-
-    .send-btn svg {
-      width: 20px;
-      height: 20px;
-      fill: white;
-    }
-
-    .send-btn.pulse {
-      animation: sendPulse 0.3s ease;
-    }
-
-    @keyframes sendPulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(0.85); }
-      100% { transform: scale(1); }
-    }
-
-    /* ===== Contact List Screen ===== */
-    .contact-list {
-      height: 100%;
-      background: #0b141a;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .cl-header {
-      background: #1f2c34;
-      padding: 14px 16px;
-    }
-
-    .cl-title {
-      color: #e9edef;
-      font-size: 20px;
-      font-weight: 700;
-    }
-
-    .cl-search {
-      margin-top: 10px;
-      background: #1f2c34;
-      border: 1px solid #2a3942;
-      border-radius: 8px;
-      padding: 8px 12px;
-      color: #e9edef;
-      font-size: 14px;
-      width: 100%;
-      font-family: 'Inter', sans-serif;
-    }
-
-    .contact-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      transition: background 0.2s;
-    }
-
-    .contact-item.highlighted {
-      background: rgba(0,168,132,0.12);
-    }
-
-    .contact-item .avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: 700;
-      font-size: 16px;
-    }
-
-    .contact-info {
-      flex: 1;
-    }
-
-    .contact-info .name {
-      color: #e9edef;
-      font-size: 15px;
-      font-weight: 500;
-    }
-
-    .contact-info .preview {
-      color: #8696a0;
-      font-size: 13px;
-      margin-top: 2px;
-    }
-
-    .contact-info .time-label {
-      color: #8696a0;
-      font-size: 11px;
-    }
-
-    /* ===== AppClaw Overlay ===== */
-    .appclaw-overlay {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(9,9,11,0.92);
-      backdrop-filter: blur(12px);
-      border-top: 1px solid rgba(59,130,246,0.3);
-      padding: 12px 16px;
-      z-index: 20;
-      transform: translateY(100%);
-      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .appclaw-overlay.visible {
-      transform: translateY(0);
-    }
-
-    .overlay-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .overlay-logo {
-      width: 20px;
-      height: 20px;
-    }
-
-    .overlay-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: #3b82f6;
-      letter-spacing: 0.5px;
-    }
-
-    .overlay-step {
-      font-size: 12px;
-      color: #a1a1aa;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .overlay-action {
-      font-size: 12px;
-      font-family: 'JetBrains Mono', monospace;
-      color: #fafafa;
-      padding: 6px 10px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 6px;
-      border-left: 2px solid #3b82f6;
-      min-height: 20px;
-      line-height: 1.5;
-    }
-
-    .overlay-action .action-name {
-      color: #22c55e;
-      font-weight: 600;
-    }
-
-    .overlay-action .action-arrow {
-      color: #71717a;
-    }
-
-    .overlay-action .action-target {
-      color: #f59e0b;
-    }
-
-    .overlay-action .action-value {
-      color: #a78bfa;
-    }
-
-    /* ===== Tap indicator ===== */
-    .tap-indicator {
-      position: absolute;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: rgba(59,130,246,0.3);
-      border: 2px solid rgba(59,130,246,0.6);
-      transform: translate(-50%, -50%) scale(0);
-      z-index: 15;
-      pointer-events: none;
-    }
-
-    .tap-indicator.active {
-      animation: tapAnim 0.6s ease forwards;
-    }
-
-    @keyframes tapAnim {
-      0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-      40% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-      100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-    }
-
-    /* ===== Typing cursor ===== */
-    .typing-cursor {
-      display: inline-block;
-      width: 2px;
-      height: 16px;
-      background: #00a884;
-      animation: blink 0.6s step-end infinite;
-      vertical-align: text-bottom;
-      margin-left: 1px;
-    }
-
-    @keyframes blink {
-      50% { opacity: 0; }
-    }
-
-    /* ===== Completion badge ===== */
-    .completion-badge {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scale(0);
-      background: rgba(9,9,11,0.95);
-      border: 1px solid rgba(34,197,94,0.4);
-      border-radius: 16px;
-      padding: 20px 28px;
-      text-align: center;
-      z-index: 30;
-      opacity: 0;
-    }
-
-    .completion-badge.visible {
-      animation: badgePop 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-
-    @keyframes badgePop {
-      0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-
-    .completion-check {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: rgba(34,197,94,0.15);
-      border: 2px solid #22c55e;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 10px;
-      font-size: 24px;
-    }
-
-    .completion-text {
-      color: #22c55e;
-      font-weight: 700;
-      font-size: 15px;
-    }
-
-    .completion-sub {
-      color: #a1a1aa;
-      font-size: 12px;
-      margin-top: 4px;
-    }
-
-    /* ===== Home screen ===== */
-    .home-screen {
-      height: 100%;
-      background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 40px;
-    }
-
-    .home-greeting {
-      color: #e2e8f0;
-      font-size: 24px;
-      font-weight: 300;
-      margin-bottom: 30px;
-    }
-
-    .app-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px 16px;
-      padding: 0 20px;
-      width: 100%;
-    }
-
-    .app-icon {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .app-icon .icon {
-      width: 52px;
-      height: 52px;
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      transition: transform 0.2s;
-    }
-
-    .app-icon .icon.highlighted {
-      transform: scale(1.1);
-      box-shadow: 0 0 20px rgba(59,130,246,0.4);
-    }
-
-    .app-icon .label {
-      font-size: 10px;
-      color: #94a3b8;
-      text-align: center;
-    }
-
-    /* Goal input overlay */
-    .goal-overlay {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(9,9,11,0.95);
-      backdrop-filter: blur(16px);
-      border-top: 1px solid rgba(59,130,246,0.3);
-      padding: 16px;
-      z-index: 20;
-      transform: translateY(100%);
-      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .goal-overlay.visible {
-      transform: translateY(0);
-    }
-
-    .goal-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: #3b82f6;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .goal-text {
-      font-size: 15px;
-      color: #fafafa;
-      font-weight: 500;
-      line-height: 1.5;
-    }
-
-    .goal-cursor {
-      display: inline-block;
-      width: 2px;
-      height: 17px;
-      background: #3b82f6;
-      animation: blink 0.6s step-end infinite;
-      vertical-align: text-bottom;
-      margin-left: 2px;
-    }
-
-    /* Screen transitions */
-    .screen-view {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      transition: opacity 0.35s ease;
-      pointer-events: none;
-    }
-
-    .screen-view.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-  </style>
-</head>
-<body>
-  <div class="phone-frame">
-    <div class="notch"></div>
-    <div class="status-bar">
-      <span class="time">9:41</span>
-      <div class="status-icons">
-        <span>5G</span>
-        <span>▐▐▐▐</span>
-        <span>🔋</span>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AppClaw Demo</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 360px;
+        height: 760px;
+        margin: 0;
+        background: #09090b;
+        font-family: 'Inter', sans-serif;
+        overflow: hidden;
+      }
+
+      .phone-frame {
+        width: 100%;
+        height: 100%;
+        background: #1a1a1f;
+        border-radius: 44px;
+        border: 3px solid #2a2a30;
+        position: relative;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.05),
+          0 25px 60px rgba(0, 0, 0, 0.5),
+          0 0 80px rgba(59, 130, 246, 0.08);
+      }
+
+      /* Notch */
+      .notch {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 150px;
+        height: 30px;
+        background: #1a1a1f;
+        border-radius: 0 0 20px 20px;
+        z-index: 10;
+      }
+
+      /* Status bar */
+      .status-bar {
+        height: 48px;
+        padding: 12px 24px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: #fafafa;
+        position: relative;
+        z-index: 5;
+      }
+
+      .status-bar .time {
+        font-size: 14px;
+      }
+      .status-icons {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        font-size: 11px;
+      }
+      .status-icons span {
+        opacity: 0.8;
+      }
+
+      /* Screen content */
+      .screen {
+        height: calc(100% - 48px);
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* ===== WhatsApp-like Chat Screen ===== */
+      .chat-app {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: #0b141a;
+      }
+
+      .chat-header {
+        background: #1f2c34;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .chat-back {
+        color: #00a884;
+        font-size: 18px;
+      }
+
+      .chat-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #00a884, #128c7e);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 15px;
+      }
+
+      .chat-name {
+        color: #e9edef;
+        font-weight: 600;
+        font-size: 15px;
+      }
+
+      .chat-status {
+        color: #8696a0;
+        font-size: 12px;
+      }
+
+      .chat-messages {
+        flex: 1;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        justify-content: flex-end;
+      }
+
+      .message {
+        max-width: 75%;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        line-height: 1.4;
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      .message.received {
+        background: #1f2c34;
+        color: #e9edef;
+        align-self: flex-start;
+        border-top-left-radius: 0;
+      }
+
+      .message.sent {
+        background: #005c4b;
+        color: #e9edef;
+        align-self: flex-end;
+        border-top-right-radius: 0;
+      }
+
+      .message.visible {
+        opacity: 1;
+        transform: translateY(0);
+        transition: all 0.3s ease;
+      }
+
+      .message .time-stamp {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.45);
+        text-align: right;
+        margin-top: 2px;
+      }
+
+      .chat-input-bar {
+        padding: 8px 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .chat-input {
+        flex: 1;
+        background: #1f2c34;
+        border: none;
+        border-radius: 24px;
+        padding: 10px 16px;
+        color: #e9edef;
+        font-size: 14px;
+        font-family: 'Inter', sans-serif;
+        outline: none;
+        min-height: 40px;
+      }
+
+      .chat-input::placeholder {
+        color: #8696a0;
+      }
+
+      .send-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #00a884;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.15s;
+      }
+
+      .send-btn svg {
+        width: 20px;
+        height: 20px;
+        fill: white;
+      }
+
+      .send-btn.pulse {
+        animation: sendPulse 0.3s ease;
+      }
+
+      @keyframes sendPulse {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(0.85);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      /* ===== Contact List Screen ===== */
+      .contact-list {
+        height: 100%;
+        background: #0b141a;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .cl-header {
+        background: #1f2c34;
+        padding: 14px 16px;
+      }
+
+      .cl-title {
+        color: #e9edef;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .cl-search {
+        margin-top: 10px;
+        background: #1f2c34;
+        border: 1px solid #2a3942;
+        border-radius: 8px;
+        padding: 8px 12px;
+        color: #e9edef;
+        font-size: 14px;
+        width: 100%;
+        font-family: 'Inter', sans-serif;
+      }
+
+      .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background 0.2s;
+      }
+
+      .contact-item.highlighted {
+        background: rgba(0, 168, 132, 0.12);
+      }
+
+      .contact-item .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 16px;
+      }
+
+      .contact-info {
+        flex: 1;
+      }
+
+      .contact-info .name {
+        color: #e9edef;
+        font-size: 15px;
+        font-weight: 500;
+      }
+
+      .contact-info .preview {
+        color: #8696a0;
+        font-size: 13px;
+        margin-top: 2px;
+      }
+
+      .contact-info .time-label {
+        color: #8696a0;
+        font-size: 11px;
+      }
+
+      /* ===== AppClaw Overlay ===== */
+      .appclaw-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(9, 9, 11, 0.92);
+        backdrop-filter: blur(12px);
+        border-top: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 12px 16px;
+        z-index: 20;
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .appclaw-overlay.visible {
+        transform: translateY(0);
+      }
+
+      .overlay-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .overlay-logo {
+        width: 20px;
+        height: 20px;
+      }
+
+      .overlay-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #3b82f6;
+        letter-spacing: 0.5px;
+      }
+
+      .overlay-step {
+        font-size: 12px;
+        color: #a1a1aa;
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      .overlay-action {
+        font-size: 12px;
+        font-family: 'JetBrains Mono', monospace;
+        color: #fafafa;
+        padding: 6px 10px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+        border-left: 2px solid #3b82f6;
+        min-height: 20px;
+        line-height: 1.5;
+      }
+
+      .overlay-action .action-name {
+        color: #22c55e;
+        font-weight: 600;
+      }
+
+      .overlay-action .action-arrow {
+        color: #71717a;
+      }
+
+      .overlay-action .action-target {
+        color: #f59e0b;
+      }
+
+      .overlay-action .action-value {
+        color: #a78bfa;
+      }
+
+      /* ===== Tap indicator ===== */
+      .tap-indicator {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.3);
+        border: 2px solid rgba(59, 130, 246, 0.6);
+        transform: translate(-50%, -50%) scale(0);
+        z-index: 15;
+        pointer-events: none;
+      }
+
+      .tap-indicator.active {
+        animation: tapAnim 0.6s ease forwards;
+      }
+
+      @keyframes tapAnim {
+        0% {
+          transform: translate(-50%, -50%) scale(0);
+          opacity: 1;
+        }
+        40% {
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(1.5);
+          opacity: 0;
+        }
+      }
+
+      /* ===== Typing cursor ===== */
+      .typing-cursor {
+        display: inline-block;
+        width: 2px;
+        height: 16px;
+        background: #00a884;
+        animation: blink 0.6s step-end infinite;
+        vertical-align: text-bottom;
+        margin-left: 1px;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      /* ===== Completion badge ===== */
+      .completion-badge {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        background: rgba(9, 9, 11, 0.95);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        border-radius: 16px;
+        padding: 20px 28px;
+        text-align: center;
+        z-index: 30;
+        opacity: 0;
+      }
+
+      .completion-badge.visible {
+        animation: badgePop 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      @keyframes badgePop {
+        0% {
+          transform: translate(-50%, -50%) scale(0);
+          opacity: 0;
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 1;
+        }
+      }
+
+      .completion-check {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(34, 197, 94, 0.15);
+        border: 2px solid #22c55e;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 10px;
+        font-size: 24px;
+      }
+
+      .completion-text {
+        color: #22c55e;
+        font-weight: 700;
+        font-size: 15px;
+      }
+
+      .completion-sub {
+        color: #a1a1aa;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
+      /* ===== Home screen ===== */
+      .home-screen {
+        height: 100%;
+        background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 40px;
+      }
+
+      .home-greeting {
+        color: #e2e8f0;
+        font-size: 24px;
+        font-weight: 300;
+        margin-bottom: 30px;
+      }
+
+      .app-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px 16px;
+        padding: 0 20px;
+        width: 100%;
+      }
+
+      .app-icon {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .app-icon .icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        transition: transform 0.2s;
+      }
+
+      .app-icon .icon.highlighted {
+        transform: scale(1.1);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+      }
+
+      .app-icon .label {
+        font-size: 10px;
+        color: #94a3b8;
+        text-align: center;
+      }
+
+      /* Goal input overlay */
+      .goal-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(9, 9, 11, 0.95);
+        backdrop-filter: blur(16px);
+        border-top: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 16px;
+        z-index: 20;
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .goal-overlay.visible {
+        transform: translateY(0);
+      }
+
+      .goal-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #3b82f6;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .goal-text {
+        font-size: 15px;
+        color: #fafafa;
+        font-weight: 500;
+        line-height: 1.5;
+      }
+
+      .goal-cursor {
+        display: inline-block;
+        width: 2px;
+        height: 17px;
+        background: #3b82f6;
+        animation: blink 0.6s step-end infinite;
+        vertical-align: text-bottom;
+        margin-left: 2px;
+      }
+
+      /* Screen transitions */
+      .screen-view {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+        pointer-events: none;
+      }
+
+      .screen-view.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phone-frame">
+      <div class="notch"></div>
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <div class="status-icons">
+          <span>5G</span>
+          <span>▐▐▐▐</span>
+          <span>🔋</span>
+        </div>
       </div>
-    </div>
 
-    <div class="screen" id="screen">
-      <!-- SCREEN 1: Home -->
-      <div class="screen-view active" id="homeScreen">
-        <div class="home-screen">
-          <div class="home-greeting">Good morning</div>
-          <div class="app-grid">
-            <div class="app-icon">
-              <div class="icon" style="background: linear-gradient(135deg, #25D366, #128C7E);">💬</div>
-              <span class="label">WhatsApp</span>
+      <div class="screen" id="screen">
+        <!-- SCREEN 1: Home -->
+        <div class="screen-view active" id="homeScreen">
+          <div class="home-screen">
+            <div class="home-greeting">Good morning</div>
+            <div class="app-grid">
+              <div class="app-icon">
+                <div class="icon" style="background: linear-gradient(135deg, #25d366, #128c7e)">
+                  💬
+                </div>
+                <span class="label">WhatsApp</span>
+              </div>
+              <div class="app-icon">
+                <div class="icon" style="background: linear-gradient(135deg, #0088cc, #005f8a)">
+                  ✈️
+                </div>
+                <span class="label">Telegram</span>
+              </div>
+              <div class="app-icon">
+                <div class="icon" style="background: linear-gradient(135deg, #4a154b, #611f69)">
+                  💼
+                </div>
+                <span class="label">Slack</span>
+              </div>
+              <div class="app-icon">
+                <div class="icon" style="background: linear-gradient(135deg, #1da1f2, #0d8bd9)">
+                  🐦
+                </div>
+                <span class="label">Twitter</span>
+              </div>
+              <div class="app-icon">
+                <div class="icon" style="background: linear-gradient(135deg, #ff6900, #ff8533)">
+                  🎵
+                </div>
+                <span class="label">Music</span>
+              </div>
+              <div class="app-icon">
+                <div class="icon" style="background: linear-gradient(135deg, #34a853, #0f9d58)">
+                  📷
+                </div>
+                <span class="label">Camera</span>
+              </div>
+              <div class="app-icon">
+                <div class="icon" style="background: linear-gradient(135deg, #4285f4, #1a73e8)">
+                  ⚙️
+                </div>
+                <span class="label">Settings</span>
+              </div>
+              <div class="app-icon">
+                <div class="icon" style="background: linear-gradient(135deg, #ea4335, #d93025)">
+                  📧
+                </div>
+                <span class="label">Gmail</span>
+              </div>
             </div>
-            <div class="app-icon">
-              <div class="icon" style="background: linear-gradient(135deg, #0088cc, #005f8a);">✈️</div>
-              <span class="label">Telegram</span>
+          </div>
+
+          <div class="goal-overlay" id="goalOverlay">
+            <div class="goal-label">
+              <svg width="16" height="16" viewBox="0 0 512 512" style="vertical-align: middle">
+                <circle cx="256" cy="264" r="100" fill="#e53e3e" />
+                <circle cx="232" cy="248" r="10" fill="#1a1a2e" />
+                <circle cx="235" cy="245" r="4" fill="white" />
+                <circle cx="280" cy="248" r="10" fill="#1a1a2e" />
+                <circle cx="283" cy="245" r="4" fill="white" />
+              </svg>
+              APPCLAW
             </div>
-            <div class="app-icon">
-              <div class="icon" style="background: linear-gradient(135deg, #4A154B, #611f69);">💼</div>
-              <span class="label">Slack</span>
+            <div class="goal-text" id="goalText"></div>
+          </div>
+        </div>
+
+        <!-- SCREEN 2: Contact list -->
+        <div class="screen-view" id="contactScreen">
+          <div class="contact-list">
+            <div class="cl-header">
+              <div class="cl-title">WhatsApp</div>
+              <input class="cl-search" id="searchInput" placeholder="Search..." readonly />
             </div>
-            <div class="app-icon">
-              <div class="icon" style="background: linear-gradient(135deg, #1DA1F2, #0d8bd9);">🐦</div>
-              <span class="label">Twitter</span>
+            <div class="contact-item" id="contactMom">
+              <div class="avatar" style="background: linear-gradient(135deg, #f472b6, #ec4899)">
+                M
+              </div>
+              <div class="contact-info">
+                <div class="name">Mom</div>
+                <div class="preview">Call me when you're free</div>
+              </div>
+              <div class="contact-info"><span class="time-label">Yesterday</span></div>
             </div>
-            <div class="app-icon">
-              <div class="icon" style="background: linear-gradient(135deg, #FF6900, #ff8533);">🎵</div>
-              <span class="label">Music</span>
+            <div class="contact-item">
+              <div class="avatar" style="background: linear-gradient(135deg, #60a5fa, #3b82f6)">
+                A
+              </div>
+              <div class="contact-info">
+                <div class="name">Alex</div>
+                <div class="preview">See you at 5!</div>
+              </div>
+              <div class="contact-info"><span class="time-label">11:30 AM</span></div>
             </div>
-            <div class="app-icon">
-              <div class="icon" style="background: linear-gradient(135deg, #34A853, #0f9d58);">📷</div>
-              <span class="label">Camera</span>
+            <div class="contact-item">
+              <div class="avatar" style="background: linear-gradient(135deg, #34d399, #10b981)">
+                T
+              </div>
+              <div class="contact-info">
+                <div class="name">Team Dev</div>
+                <div class="preview">Build passed ✅</div>
+              </div>
+              <div class="contact-info"><span class="time-label">10:15 AM</span></div>
             </div>
-            <div class="app-icon">
-              <div class="icon" style="background: linear-gradient(135deg, #4285F4, #1a73e8);">⚙️</div>
-              <span class="label">Settings</span>
+            <div class="contact-item">
+              <div class="avatar" style="background: linear-gradient(135deg, #fbbf24, #f59e0b)">
+                S
+              </div>
+              <div class="contact-info">
+                <div class="name">Sarah</div>
+                <div class="preview">Thanks for the help!</div>
+              </div>
+              <div class="contact-info"><span class="time-label">Yesterday</span></div>
             </div>
-            <div class="app-icon">
-              <div class="icon" style="background: linear-gradient(135deg, #EA4335, #d93025);">📧</div>
-              <span class="label">Gmail</span>
+            <div class="contact-item">
+              <div class="avatar" style="background: linear-gradient(135deg, #a78bfa, #8b5cf6)">
+                D
+              </div>
+              <div class="contact-info">
+                <div class="name">David</div>
+                <div class="preview">Meeting at 3pm</div>
+              </div>
+              <div class="contact-info"><span class="time-label">Mon</span></div>
             </div>
           </div>
         </div>
 
-        <div class="goal-overlay" id="goalOverlay">
-          <div class="goal-label">
-            <svg width="16" height="16" viewBox="0 0 512 512" style="vertical-align: middle;">
-              <circle cx="256" cy="264" r="100" fill="#e53e3e"/>
-              <circle cx="232" cy="248" r="10" fill="#1a1a2e"/>
-              <circle cx="235" cy="245" r="4" fill="white"/>
-              <circle cx="280" cy="248" r="10" fill="#1a1a2e"/>
-              <circle cx="283" cy="245" r="4" fill="white"/>
+        <!-- SCREEN 3: Chat -->
+        <div class="screen-view" id="chatScreen">
+          <div class="chat-app">
+            <div class="chat-header">
+              <span class="chat-back">←</span>
+              <div class="chat-avatar">M</div>
+              <div>
+                <div class="chat-name">Mom</div>
+                <div class="chat-status">online</div>
+              </div>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+              <div class="message received visible">
+                <div>Did you reach home safe?</div>
+                <div class="time-stamp">Yesterday, 8:12 PM</div>
+              </div>
+              <div class="message sent visible">
+                <div>Yeah just got in!</div>
+                <div class="time-stamp">Yesterday, 8:15 PM</div>
+              </div>
+              <div class="message received visible">
+                <div>Call me when you're free</div>
+                <div class="time-stamp">Yesterday, 9:00 PM</div>
+              </div>
+              <div class="message sent" id="newMessage">
+                <div id="newMessageText"></div>
+                <div class="time-stamp">9:41 AM</div>
+              </div>
+            </div>
+            <div class="chat-input-bar">
+              <input class="chat-input" id="chatInput" placeholder="Message" readonly />
+              <button class="send-btn" id="sendBtn">
+                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tap indicator -->
+        <div class="tap-indicator" id="tapIndicator"></div>
+
+        <!-- AppClaw overlay -->
+        <div class="appclaw-overlay" id="appclawOverlay">
+          <div class="overlay-header">
+            <svg class="overlay-logo" viewBox="0 0 512 512">
+              <circle cx="256" cy="264" r="100" fill="#e53e3e" />
+              <circle cx="232" cy="248" r="10" fill="#1a1a2e" />
+              <circle cx="235" cy="245" r="4" fill="white" />
+              <circle cx="280" cy="248" r="10" fill="#1a1a2e" />
+              <circle cx="283" cy="245" r="4" fill="white" />
             </svg>
-            APPCLAW
+            <span class="overlay-title">APPCLAW</span>
+            <span class="overlay-step" id="stepCounter"></span>
           </div>
-          <div class="goal-text" id="goalText"></div>
+          <div class="overlay-action" id="actionDisplay"></div>
         </div>
-      </div>
 
-      <!-- SCREEN 2: Contact list -->
-      <div class="screen-view" id="contactScreen">
-        <div class="contact-list">
-          <div class="cl-header">
-            <div class="cl-title">WhatsApp</div>
-            <input class="cl-search" id="searchInput" placeholder="Search..." readonly>
-          </div>
-          <div class="contact-item" id="contactMom">
-            <div class="avatar" style="background: linear-gradient(135deg, #f472b6, #ec4899);">M</div>
-            <div class="contact-info">
-              <div class="name">Mom</div>
-              <div class="preview">Call me when you're free</div>
-            </div>
-            <div class="contact-info"><span class="time-label">Yesterday</span></div>
-          </div>
-          <div class="contact-item">
-            <div class="avatar" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);">A</div>
-            <div class="contact-info">
-              <div class="name">Alex</div>
-              <div class="preview">See you at 5!</div>
-            </div>
-            <div class="contact-info"><span class="time-label">11:30 AM</span></div>
-          </div>
-          <div class="contact-item">
-            <div class="avatar" style="background: linear-gradient(135deg, #34d399, #10b981);">T</div>
-            <div class="contact-info">
-              <div class="name">Team Dev</div>
-              <div class="preview">Build passed ✅</div>
-            </div>
-            <div class="contact-info"><span class="time-label">10:15 AM</span></div>
-          </div>
-          <div class="contact-item">
-            <div class="avatar" style="background: linear-gradient(135deg, #fbbf24, #f59e0b);">S</div>
-            <div class="contact-info">
-              <div class="name">Sarah</div>
-              <div class="preview">Thanks for the help!</div>
-            </div>
-            <div class="contact-info"><span class="time-label">Yesterday</span></div>
-          </div>
-          <div class="contact-item">
-            <div class="avatar" style="background: linear-gradient(135deg, #a78bfa, #8b5cf6);">D</div>
-            <div class="contact-info">
-              <div class="name">David</div>
-              <div class="preview">Meeting at 3pm</div>
-            </div>
-            <div class="contact-info"><span class="time-label">Mon</span></div>
-          </div>
+        <!-- Completion badge -->
+        <div class="completion-badge" id="completionBadge">
+          <div class="completion-check">✓</div>
+          <div class="completion-text">Goal Complete</div>
+          <div class="completion-sub">5 steps · 0.002$</div>
         </div>
-      </div>
-
-      <!-- SCREEN 3: Chat -->
-      <div class="screen-view" id="chatScreen">
-        <div class="chat-app">
-          <div class="chat-header">
-            <span class="chat-back">←</span>
-            <div class="chat-avatar">M</div>
-            <div>
-              <div class="chat-name">Mom</div>
-              <div class="chat-status">online</div>
-            </div>
-          </div>
-          <div class="chat-messages" id="chatMessages">
-            <div class="message received visible">
-              <div>Did you reach home safe?</div>
-              <div class="time-stamp">Yesterday, 8:12 PM</div>
-            </div>
-            <div class="message sent visible">
-              <div>Yeah just got in!</div>
-              <div class="time-stamp">Yesterday, 8:15 PM</div>
-            </div>
-            <div class="message received visible">
-              <div>Call me when you're free</div>
-              <div class="time-stamp">Yesterday, 9:00 PM</div>
-            </div>
-            <div class="message sent" id="newMessage">
-              <div id="newMessageText"></div>
-              <div class="time-stamp">9:41 AM</div>
-            </div>
-          </div>
-          <div class="chat-input-bar">
-            <input class="chat-input" id="chatInput" placeholder="Message" readonly>
-            <button class="send-btn" id="sendBtn">
-              <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tap indicator -->
-      <div class="tap-indicator" id="tapIndicator"></div>
-
-      <!-- AppClaw overlay -->
-      <div class="appclaw-overlay" id="appclawOverlay">
-        <div class="overlay-header">
-          <svg class="overlay-logo" viewBox="0 0 512 512">
-            <circle cx="256" cy="264" r="100" fill="#e53e3e"/>
-            <circle cx="232" cy="248" r="10" fill="#1a1a2e"/>
-            <circle cx="235" cy="245" r="4" fill="white"/>
-            <circle cx="280" cy="248" r="10" fill="#1a1a2e"/>
-            <circle cx="283" cy="245" r="4" fill="white"/>
-          </svg>
-          <span class="overlay-title">APPCLAW</span>
-          <span class="overlay-step" id="stepCounter"></span>
-        </div>
-        <div class="overlay-action" id="actionDisplay"></div>
-      </div>
-
-      <!-- Completion badge -->
-      <div class="completion-badge" id="completionBadge">
-        <div class="completion-check">✓</div>
-        <div class="completion-text">Goal Complete</div>
-        <div class="completion-sub">5 steps · 0.002$</div>
       </div>
     </div>
-  </div>
 
-  <script>
-    const GOAL_TEXT = 'Send a WhatsApp message to Mom saying good morning';
-    const TYPING_TEXT = 'Good morning Mom! ☀️';
+    <script>
+      const GOAL_TEXT = 'Send a WhatsApp message to Mom saying good morning';
+      const TYPING_TEXT = 'Good morning Mom! ☀️';
 
-    const $ = id => document.getElementById(id);
+      const $ = (id) => document.getElementById(id);
 
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-    function showScreen(id) {
-      document.querySelectorAll('.screen-view').forEach(v => v.classList.remove('active'));
-      $(id).classList.add('active');
-    }
-
-    function showTap(x, y) {
-      const tap = $('tapIndicator');
-      tap.style.left = x + 'px';
-      tap.style.top = y + 'px';
-      tap.classList.remove('active');
-      void tap.offsetWidth;
-      tap.classList.add('active');
-    }
-
-    function setAction(step, html) {
-      $('stepCounter').textContent = `Step ${step}/5`;
-      $('actionDisplay').innerHTML = html;
-    }
-
-    async function typeText(element, text, speed = 55) {
-      for (let i = 0; i <= text.length; i++) {
-        element.value = text.slice(0, i);
-        element.textContent = text.slice(0, i);
-        await sleep(speed);
+      function sleep(ms) {
+        return new Promise((r) => setTimeout(r, ms));
       }
-    }
 
-    async function typeGoal() {
-      const el = $('goalText');
-      for (let i = 0; i <= GOAL_TEXT.length; i++) {
-        el.innerHTML = GOAL_TEXT.slice(0, i) + '<span class="goal-cursor"></span>';
-        await sleep(40);
+      function showScreen(id) {
+        document.querySelectorAll('.screen-view').forEach((v) => v.classList.remove('active'));
+        $(id).classList.add('active');
       }
-      await sleep(400);
-      el.innerHTML = GOAL_TEXT;
-    }
 
-    async function runDemo() {
-      // Phase 1: Show goal input
-      await sleep(800);
-      $('goalOverlay').classList.add('visible');
-      await sleep(500);
-      await typeGoal();
-      await sleep(600);
-
-      // Show appclaw overlay
-      $('appclawOverlay').classList.add('visible');
-      $('goalOverlay').classList.remove('visible');
-      await sleep(400);
-
-      // Step 1: Launch WhatsApp
-      setAction(1, '<span class="action-name">launch</span> <span class="action-arrow">→</span> <span class="action-target">"com.whatsapp"</span>');
-      const waIcon = document.querySelector('.app-grid .app-icon:first-child .icon');
-      waIcon.classList.add('highlighted');
-      showTap(60, 140);
-      await sleep(1200);
-      waIcon.classList.remove('highlighted');
-
-      // Transition to contact list
-      showScreen('contactScreen');
-      await sleep(600);
-
-      // Step 2: Find and tap Mom
-      setAction(2, '<span class="action-name">find_and_tap</span> <span class="action-arrow">→</span> <span class="action-target">"Mom"</span>');
-      await sleep(500);
-      $('contactMom').classList.add('highlighted');
-      showTap(170, 130);
-      await sleep(1000);
-
-      // Transition to chat
-      showScreen('chatScreen');
-      $('contactMom').classList.remove('highlighted');
-      await sleep(600);
-
-      // Step 3: Type message
-      setAction(3, '<span class="action-name">type</span> <span class="action-arrow">→</span> <span class="action-target">"message_input"</span> <span class="action-value">text="Good morning Mom! ☀️"</span>');
-      showTap(170, 595);
-      await sleep(400);
-      const input = $('chatInput');
-      for (let i = 0; i <= TYPING_TEXT.length; i++) {
-        input.value = TYPING_TEXT.slice(0, i);
-        await sleep(50);
+      function showTap(x, y) {
+        const tap = $('tapIndicator');
+        tap.style.left = x + 'px';
+        tap.style.top = y + 'px';
+        tap.classList.remove('active');
+        void tap.offsetWidth;
+        tap.classList.add('active');
       }
-      await sleep(500);
 
-      // Step 4: Submit message
-      setAction(4, '<span class="action-name">submit_message</span> <span class="action-arrow">→</span> <span class="action-target">Send button</span>');
-      showTap(325, 595);
-      $('sendBtn').classList.add('pulse');
-      await sleep(300);
+      function setAction(step, html) {
+        $('stepCounter').textContent = `Step ${step}/5`;
+        $('actionDisplay').innerHTML = html;
+      }
 
-      // Show sent message
-      input.value = '';
-      const msgEl = $('newMessage');
-      $('newMessageText').textContent = TYPING_TEXT;
-      msgEl.classList.add('visible');
-      await sleep(800);
+      async function typeText(element, text, speed = 55) {
+        for (let i = 0; i <= text.length; i++) {
+          element.value = text.slice(0, i);
+          element.textContent = text.slice(0, i);
+          await sleep(speed);
+        }
+      }
 
-      // Step 5: Done
-      setAction(5, '<span class="action-name" style="color:#22c55e;">done</span> <span class="action-arrow">→</span> <span class="action-value">"Message sent successfully"</span>');
-      await sleep(800);
+      async function typeGoal() {
+        const el = $('goalText');
+        for (let i = 0; i <= GOAL_TEXT.length; i++) {
+          el.innerHTML = GOAL_TEXT.slice(0, i) + '<span class="goal-cursor"></span>';
+          await sleep(40);
+        }
+        await sleep(400);
+        el.innerHTML = GOAL_TEXT;
+      }
 
-      // Show completion
-      $('appclawOverlay').classList.remove('visible');
-      $('completionBadge').classList.add('visible');
-      await sleep(3000);
+      async function runDemo() {
+        // Phase 1: Show goal input
+        await sleep(800);
+        $('goalOverlay').classList.add('visible');
+        await sleep(500);
+        await typeGoal();
+        await sleep(600);
 
-      // Reset and loop
-      $('completionBadge').classList.remove('visible');
-      await sleep(500);
-      showScreen('homeScreen');
-      $('goalText').innerHTML = '';
-      $('chatInput').value = '';
-      msgEl.classList.remove('visible');
-      $('sendBtn').classList.remove('pulse');
-      $('newMessageText').textContent = '';
-      await sleep(1000);
+        // Show appclaw overlay
+        $('appclawOverlay').classList.add('visible');
+        $('goalOverlay').classList.remove('visible');
+        await sleep(400);
 
+        // Step 1: Launch WhatsApp
+        setAction(
+          1,
+          '<span class="action-name">launch</span> <span class="action-arrow">→</span> <span class="action-target">"com.whatsapp"</span>'
+        );
+        const waIcon = document.querySelector('.app-grid .app-icon:first-child .icon');
+        waIcon.classList.add('highlighted');
+        showTap(60, 140);
+        await sleep(1200);
+        waIcon.classList.remove('highlighted');
+
+        // Transition to contact list
+        showScreen('contactScreen');
+        await sleep(600);
+
+        // Step 2: Find and tap Mom
+        setAction(
+          2,
+          '<span class="action-name">find_and_tap</span> <span class="action-arrow">→</span> <span class="action-target">"Mom"</span>'
+        );
+        await sleep(500);
+        $('contactMom').classList.add('highlighted');
+        showTap(170, 130);
+        await sleep(1000);
+
+        // Transition to chat
+        showScreen('chatScreen');
+        $('contactMom').classList.remove('highlighted');
+        await sleep(600);
+
+        // Step 3: Type message
+        setAction(
+          3,
+          '<span class="action-name">type</span> <span class="action-arrow">→</span> <span class="action-target">"message_input"</span> <span class="action-value">text="Good morning Mom! ☀️"</span>'
+        );
+        showTap(170, 595);
+        await sleep(400);
+        const input = $('chatInput');
+        for (let i = 0; i <= TYPING_TEXT.length; i++) {
+          input.value = TYPING_TEXT.slice(0, i);
+          await sleep(50);
+        }
+        await sleep(500);
+
+        // Step 4: Submit message
+        setAction(
+          4,
+          '<span class="action-name">submit_message</span> <span class="action-arrow">→</span> <span class="action-target">Send button</span>'
+        );
+        showTap(325, 595);
+        $('sendBtn').classList.add('pulse');
+        await sleep(300);
+
+        // Show sent message
+        input.value = '';
+        const msgEl = $('newMessage');
+        $('newMessageText').textContent = TYPING_TEXT;
+        msgEl.classList.add('visible');
+        await sleep(800);
+
+        // Step 5: Done
+        setAction(
+          5,
+          '<span class="action-name" style="color:#22c55e;">done</span> <span class="action-arrow">→</span> <span class="action-value">"Message sent successfully"</span>'
+        );
+        await sleep(800);
+
+        // Show completion
+        $('appclawOverlay').classList.remove('visible');
+        $('completionBadge').classList.add('visible');
+        await sleep(3000);
+
+        // Reset and loop
+        $('completionBadge').classList.remove('visible');
+        await sleep(500);
+        showScreen('homeScreen');
+        $('goalText').innerHTML = '';
+        $('chatInput').value = '';
+        msgEl.classList.remove('visible');
+        $('sendBtn').classList.remove('pulse');
+        $('newMessageText').textContent = '';
+        await sleep(1000);
+
+        runDemo();
+      }
+
+      // Signal ready for capture
+      window.DEMO_READY = true;
       runDemo();
-    }
-
-    // Signal ready for capture
-    window.DEMO_READY = true;
-    runDemo();
-  </script>
-</body>
+    </script>
+  </body>
 </html>

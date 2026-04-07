@@ -1,1451 +1,2355 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AppClaw — AI-Powered Mobile Automation Agent</title>
-  <meta name="description" content="Tell AppClaw what to do in plain English. It figures out what to tap, type, and swipe — across Android and iOS. Use the CLI or the Cursor / VS Code Marketplace extension. YAML flows, playground, PRD-driven test generation.">
-  <meta name="theme-color" id="themeColorMeta" content="#ffffff">
-  <link rel="icon" type="image/svg+xml" href="logo.svg">
-  <script>
-    (function () {
-      try {
-        if (localStorage.getItem('appclaw-theme') === 'dark') {
-          document.documentElement.setAttribute('data-theme', 'dark');
-          var m = document.getElementById('themeColorMeta');
-          if (m) m.setAttribute('content', '#020c18');
-        }
-      } catch (e) {}
-    })();
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html { color-scheme: light; scroll-behavior: smooth; }
-    html[data-theme="dark"] { color-scheme: dark; }
-
-    :root {
-      --bg: #ffffff;
-      --bg-2: #f8fafc;
-      --bg-card: #f1f5f9;
-      --border: rgba(15, 23, 42, 0.08);
-      --border-strong: rgba(15, 23, 42, 0.14);
-      --text: #0f172a;
-      --text-2: #64748b;
-      --text-3: #94a3b8;
-      --orange: #f97316;
-      --orange-glow: rgba(249, 115, 22, 0.12);
-      --cyan: #0ea5e9;
-      --cyan-glow: rgba(14, 165, 233, 0.12);
-      --green: #16a34a;
-      --red: #dc2626;
-      --font-display: 'Bricolage Grotesque', sans-serif;
-      --font-body: 'DM Sans', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-
-      --nav-surface: rgba(255, 255, 255, 0.88);
-      --grain-opacity: 0.09;
-      --hero-glow-1: radial-gradient(ellipse, rgba(249, 115, 22, 0.09) 0%, transparent 65%);
-      --hero-glow-2: radial-gradient(ellipse, rgba(14, 165, 233, 0.07) 0%, transparent 65%);
-      --hero-col-glow: radial-gradient(ellipse, rgba(249, 115, 22, 0.07) 0%, transparent 65%);
-      --parallel-glow: radial-gradient(ellipse 800px 500px at 50% -100px, rgba(14, 165, 233, 0.06) 0%, transparent 70%);
-      --arch-section-glow: radial-gradient(ellipse 700px 400px at 60% 50%, rgba(249, 115, 22, 0.07) 0%, transparent 70%);
-      --cta-glow: radial-gradient(ellipse 800px 500px at 50% 50%, rgba(249, 115, 22, 0.08) 0%, transparent 65%);
-      --cta-line-opacity: 0.14;
-
-      --btn-secondary-fill: rgba(15, 23, 42, 0.04);
-      --btn-secondary-hover-fill: rgba(15, 23, 42, 0.08);
-      --btn-secondary-hover-border: rgba(15, 23, 42, 0.22);
-      --btn-ghost-hover-fill: rgba(15, 23, 42, 0.06);
-
-      --pill-fill: rgba(15, 23, 42, 0.04);
-      --yaml-bar-fill: rgba(15, 23, 42, 0.04);
-      --shadow-yaml: 0 16px 48px rgba(15, 23, 42, 0.1);
-      --parallel-frame-border: rgba(14, 165, 233, 0.25);
-      --parallel-frame-shadow:
-        0 0 0 1px rgba(14, 165, 233, 0.08),
-        0 32px 80px rgba(15, 23, 42, 0.12),
-        0 0 60px rgba(14, 165, 233, 0.06);
-      --install-copy-hover: rgba(15, 23, 42, 0.1);
-      --icon-muted-bg: rgba(15, 23, 42, 0.08);
-      --mobile-menu-bg: rgba(255, 255, 255, 0.98);
-      --code-bg: rgba(14, 165, 233, 0.12);
-      --arch-node-hover-border: rgba(249, 115, 22, 0.4);
-      --link-cyan-border: rgba(14, 165, 233, 0.45);
-      --link-cyan-border-hover: rgba(14, 165, 233, 0.65);
-      --run-surface-link-border: rgba(14, 165, 233, 0.45);
-      --badge-agent-border: rgba(249, 115, 22, 0.32);
-      --badge-yaml-border: rgba(14, 165, 233, 0.3);
-      --badge-play-border: rgba(22, 163, 74, 0.32);
-      --syntax-k: #7c3aed;
-      --syntax-n: #0d9488;
-      --term-string: #0369a1;
-    }
-
-    html[data-theme="dark"] {
-      --bg: #020c18;
-      --bg-2: #061122;
-      --bg-card: #0a1628;
-      --border: rgba(255, 255, 255, 0.07);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --text: #eef2f7;
-      --text-2: #7a90a8;
-      --text-3: #405268;
-      --orange: #f97316;
-      --orange-glow: rgba(249, 115, 22, 0.18);
-      --cyan: #22d3ee;
-      --cyan-glow: rgba(34, 211, 238, 0.12);
-      --green: #10b981;
-      --red: #f87171;
-
-      --nav-surface: rgba(2, 12, 24, 0.72);
-      --grain-opacity: 0.35;
-      --hero-glow-1: radial-gradient(ellipse, rgba(249, 115, 22, 0.1) 0%, transparent 65%);
-      --hero-glow-2: radial-gradient(ellipse, rgba(34, 211, 238, 0.07) 0%, transparent 65%);
-      --hero-col-glow: radial-gradient(ellipse, rgba(249, 115, 22, 0.08) 0%, transparent 65%);
-      --parallel-glow: radial-gradient(ellipse 800px 500px at 50% -100px, rgba(34, 211, 238, 0.06) 0%, transparent 70%);
-      --arch-section-glow: radial-gradient(ellipse 700px 400px at 60% 50%, rgba(249, 115, 22, 0.04) 0%, transparent 70%);
-      --cta-glow: radial-gradient(ellipse 800px 500px at 50% 50%, rgba(249, 115, 22, 0.07) 0%, transparent 65%);
-      --cta-line-opacity: 0.12;
-
-      --btn-secondary-fill: rgba(255, 255, 255, 0.04);
-      --btn-secondary-hover-fill: rgba(255, 255, 255, 0.07);
-      --btn-secondary-hover-border: rgba(255, 255, 255, 0.2);
-      --btn-ghost-hover-fill: rgba(255, 255, 255, 0.04);
-
-      --pill-fill: rgba(255, 255, 255, 0.03);
-      --yaml-bar-fill: rgba(255, 255, 255, 0.02);
-      --shadow-yaml: 0 16px 48px rgba(0, 0, 0, 0.5);
-      --parallel-frame-border: rgba(34, 211, 238, 0.2);
-      --parallel-frame-shadow:
-        0 0 0 1px rgba(34, 211, 238, 0.08),
-        0 40px 100px rgba(0, 0, 0, 0.8),
-        0 0 100px rgba(34, 211, 238, 0.06);
-      --install-copy-hover: rgba(255, 255, 255, 0.08);
-      --icon-muted-bg: rgba(255, 255, 255, 0.06);
-      --mobile-menu-bg: rgba(2, 12, 24, 0.97);
-      --code-bg: rgba(34, 211, 238, 0.08);
-      --arch-node-hover-border: rgba(249, 115, 22, 0.3);
-      --link-cyan-border: rgba(34, 211, 238, 0.35);
-      --link-cyan-border-hover: rgba(34, 211, 238, 0.55);
-      --run-surface-link-border: rgba(34, 211, 238, 0.45);
-      --badge-agent-border: rgba(249, 115, 22, 0.25);
-      --badge-yaml-border: rgba(34, 211, 238, 0.25);
-      --badge-play-border: rgba(16, 185, 129, 0.25);
-      --syntax-k: #c792ea;
-      --syntax-n: #80cbc4;
-      --term-string: #a5d6ff;
-    }
-
-    body {
-      font-family: var(--font-body);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-
-    /* Grain overlay */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 1000;
-      opacity: var(--grain-opacity);
-    }
-
-    .container { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
-
-    /* Reveal animations */
-    .reveal {
-      opacity: 0;
-      transform: translateY(28px);
-      transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
-    .reveal-delay-1 { transition-delay: 0.1s; }
-    .reveal-delay-2 { transition-delay: 0.2s; }
-    .reveal-delay-3 { transition-delay: 0.3s; }
-    .reveal-delay-4 { transition-delay: 0.4s; }
-    @media (prefers-reduced-motion: reduce) {
-      .reveal { opacity: 1; transform: none; transition: none; }
-    }
-
-    /* ───────────── NAV ───────────── */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-      height: 60px;
-      display: flex; align-items: center;
-      background: var(--nav-surface);
-      backdrop-filter: blur(18px) saturate(160%);
-      border-bottom: 1px solid transparent;
-      transition: border-color 0.3s, background 0.25s;
-    }
-    nav.scrolled { border-bottom-color: var(--border); }
-    .nav-inner {
-      max-width: 1160px; margin: 0 auto; padding: 0 32px;
-      width: 100%; display: flex; align-items: center; gap: 40px;
-    }
-    .nav-logo {
-      display: flex; align-items: center; gap: 9px;
-      text-decoration: none; flex-shrink: 0;
-    }
-    .nav-logo img { width: 26px; height: 26px; }
-    .nav-logo-name {
-      font-family: var(--font-display);
-      font-size: 19px; font-weight: 700; color: var(--text);
-      letter-spacing: -0.01em;
-    }
-    .nav-links {
-      display: flex; gap: 4px; flex: 1;
-    }
-    .nav-links a {
-      font-size: 15px; font-weight: 500; color: var(--text-2);
-      text-decoration: none; padding: 6px 12px; border-radius: 6px;
-      transition: color 0.2s, background 0.2s;
-    }
-    .nav-links a:hover { color: var(--text); background: var(--border); }
-    .nav-right { display: flex; align-items: center; gap: 10px; }
-    .btn-ghost {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 13px; font-weight: 500; color: var(--text-2);
-      background: none; border: 1px solid var(--border);
-      padding: 7px 14px; border-radius: 8px; cursor: pointer;
-      text-decoration: none;
-      transition: color 0.2s, border-color 0.2s, background 0.2s;
-    }
-    .btn-ghost:hover { color: var(--text); border-color: var(--border-strong); background: var(--btn-ghost-hover-fill); }
-    .btn-ghost svg { flex-shrink: 0; }
-    .btn-orange {
-      font-family: var(--font-display); font-size: 13px; font-weight: 700;
-      color: #fff; background: var(--orange);
-      padding: 7px 18px; border-radius: 8px; border: none;
-      text-decoration: none; cursor: pointer;
-      transition: background 0.2s, transform 0.15s;
-      letter-spacing: 0.01em;
-    }
-    .btn-orange:hover { background: #ea580c; transform: translateY(-1px); }
-    .nav-mobile-toggle {
-      display: none; background: none; border: none;
-      color: var(--text-2); cursor: pointer; padding: 4px;
-    }
-
-    .theme-toggle {
-      display: flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px; flex-shrink: 0;
-      padding: 0; border-radius: 8px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-2);
-      cursor: pointer;
-      transition: color 0.2s, border-color 0.2s, background 0.2s;
-    }
-    .theme-toggle:hover {
-      color: var(--text);
-      border-color: var(--border-strong);
-      background: var(--btn-ghost-hover-fill);
-    }
-    .theme-toggle svg { width: 18px; height: 18px; }
-    .theme-toggle .icon-sun { display: none; }
-    html[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
-    html[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
-
-    /* ───────────── HERO ───────────── */
-    .hero {
-      padding: 140px 0 100px;
-      position: relative; overflow: hidden;
-    }
-    /* Radial glow */
-    .hero::before {
-      content: '';
-      position: absolute;
-      width: 900px; height: 700px;
-      top: -200px; left: -300px;
-      background: var(--hero-glow-1);
-      pointer-events: none;
-    }
-    .hero::after {
-      content: '';
-      position: absolute;
-      width: 600px; height: 600px;
-      bottom: -100px; right: -150px;
-      background: var(--hero-glow-2);
-      pointer-events: none;
-    }
-    .hero-inner {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 80px; align-items: center;
-      position: relative; z-index: 1;
-    }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-family: var(--font-mono); font-size: 11px; font-weight: 500;
-      color: var(--orange); letter-spacing: 0.08em; text-transform: uppercase;
-      border: 1px solid rgba(249,115,22,0.3);
-      background: rgba(249,115,22,0.06);
-      padding: 5px 12px; border-radius: 100px;
-      margin-bottom: 28px; width: fit-content;
-    }
-    .hero-badge-dot {
-      width: 5px; height: 5px; border-radius: 50%;
-      background: var(--orange);
-      animation: blink 2s ease-in-out infinite;
-    }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-    h1 {
-      font-family: var(--font-display);
-      font-size: clamp(46px, 5.5vw, 76px);
-      font-weight: 800;
-      line-height: 1.08;
-      letter-spacing: -0.025em;
-      color: var(--text);
-      margin-bottom: 24px;
-    }
-    h1 .accent-line {
-      position: relative; display: inline-block;
-      color: var(--orange);
-    }
-    .hero-sub {
-      font-size: 19px; font-weight: 400; color: var(--text-2);
-      line-height: 1.7; max-width: 560px; margin-bottom: 40px;
-    }
-    .hero-sub a {
-      color: var(--cyan); font-weight: 600; text-decoration: none;
-      border-bottom: 1px solid var(--link-cyan-border);
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .hero-sub a:hover { color: var(--text); border-bottom-color: var(--link-cyan-border-hover); }
-    .hero-buttons {
-      display: flex; gap: 12px; flex-wrap: wrap;
-    }
-    .btn-primary {
-      font-family: var(--font-display); font-size: 14px; font-weight: 700;
-      color: #fff; background: var(--orange);
-      padding: 12px 24px; border-radius: 10px; border: none;
-      text-decoration: none; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 8px;
-      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-      box-shadow: 0 4px 24px rgba(249,115,22,0.3);
-    }
-    .btn-primary:hover { background: #ea580c; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(249,115,22,0.4); }
-    .btn-secondary {
-      font-size: 14px; font-weight: 500; color: var(--text-2);
-      background: var(--btn-secondary-fill);
-      border: 1px solid var(--border-strong);
-      padding: 12px 24px; border-radius: 10px;
-      text-decoration: none; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 8px;
-      transition: color 0.2s, background 0.2s, border-color 0.2s;
-    }
-    .btn-secondary:hover {
-      color: var(--text);
-      background: var(--btn-secondary-hover-fill);
-      border-color: var(--btn-secondary-hover-border);
-    }
-    /* Hero right column */
-    .hero-right {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 20px;
-      align-items: start;
-      position: relative;
-    }
-    .hero-right::before {
-      content: '';
-      position: absolute; inset: -60px;
-      background: var(--hero-col-glow);
-      pointer-events: none; z-index: -1;
-    }
-    .phone-frame {
-      position: relative; width: 220px; flex-shrink: 0;
-      background: #0a0a0a;
-      border-radius: 40px;
-      border: 2px solid rgba(255,255,255,0.12);
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.05),
-        0 40px 80px rgba(0,0,0,0.75),
-        0 0 60px rgba(249,115,22,0.07);
-      overflow: hidden;
-      padding: 10px;
-    }
-    .phone-screen {
-      border-radius: 32px; overflow: hidden;
-      background: #000;
-    }
-    .phone-screen img {
-      display: block; width: 100%; height: auto;
-    }
-    /* YAML card beside phone */
-    .hero-yaml {
-      background: var(--bg-card);
-      border: 1px solid var(--border-strong);
-      border-radius: 12px; overflow: hidden;
-      box-shadow: var(--shadow-yaml);
-      position: relative; top: 40px;
-    }
-    .hero-yaml::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, var(--orange), transparent);
-      opacity: 0.5;
-    }
-    .tdot { width: 11px; height: 11px; border-radius: 50%; }
-    .tdot-r { background: #ff5f57; } .tdot-y { background: #febc2e; } .tdot-g { background: #28c840; }
-
-    /* Providers bar */
-    .providers {
-      padding: 56px 0;
-      border-top: 1px solid var(--border);
-      position: relative; z-index: 1;
-    }
-    .providers-label {
-      font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
-      color: var(--text-3); letter-spacing: 0.1em; text-transform: uppercase;
-      text-align: center; margin-bottom: 28px;
-    }
-    .providers-logos {
-      display: flex; align-items: center; justify-content: center;
-      gap: 0; flex-wrap: wrap;
-    }
-    .provider-item {
-      font-family: var(--font-display); font-size: 14px; font-weight: 700;
-      color: var(--text-3); letter-spacing: -0.01em;
-      padding: 8px 28px;
-      border-right: 1px solid var(--border);
-      transition: color 0.2s;
-    }
-    .provider-item:last-child { border-right: none; }
-    .provider-item:hover { color: var(--text-2); }
-
-    /* Where you run it (CLI + IDEs) */
-    .run-surface {
-      padding: 40px 0 56px;
-      border-bottom: 1px solid var(--border);
-      position: relative; z-index: 1;
-    }
-    .run-surface-text {
-      text-align: center;
-      font-size: 17px;
-      color: var(--text-2);
-      line-height: 1.75;
-      max-width: 700px;
-      margin: 0 auto;
-    }
-    .run-surface-text a {
-      color: var(--cyan);
-      text-decoration: none;
-      font-weight: 500;
-      border-bottom: 1px solid transparent;
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .run-surface-text a:hover {
-      color: var(--text);
-      border-bottom-color: var(--run-surface-link-border);
-    }
-    .run-surface-text strong { color: var(--text); font-weight: 600; }
-    .term-string { color: var(--term-string); }
-
-    /* ───────────── SECTION COMMON ───────────── */
-    .section-eyebrow {
-      display: inline-flex; align-items: center; gap: 10px;
-      font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
-      color: var(--orange); letter-spacing: 0.12em; text-transform: uppercase;
-      margin-bottom: 20px;
-    }
-    .section-eyebrow::before {
-      content: ''; display: block; width: 20px; height: 1.5px; background: var(--orange);
-    }
-    h2 {
-      font-family: var(--font-display);
-      font-size: clamp(32px, 3.5vw, 52px);
-      font-weight: 800; line-height: 1.1;
-      letter-spacing: -0.025em; color: var(--text);
-      margin-bottom: 16px;
-    }
-    .section-sub {
-      font-size: 18px; color: var(--text-2); max-width: 540px; line-height: 1.7;
-    }
-    .section-header { margin-bottom: 64px; }
-
-    /* ───────────── PARALLEL SECTION ───────────── */
-    .parallel-section {
-      padding: 100px 0 80px;
-      position: relative; overflow: hidden;
-      border-top: 1px solid var(--border);
-    }
-    .parallel-section::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: var(--parallel-glow);
-      pointer-events: none;
-    }
-    /* Grid lines */
-    .parallel-section::after {
-      content: '';
-      position: absolute; inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 80px 80px;
-      mask-image: radial-gradient(ellipse 900px 600px at 50% 0%, black 0%, transparent 70%);
-      pointer-events: none; opacity: 0.5;
-    }
-    code {
-      font-family: var(--font-mono); font-size: 0.875em;
-      color: var(--cyan); background: var(--code-bg);
-      padding: 2px 7px; border-radius: 5px;
-    }
-    .parallel-inner {
-      display: grid; grid-template-columns: 1.5fr 1fr;
-      gap: 56px; align-items: center;
-      position: relative; z-index: 2;
-    }
-    .parallel-frame {
-      border-radius: 14px; overflow: hidden;
-      border: 1px solid var(--parallel-frame-border);
-      box-shadow: var(--parallel-frame-shadow);
-    }
-    .parallel-frame img { display: block; width: 100%; height: auto; }
-    .parallel-copy { display: flex; flex-direction: column; gap: 28px; }
-    .parallel-pills {
-      display: flex; gap: 8px; flex-wrap: wrap;
-    }
-    .parallel-pill {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 14px; font-weight: 500; color: var(--text-2);
-      padding: 7px 16px; border-radius: 100px;
-      border: 1px solid var(--border-strong);
-      background: var(--pill-fill);
-      white-space: nowrap;
-    }
-    .parallel-pill-dot {
-      width: 5px; height: 5px; border-radius: 50%;
-      background: var(--cyan); flex-shrink: 0;
-    }
-    .parallel-pill strong { color: var(--text); font-weight: 600; }
-    .parallel-yaml-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-strong);
-      border-radius: 12px; overflow: hidden;
-    }
-    .yaml-bar {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 14px; border-bottom: 1px solid var(--border);
-      background: var(--yaml-bar-fill);
-    }
-    .yaml-fname {
-      font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
-      margin-left: 6px;
-    }
-    .yaml-body {
-      padding: 20px 24px;
-      font-family: var(--font-mono); font-size: 14.5px; line-height: 2;
-    }
-    .y-k { color: var(--syntax-k); }
-    .y-v { color: var(--orange); }
-    .y-n { color: var(--syntax-n); }
-    .y-c { color: var(--cyan); }
-    .y-d { color: var(--text-3); }
-    .y-s { color: var(--text-2); }
-
-    /* ───────────── FEATURES / THREE MODES ───────────── */
-    .features-section {
-      padding: 100px 0;
-      border-top: 1px solid var(--border);
-      position: relative;
-    }
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 16px; overflow: hidden;
-    }
-    .feature-card {
-      background: var(--bg);
-      padding: 36px 32px;
-      position: relative;
-      transition: background 0.25s;
-    }
-    .feature-card:hover { background: var(--bg-card); }
-    .feature-card::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 2px;
-      opacity: 0;
-      background: linear-gradient(90deg, var(--orange), transparent);
-      transition: opacity 0.25s;
-    }
-    .feature-card:hover::before { opacity: 1; }
-    .feature-badge {
-      display: inline-flex; align-items: center;
-      font-family: var(--font-mono); font-size: 10px; font-weight: 600;
-      letter-spacing: 0.08em; text-transform: uppercase;
-      padding: 4px 10px; border-radius: 5px;
-      margin-bottom: 20px;
-    }
-    .badge-agent  { color: var(--orange); background: var(--orange-glow); border: 1px solid var(--badge-agent-border); }
-    .badge-yaml   { color: var(--cyan);   background: var(--cyan-glow);   border: 1px solid var(--badge-yaml-border); }
-    .badge-play   { color: var(--green);  background: rgba(16,185,129,0.1); border: 1px solid var(--badge-play-border); }
-    .feature-card h3 {
-      font-family: var(--font-display); font-size: 22px; font-weight: 700;
-      color: var(--text); letter-spacing: -0.02em; margin-bottom: 10px; line-height: 1.25;
-    }
-    .feature-card p {
-      font-size: 16px; color: var(--text-2); line-height: 1.65; margin-bottom: 24px;
-    }
-    .mini-term {
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      border-radius: 10px; overflow: hidden;
-    }
-    .mini-term-bar {
-      display: flex; align-items: center; gap: 7px;
-      padding: 9px 12px; border-bottom: 1px solid var(--border);
-    }
-    .mdot { width: 8px; height: 8px; border-radius: 50%; }
-    .mini-term-title { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); margin-left: 4px; }
-    .mini-term-body {
-      padding: 14px 16px; font-family: var(--font-mono); font-size: 13px; line-height: 1.85;
-      color: var(--text-3);
-    }
-
-    /* ───────────── HOW IT WORKS ───────────── */
-    .how-section {
-      padding: 100px 0;
-      border-top: 1px solid var(--border);
-    }
-    .how-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 0;
-    }
-    .how-step {
-      padding: 40px 36px 40px 0;
-      border-right: 1px solid var(--border);
-      position: relative;
-    }
-    .how-step:last-child { border-right: none; padding-right: 0; padding-left: 36px; }
-    .how-step:not(:first-child):not(:last-child) { padding: 40px 36px; }
-    .how-num {
-      font-family: var(--font-mono); font-size: 11px; font-weight: 600;
-      color: var(--orange); letter-spacing: 0.1em; margin-bottom: 20px;
-      display: flex; align-items: center; gap: 10px;
-    }
-    .how-num::after {
-      content: ''; flex: 1; height: 1px; background: var(--border);
-    }
-    .how-step h3 {
-      font-family: var(--font-display); font-size: 23px; font-weight: 700;
-      color: var(--text); letter-spacing: -0.02em; margin-bottom: 12px;
-    }
-    .how-step p {
-      font-size: 16px; color: var(--text-2); line-height: 1.7; margin-bottom: 20px;
-    }
-    .snippet {
-      background: var(--bg-2); border: 1px solid var(--border);
-      border-radius: 8px; padding: 12px 14px;
-      font-family: var(--font-mono); font-size: 11px; line-height: 1.8;
-      color: var(--text-3);
-    }
-
-    /* ───────────── ARCHITECTURE ───────────── */
-    .arch-section {
-      padding: 100px 0;
-      border-top: 1px solid var(--border);
-      position: relative; overflow: hidden;
-    }
-    .arch-section::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: var(--arch-section-glow);
-      pointer-events: none;
-    }
-    .arch-inner {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 80px; align-items: center;
-    }
-    .arch-flow {
-      display: flex; flex-direction: column; gap: 0;
-      align-items: stretch;
-    }
-    .arch-node {
-      background: var(--bg-card); border: 1px solid var(--border-strong);
-      border-radius: 10px; padding: 16px 22px;
-      display: flex; align-items: center; gap: 14px;
-      position: relative;
-    }
-    .arch-node:hover { border-color: var(--arch-node-hover-border); }
-    .arch-node-icon {
-      width: 32px; height: 32px; border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; flex-shrink: 0;
-    }
-    .icon-orange { background: rgba(249,115,22,0.15); color: var(--orange); }
-    .icon-cyan   { background: rgba(34,211,238,0.1);  color: var(--cyan); }
-    .icon-green  { background: rgba(16,185,129,0.1);  color: var(--green); }
-    .icon-gray   { background: var(--icon-muted-bg); color: var(--text-2); }
-    .arch-node-info { flex: 1; }
-    .arch-node-name {
-      font-family: var(--font-display); font-size: 16px; font-weight: 700;
-      color: var(--text); letter-spacing: -0.01em;
-    }
-    .arch-node-desc { font-size: 14px; color: var(--text-3); margin-top: 2px; }
-    .arch-connector {
-      display: flex; align-items: center; justify-content: center;
-      height: 24px; gap: 0;
-    }
-    .arch-line {
-      width: 1px; height: 100%; background: linear-gradient(to bottom, var(--border-strong), var(--border));
-      flex-shrink: 0;
-    }
-    .arch-arrow {
-      font-size: 10px; color: var(--text-3);
-    }
-
-    /* ───────────── STATS ───────────── */
-    .stats-section {
-      padding: 80px 0;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .stats-row {
-      display: grid; grid-template-columns: repeat(5, 1fr);
-      gap: 0;
-    }
-    .stat-item {
-      padding: 32px 40px;
-      border-right: 1px solid var(--border);
-      text-align: center;
-    }
-    .stat-item:last-child { border-right: none; }
-    .stat-num {
-      font-family: var(--font-display); font-size: 52px; font-weight: 800;
-      letter-spacing: -0.04em; line-height: 1;
-      background: linear-gradient(135deg, var(--orange), #fbbf24);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 6px;
-    }
-    .stat-label {
-      font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
-      letter-spacing: 0.08em; text-transform: uppercase;
-    }
-
-    /* ───────────── QUOTE ───────────── */
-    .quote-section {
-      padding: 100px 0;
-    }
-    .quote-inner {
-      max-width: 760px; margin: 0 auto; text-align: center;
-    }
-    .quote-mark {
-      font-family: var(--font-display); font-size: 80px; line-height: 0.5;
-      color: var(--orange); opacity: 0.4; margin-bottom: 24px;
-    }
-    .quote-text {
-      font-family: var(--font-display); font-size: clamp(20px, 2.5vw, 28px);
-      font-weight: 600; color: var(--text); line-height: 1.45;
-      letter-spacing: -0.02em; margin-bottom: 28px;
-    }
-    .quote-author {
-      font-family: var(--font-mono); font-size: 12px; color: var(--text-3);
-      letter-spacing: 0.08em; text-transform: uppercase;
-    }
-
-    /* ───────────── CTA ───────────── */
-    .cta-section {
-      padding: 100px 0;
-      border-top: 1px solid var(--border);
-      position: relative; overflow: hidden;
-      text-align: center;
-    }
-    .cta-section::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: var(--cta-glow);
-      pointer-events: none;
-    }
-    /* Diagonal orange line */
-    .cta-section::after {
-      content: '';
-      position: absolute;
-      width: 200%; height: 1px;
-      top: 50%; left: -50%;
-      background: linear-gradient(90deg, transparent 10%, var(--orange) 40%, var(--orange) 60%, transparent 90%);
-      opacity: var(--cta-line-opacity);
-      transform: rotate(-8deg);
-      pointer-events: none;
-    }
-    .cta-section h2 { max-width: 600px; margin: 0 auto 16px; }
-    .cta-section .section-sub { margin: 0 auto 44px; text-align: center; max-width: 460px; }
-    .install-block {
-      display: inline-flex; align-items: center; gap: 12px;
-      background: var(--bg-card); border: 1px solid var(--border-strong);
-      border-radius: 12px; padding: 14px 20px;
-      margin-bottom: 32px;
-    }
-    .install-dollar { color: var(--orange); font-family: var(--font-mono); font-size: 16px; }
-    .install-cmd { font-family: var(--font-mono); font-size: 16px; color: var(--text); }
-    .install-copy {
-      font-family: var(--font-mono); font-size: 11px; font-weight: 600;
-      color: var(--text-2); background: var(--bg-2); border: 1px solid var(--border-strong);
-      padding: 5px 12px; border-radius: 6px; cursor: pointer; letter-spacing: 0.04em;
-      transition: color 0.2s, background 0.2s;
-    }
-    .install-copy:hover { color: var(--text); background: var(--install-copy-hover); }
-    .cta-buttons {
-      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
-      margin-bottom: 28px;
-    }
-    .cta-meta {
-      font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
-      letter-spacing: 0.06em;
-    }
-    .cta-meta span { margin: 0 10px; opacity: 0.4; }
-
-    /* ───────────── FOOTER ───────────── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 60px 0 40px;
-    }
-    .footer-grid {
-      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
-      gap: 60px; margin-bottom: 48px;
-    }
-    .footer-brand-logo {
-      display: flex; align-items: center; gap: 9px;
-      margin-bottom: 14px; text-decoration: none;
-    }
-    .footer-brand-logo img { width: 24px; }
-    .footer-brand-logo span {
-      font-family: var(--font-display); font-size: 16px; font-weight: 700;
-      color: var(--text); letter-spacing: -0.01em;
-    }
-    .footer-brand p { font-size: 15px; color: var(--text-3); line-height: 1.65; max-width: 300px; }
-    .footer-col h4 {
-      font-family: var(--font-mono); font-size: 10px; font-weight: 600;
-      color: var(--text-3); letter-spacing: 0.1em; text-transform: uppercase;
-      margin-bottom: 16px;
-    }
-    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-    .footer-col ul a {
-      font-size: 15px; color: var(--text-2); text-decoration: none;
-      transition: color 0.2s;
-    }
-    .footer-col ul a:hover { color: var(--text); }
-    .footer-bottom {
-      padding-top: 28px; border-top: 1px solid var(--border);
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .footer-copy { font-size: 12.5px; color: var(--text-3); }
-    .footer-gh {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 12.5px; color: var(--text-2); text-decoration: none;
-      transition: color 0.2s;
-    }
-    .footer-gh:hover { color: var(--text); }
-
-    /* ───────────── MOBILE MENU ───────────── */
-    .mobile-menu {
-      display: none;
-      position: fixed; top: 60px; left: 0; right: 0; z-index: 199;
-      background: var(--mobile-menu-bg);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-      padding: 16px 24px; flex-direction: column; gap: 4px;
-      transition: background 0.25s;
-    }
-    .mobile-menu.open { display: flex; }
-    .mobile-menu a {
-      font-size: 15px; font-weight: 500; color: var(--text-2);
-      text-decoration: none; padding: 10px 12px; border-radius: 8px;
-      transition: color 0.2s, background 0.2s;
-    }
-    .mobile-menu a:hover { color: var(--text); background: var(--border); }
-
-    /* ───────────── RESPONSIVE ───────────── */
-    @media (max-width: 1024px) {
-      .parallel-inner { grid-template-columns: 1fr; gap: 48px; }
-      .features-grid { grid-template-columns: 1fr; gap: 0; }
-      .arch-inner { grid-template-columns: 1fr; gap: 48px; }
-      .stats-row { grid-template-columns: repeat(3, 1fr); }
-      .stats-row .stat-item:nth-child(3) { border-right: none; }
-      .stats-row .stat-item:nth-child(4),
-      .stats-row .stat-item:nth-child(5) { border-top: 1px solid var(--border); }
-      .footer-grid { grid-template-columns: 1fr 1fr; gap: 40px; }
-    }
-    @media (max-width: 768px) {
-      .hero-inner { grid-template-columns: 1fr; gap: 48px; }
-      .how-grid { grid-template-columns: 1fr; gap: 0; }
-      .how-step, .how-step:not(:first-child):not(:last-child), .how-step:last-child {
-        padding: 32px 0; border-right: none; border-bottom: 1px solid var(--border);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AppClaw — AI-Powered Mobile Automation Agent</title>
+    <meta
+      name="description"
+      content="Tell AppClaw what to do in plain English. It figures out what to tap, type, and swipe — across Android and iOS. Use the CLI or the Cursor / VS Code Marketplace extension. YAML flows, playground, PRD-driven test generation."
+    />
+    <meta name="theme-color" id="themeColorMeta" content="#ffffff" />
+    <link rel="icon" type="image/svg+xml" href="logo.svg" />
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('appclaw-theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            var m = document.getElementById('themeColorMeta');
+            if (m) m.setAttribute('content', '#020c18');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-      .how-step:last-child { border-bottom: none; }
-      .stats-row { grid-template-columns: repeat(2, 1fr); }
-      .stats-row .stat-item:nth-child(2) { border-right: none; }
-      .stats-row .stat-item:nth-child(3) { border-top: 1px solid var(--border); border-right: 1px solid var(--border); }
-      .nav-links { display: none; }
-      .nav-mobile-toggle { display: flex; }
-      .nav-right { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-      .footer-grid { grid-template-columns: 1fr; gap: 32px; }
-    }
-    @media (max-width: 480px) {
-      .container { padding: 0 20px; }
-      .install-block { flex-wrap: wrap; }
-      .stats-row { grid-template-columns: 1fr 1fr; }
-    }
-  </style>
-</head>
-<body>
 
-  <!-- NAV -->
-  <nav id="navbar">
-    <div class="nav-inner">
-      <a class="nav-logo" href="#">
-        <img src="logo.svg" alt="AppClaw">
-        <span class="nav-logo-name">AppClaw</span>
-      </a>
-      <div class="nav-links">
-        <a href="#parallel">Parallel</a>
-        <a href="#features">Features</a>
-        <a href="#how-it-works">How It Works</a>
-        <a href="#architecture">Architecture</a>
-        <a href="usage.html">Usage Guide</a>
-      </div>
-      <div class="nav-right">
-        <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to dark theme" title="Theme">
-          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
-          </svg>
-          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="12" cy="12" r="4"/>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
-          </svg>
-        </button>
-        <a class="btn-ghost" href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          Star
+      html {
+        color-scheme: light;
+        scroll-behavior: smooth;
+      }
+      html[data-theme='dark'] {
+        color-scheme: dark;
+      }
+
+      :root {
+        --bg: #ffffff;
+        --bg-2: #f8fafc;
+        --bg-card: #f1f5f9;
+        --border: rgba(15, 23, 42, 0.08);
+        --border-strong: rgba(15, 23, 42, 0.14);
+        --text: #0f172a;
+        --text-2: #64748b;
+        --text-3: #94a3b8;
+        --orange: #f97316;
+        --orange-glow: rgba(249, 115, 22, 0.12);
+        --cyan: #0ea5e9;
+        --cyan-glow: rgba(14, 165, 233, 0.12);
+        --green: #16a34a;
+        --red: #dc2626;
+        --font-display: 'Bricolage Grotesque', sans-serif;
+        --font-body: 'DM Sans', sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
+
+        --nav-surface: rgba(255, 255, 255, 0.88);
+        --grain-opacity: 0.09;
+        --hero-glow-1: radial-gradient(ellipse, rgba(249, 115, 22, 0.09) 0%, transparent 65%);
+        --hero-glow-2: radial-gradient(ellipse, rgba(14, 165, 233, 0.07) 0%, transparent 65%);
+        --hero-col-glow: radial-gradient(ellipse, rgba(249, 115, 22, 0.07) 0%, transparent 65%);
+        --parallel-glow: radial-gradient(
+          ellipse 800px 500px at 50% -100px,
+          rgba(14, 165, 233, 0.06) 0%,
+          transparent 70%
+        );
+        --arch-section-glow: radial-gradient(
+          ellipse 700px 400px at 60% 50%,
+          rgba(249, 115, 22, 0.07) 0%,
+          transparent 70%
+        );
+        --cta-glow: radial-gradient(
+          ellipse 800px 500px at 50% 50%,
+          rgba(249, 115, 22, 0.08) 0%,
+          transparent 65%
+        );
+        --cta-line-opacity: 0.14;
+
+        --btn-secondary-fill: rgba(15, 23, 42, 0.04);
+        --btn-secondary-hover-fill: rgba(15, 23, 42, 0.08);
+        --btn-secondary-hover-border: rgba(15, 23, 42, 0.22);
+        --btn-ghost-hover-fill: rgba(15, 23, 42, 0.06);
+
+        --pill-fill: rgba(15, 23, 42, 0.04);
+        --yaml-bar-fill: rgba(15, 23, 42, 0.04);
+        --shadow-yaml: 0 16px 48px rgba(15, 23, 42, 0.1);
+        --parallel-frame-border: rgba(14, 165, 233, 0.25);
+        --parallel-frame-shadow:
+          0 0 0 1px rgba(14, 165, 233, 0.08), 0 32px 80px rgba(15, 23, 42, 0.12),
+          0 0 60px rgba(14, 165, 233, 0.06);
+        --install-copy-hover: rgba(15, 23, 42, 0.1);
+        --icon-muted-bg: rgba(15, 23, 42, 0.08);
+        --mobile-menu-bg: rgba(255, 255, 255, 0.98);
+        --code-bg: rgba(14, 165, 233, 0.12);
+        --arch-node-hover-border: rgba(249, 115, 22, 0.4);
+        --link-cyan-border: rgba(14, 165, 233, 0.45);
+        --link-cyan-border-hover: rgba(14, 165, 233, 0.65);
+        --run-surface-link-border: rgba(14, 165, 233, 0.45);
+        --badge-agent-border: rgba(249, 115, 22, 0.32);
+        --badge-yaml-border: rgba(14, 165, 233, 0.3);
+        --badge-play-border: rgba(22, 163, 74, 0.32);
+        --syntax-k: #7c3aed;
+        --syntax-n: #0d9488;
+        --term-string: #0369a1;
+      }
+
+      html[data-theme='dark'] {
+        --bg: #020c18;
+        --bg-2: #061122;
+        --bg-card: #0a1628;
+        --border: rgba(255, 255, 255, 0.07);
+        --border-strong: rgba(255, 255, 255, 0.14);
+        --text: #eef2f7;
+        --text-2: #7a90a8;
+        --text-3: #405268;
+        --orange: #f97316;
+        --orange-glow: rgba(249, 115, 22, 0.18);
+        --cyan: #22d3ee;
+        --cyan-glow: rgba(34, 211, 238, 0.12);
+        --green: #10b981;
+        --red: #f87171;
+
+        --nav-surface: rgba(2, 12, 24, 0.72);
+        --grain-opacity: 0.35;
+        --hero-glow-1: radial-gradient(ellipse, rgba(249, 115, 22, 0.1) 0%, transparent 65%);
+        --hero-glow-2: radial-gradient(ellipse, rgba(34, 211, 238, 0.07) 0%, transparent 65%);
+        --hero-col-glow: radial-gradient(ellipse, rgba(249, 115, 22, 0.08) 0%, transparent 65%);
+        --parallel-glow: radial-gradient(
+          ellipse 800px 500px at 50% -100px,
+          rgba(34, 211, 238, 0.06) 0%,
+          transparent 70%
+        );
+        --arch-section-glow: radial-gradient(
+          ellipse 700px 400px at 60% 50%,
+          rgba(249, 115, 22, 0.04) 0%,
+          transparent 70%
+        );
+        --cta-glow: radial-gradient(
+          ellipse 800px 500px at 50% 50%,
+          rgba(249, 115, 22, 0.07) 0%,
+          transparent 65%
+        );
+        --cta-line-opacity: 0.12;
+
+        --btn-secondary-fill: rgba(255, 255, 255, 0.04);
+        --btn-secondary-hover-fill: rgba(255, 255, 255, 0.07);
+        --btn-secondary-hover-border: rgba(255, 255, 255, 0.2);
+        --btn-ghost-hover-fill: rgba(255, 255, 255, 0.04);
+
+        --pill-fill: rgba(255, 255, 255, 0.03);
+        --yaml-bar-fill: rgba(255, 255, 255, 0.02);
+        --shadow-yaml: 0 16px 48px rgba(0, 0, 0, 0.5);
+        --parallel-frame-border: rgba(34, 211, 238, 0.2);
+        --parallel-frame-shadow:
+          0 0 0 1px rgba(34, 211, 238, 0.08), 0 40px 100px rgba(0, 0, 0, 0.8),
+          0 0 100px rgba(34, 211, 238, 0.06);
+        --install-copy-hover: rgba(255, 255, 255, 0.08);
+        --icon-muted-bg: rgba(255, 255, 255, 0.06);
+        --mobile-menu-bg: rgba(2, 12, 24, 0.97);
+        --code-bg: rgba(34, 211, 238, 0.08);
+        --arch-node-hover-border: rgba(249, 115, 22, 0.3);
+        --link-cyan-border: rgba(34, 211, 238, 0.35);
+        --link-cyan-border-hover: rgba(34, 211, 238, 0.55);
+        --run-surface-link-border: rgba(34, 211, 238, 0.45);
+        --badge-agent-border: rgba(249, 115, 22, 0.25);
+        --badge-yaml-border: rgba(34, 211, 238, 0.25);
+        --badge-play-border: rgba(16, 185, 129, 0.25);
+        --syntax-k: #c792ea;
+        --syntax-n: #80cbc4;
+        --term-string: #a5d6ff;
+      }
+
+      body {
+        font-family: var(--font-body);
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+
+      /* Grain overlay */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 1000;
+        opacity: var(--grain-opacity);
+      }
+
+      .container {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 0 32px;
+      }
+
+      /* Reveal animations */
+      .reveal {
+        opacity: 0;
+        transform: translateY(28px);
+        transition:
+          opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+          transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .reveal.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .reveal-delay-1 {
+        transition-delay: 0.1s;
+      }
+      .reveal-delay-2 {
+        transition-delay: 0.2s;
+      }
+      .reveal-delay-3 {
+        transition-delay: 0.3s;
+      }
+      .reveal-delay-4 {
+        transition-delay: 0.4s;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .reveal {
+          opacity: 1;
+          transform: none;
+          transition: none;
+        }
+      }
+
+      /* ───────────── NAV ───────────── */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 200;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        background: var(--nav-surface);
+        backdrop-filter: blur(18px) saturate(160%);
+        border-bottom: 1px solid transparent;
+        transition:
+          border-color 0.3s,
+          background 0.25s;
+      }
+      nav.scrolled {
+        border-bottom-color: var(--border);
+      }
+      .nav-inner {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 0 32px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 40px;
+      }
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        text-decoration: none;
+        flex-shrink: 0;
+      }
+      .nav-logo img {
+        width: 26px;
+        height: 26px;
+      }
+      .nav-logo-name {
+        font-family: var(--font-display);
+        font-size: 19px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.01em;
+      }
+      .nav-links {
+        display: flex;
+        gap: 4px;
+        flex: 1;
+      }
+      .nav-links a {
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--text-2);
+        text-decoration: none;
+        padding: 6px 12px;
+        border-radius: 6px;
+        transition:
+          color 0.2s,
+          background 0.2s;
+      }
+      .nav-links a:hover {
+        color: var(--text);
+        background: var(--border);
+      }
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .btn-ghost {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-2);
+        background: none;
+        border: 1px solid var(--border);
+        padding: 7px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        text-decoration: none;
+        transition:
+          color 0.2s,
+          border-color 0.2s,
+          background 0.2s;
+      }
+      .btn-ghost:hover {
+        color: var(--text);
+        border-color: var(--border-strong);
+        background: var(--btn-ghost-hover-fill);
+      }
+      .btn-ghost svg {
+        flex-shrink: 0;
+      }
+      .btn-orange {
+        font-family: var(--font-display);
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--orange);
+        padding: 7px 18px;
+        border-radius: 8px;
+        border: none;
+        text-decoration: none;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          transform 0.15s;
+        letter-spacing: 0.01em;
+      }
+      .btn-orange:hover {
+        background: #ea580c;
+        transform: translateY(-1px);
+      }
+      .nav-mobile-toggle {
+        display: none;
+        background: none;
+        border: none;
+        color: var(--text-2);
+        cursor: pointer;
+        padding: 4px;
+      }
+
+      .theme-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        padding: 0;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text-2);
+        cursor: pointer;
+        transition:
+          color 0.2s,
+          border-color 0.2s,
+          background 0.2s;
+      }
+      .theme-toggle:hover {
+        color: var(--text);
+        border-color: var(--border-strong);
+        background: var(--btn-ghost-hover-fill);
+      }
+      .theme-toggle svg {
+        width: 18px;
+        height: 18px;
+      }
+      .theme-toggle .icon-sun {
+        display: none;
+      }
+      html[data-theme='dark'] .theme-toggle .icon-moon {
+        display: none;
+      }
+      html[data-theme='dark'] .theme-toggle .icon-sun {
+        display: block;
+      }
+
+      /* ───────────── HERO ───────────── */
+      .hero {
+        padding: 140px 0 100px;
+        position: relative;
+        overflow: hidden;
+      }
+      /* Radial glow */
+      .hero::before {
+        content: '';
+        position: absolute;
+        width: 900px;
+        height: 700px;
+        top: -200px;
+        left: -300px;
+        background: var(--hero-glow-1);
+        pointer-events: none;
+      }
+      .hero::after {
+        content: '';
+        position: absolute;
+        width: 600px;
+        height: 600px;
+        bottom: -100px;
+        right: -150px;
+        background: var(--hero-glow-2);
+        pointer-events: none;
+      }
+      .hero-inner {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 80px;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+      }
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--orange);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border: 1px solid rgba(249, 115, 22, 0.3);
+        background: rgba(249, 115, 22, 0.06);
+        padding: 5px 12px;
+        border-radius: 100px;
+        margin-bottom: 28px;
+        width: fit-content;
+      }
+      .hero-badge-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--orange);
+        animation: blink 2s ease-in-out infinite;
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-size: clamp(46px, 5.5vw, 76px);
+        font-weight: 800;
+        line-height: 1.08;
+        letter-spacing: -0.025em;
+        color: var(--text);
+        margin-bottom: 24px;
+      }
+      h1 .accent-line {
+        position: relative;
+        display: inline-block;
+        color: var(--orange);
+      }
+      .hero-sub {
+        font-size: 19px;
+        font-weight: 400;
+        color: var(--text-2);
+        line-height: 1.7;
+        max-width: 560px;
+        margin-bottom: 40px;
+      }
+      .hero-sub a {
+        color: var(--cyan);
+        font-weight: 600;
+        text-decoration: none;
+        border-bottom: 1px solid var(--link-cyan-border);
+        transition:
+          color 0.2s,
+          border-color 0.2s;
+      }
+      .hero-sub a:hover {
+        color: var(--text);
+        border-bottom-color: var(--link-cyan-border-hover);
+      }
+      .hero-buttons {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .btn-primary {
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--orange);
+        padding: 12px 24px;
+        border-radius: 10px;
+        border: none;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition:
+          background 0.2s,
+          transform 0.15s,
+          box-shadow 0.2s;
+        box-shadow: 0 4px 24px rgba(249, 115, 22, 0.3);
+      }
+      .btn-primary:hover {
+        background: #ea580c;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(249, 115, 22, 0.4);
+      }
+      .btn-secondary {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-2);
+        background: var(--btn-secondary-fill);
+        border: 1px solid var(--border-strong);
+        padding: 12px 24px;
+        border-radius: 10px;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition:
+          color 0.2s,
+          background 0.2s,
+          border-color 0.2s;
+      }
+      .btn-secondary:hover {
+        color: var(--text);
+        background: var(--btn-secondary-hover-fill);
+        border-color: var(--btn-secondary-hover-border);
+      }
+      /* Hero right column */
+      .hero-right {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 20px;
+        align-items: start;
+        position: relative;
+      }
+      .hero-right::before {
+        content: '';
+        position: absolute;
+        inset: -60px;
+        background: var(--hero-col-glow);
+        pointer-events: none;
+        z-index: -1;
+      }
+      .phone-frame {
+        position: relative;
+        width: 220px;
+        flex-shrink: 0;
+        background: #0a0a0a;
+        border-radius: 40px;
+        border: 2px solid rgba(255, 255, 255, 0.12);
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.05),
+          0 40px 80px rgba(0, 0, 0, 0.75),
+          0 0 60px rgba(249, 115, 22, 0.07);
+        overflow: hidden;
+        padding: 10px;
+      }
+      .phone-screen {
+        border-radius: 32px;
+        overflow: hidden;
+        background: #000;
+      }
+      .phone-screen img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      /* YAML card beside phone */
+      .hero-yaml {
+        background: var(--bg-card);
+        border: 1px solid var(--border-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--shadow-yaml);
+        position: relative;
+        top: 40px;
+      }
+      .hero-yaml::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--orange), transparent);
+        opacity: 0.5;
+      }
+      .tdot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+      }
+      .tdot-r {
+        background: #ff5f57;
+      }
+      .tdot-y {
+        background: #febc2e;
+      }
+      .tdot-g {
+        background: #28c840;
+      }
+
+      /* Providers bar */
+      .providers {
+        padding: 56px 0;
+        border-top: 1px solid var(--border);
+        position: relative;
+        z-index: 1;
+      }
+      .providers-label {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        font-weight: 500;
+        color: var(--text-3);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        text-align: center;
+        margin-bottom: 28px;
+      }
+      .providers-logos {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        flex-wrap: wrap;
+      }
+      .provider-item {
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-3);
+        letter-spacing: -0.01em;
+        padding: 8px 28px;
+        border-right: 1px solid var(--border);
+        transition: color 0.2s;
+      }
+      .provider-item:last-child {
+        border-right: none;
+      }
+      .provider-item:hover {
+        color: var(--text-2);
+      }
+
+      /* Where you run it (CLI + IDEs) */
+      .run-surface {
+        padding: 40px 0 56px;
+        border-bottom: 1px solid var(--border);
+        position: relative;
+        z-index: 1;
+      }
+      .run-surface-text {
+        text-align: center;
+        font-size: 17px;
+        color: var(--text-2);
+        line-height: 1.75;
+        max-width: 700px;
+        margin: 0 auto;
+      }
+      .run-surface-text a {
+        color: var(--cyan);
+        text-decoration: none;
+        font-weight: 500;
+        border-bottom: 1px solid transparent;
+        transition:
+          color 0.2s,
+          border-color 0.2s;
+      }
+      .run-surface-text a:hover {
+        color: var(--text);
+        border-bottom-color: var(--run-surface-link-border);
+      }
+      .run-surface-text strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .term-string {
+        color: var(--term-string);
+      }
+
+      /* ───────────── SECTION COMMON ───────────── */
+      .section-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--orange);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 20px;
+      }
+      .section-eyebrow::before {
+        content: '';
+        display: block;
+        width: 20px;
+        height: 1.5px;
+        background: var(--orange);
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-size: clamp(32px, 3.5vw, 52px);
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.025em;
+        color: var(--text);
+        margin-bottom: 16px;
+      }
+      .section-sub {
+        font-size: 18px;
+        color: var(--text-2);
+        max-width: 540px;
+        line-height: 1.7;
+      }
+      .section-header {
+        margin-bottom: 64px;
+      }
+
+      /* ───────────── PARALLEL SECTION ───────────── */
+      .parallel-section {
+        padding: 100px 0 80px;
+        position: relative;
+        overflow: hidden;
+        border-top: 1px solid var(--border);
+      }
+      .parallel-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--parallel-glow);
+        pointer-events: none;
+      }
+      /* Grid lines */
+      .parallel-section::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(var(--border) 1px, transparent 1px),
+          linear-gradient(90deg, var(--border) 1px, transparent 1px);
+        background-size: 80px 80px;
+        mask-image: radial-gradient(ellipse 900px 600px at 50% 0%, black 0%, transparent 70%);
+        pointer-events: none;
+        opacity: 0.5;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.875em;
+        color: var(--cyan);
+        background: var(--code-bg);
+        padding: 2px 7px;
+        border-radius: 5px;
+      }
+      .parallel-inner {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 56px;
+        align-items: center;
+        position: relative;
+        z-index: 2;
+      }
+      .parallel-frame {
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--parallel-frame-border);
+        box-shadow: var(--parallel-frame-shadow);
+      }
+      .parallel-frame img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .parallel-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+      .parallel-pills {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .parallel-pill {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-2);
+        padding: 7px 16px;
+        border-radius: 100px;
+        border: 1px solid var(--border-strong);
+        background: var(--pill-fill);
+        white-space: nowrap;
+      }
+      .parallel-pill-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--cyan);
+        flex-shrink: 0;
+      }
+      .parallel-pill strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .parallel-yaml-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-strong);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .yaml-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border);
+        background: var(--yaml-bar-fill);
+      }
+      .yaml-fname {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-3);
+        margin-left: 6px;
+      }
+      .yaml-body {
+        padding: 20px 24px;
+        font-family: var(--font-mono);
+        font-size: 14.5px;
+        line-height: 2;
+      }
+      .y-k {
+        color: var(--syntax-k);
+      }
+      .y-v {
+        color: var(--orange);
+      }
+      .y-n {
+        color: var(--syntax-n);
+      }
+      .y-c {
+        color: var(--cyan);
+      }
+      .y-d {
+        color: var(--text-3);
+      }
+      .y-s {
+        color: var(--text-2);
+      }
+
+      /* ───────────── FEATURES / THREE MODES ───────────── */
+      .features-section {
+        padding: 100px 0;
+        border-top: 1px solid var(--border);
+        position: relative;
+      }
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .feature-card {
+        background: var(--bg);
+        padding: 36px 32px;
+        position: relative;
+        transition: background 0.25s;
+      }
+      .feature-card:hover {
+        background: var(--bg-card);
+      }
+      .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        opacity: 0;
+        background: linear-gradient(90deg, var(--orange), transparent);
+        transition: opacity 0.25s;
+      }
+      .feature-card:hover::before {
+        opacity: 1;
+      }
+      .feature-badge {
+        display: inline-flex;
+        align-items: center;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+      .badge-agent {
+        color: var(--orange);
+        background: var(--orange-glow);
+        border: 1px solid var(--badge-agent-border);
+      }
+      .badge-yaml {
+        color: var(--cyan);
+        background: var(--cyan-glow);
+        border: 1px solid var(--badge-yaml-border);
+      }
+      .badge-play {
+        color: var(--green);
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid var(--badge-play-border);
+      }
+      .feature-card h3 {
+        font-family: var(--font-display);
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.02em;
+        margin-bottom: 10px;
+        line-height: 1.25;
+      }
+      .feature-card p {
+        font-size: 16px;
+        color: var(--text-2);
+        line-height: 1.65;
+        margin-bottom: 24px;
+      }
+      .mini-term {
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .mini-term-bar {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .mdot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .mini-term-title {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-3);
+        margin-left: 4px;
+      }
+      .mini-term-body {
+        padding: 14px 16px;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.85;
+        color: var(--text-3);
+      }
+
+      /* ───────────── HOW IT WORKS ───────────── */
+      .how-section {
+        padding: 100px 0;
+        border-top: 1px solid var(--border);
+      }
+      .how-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+      }
+      .how-step {
+        padding: 40px 36px 40px 0;
+        border-right: 1px solid var(--border);
+        position: relative;
+      }
+      .how-step:last-child {
+        border-right: none;
+        padding-right: 0;
+        padding-left: 36px;
+      }
+      .how-step:not(:first-child):not(:last-child) {
+        padding: 40px 36px;
+      }
+      .how-num {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--orange);
+        letter-spacing: 0.1em;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .how-num::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+      .how-step h3 {
+        font-family: var(--font-display);
+        font-size: 23px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+      .how-step p {
+        font-size: 16px;
+        color: var(--text-2);
+        line-height: 1.7;
+        margin-bottom: 20px;
+      }
+      .snippet {
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--text-3);
+      }
+
+      /* ───────────── ARCHITECTURE ───────────── */
+      .arch-section {
+        padding: 100px 0;
+        border-top: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+      }
+      .arch-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--arch-section-glow);
+        pointer-events: none;
+      }
+      .arch-inner {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 80px;
+        align-items: center;
+      }
+      .arch-flow {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        align-items: stretch;
+      }
+      .arch-node {
+        background: var(--bg-card);
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
+        padding: 16px 22px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        position: relative;
+      }
+      .arch-node:hover {
+        border-color: var(--arch-node-hover-border);
+      }
+      .arch-node-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+      .icon-orange {
+        background: rgba(249, 115, 22, 0.15);
+        color: var(--orange);
+      }
+      .icon-cyan {
+        background: rgba(34, 211, 238, 0.1);
+        color: var(--cyan);
+      }
+      .icon-green {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--green);
+      }
+      .icon-gray {
+        background: var(--icon-muted-bg);
+        color: var(--text-2);
+      }
+      .arch-node-info {
+        flex: 1;
+      }
+      .arch-node-name {
+        font-family: var(--font-display);
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.01em;
+      }
+      .arch-node-desc {
+        font-size: 14px;
+        color: var(--text-3);
+        margin-top: 2px;
+      }
+      .arch-connector {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 24px;
+        gap: 0;
+      }
+      .arch-line {
+        width: 1px;
+        height: 100%;
+        background: linear-gradient(to bottom, var(--border-strong), var(--border));
+        flex-shrink: 0;
+      }
+      .arch-arrow {
+        font-size: 10px;
+        color: var(--text-3);
+      }
+
+      /* ───────────── STATS ───────────── */
+      .stats-section {
+        padding: 80px 0;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+      .stats-row {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0;
+      }
+      .stat-item {
+        padding: 32px 40px;
+        border-right: 1px solid var(--border);
+        text-align: center;
+      }
+      .stat-item:last-child {
+        border-right: none;
+      }
+      .stat-num {
+        font-family: var(--font-display);
+        font-size: 52px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        background: linear-gradient(135deg, var(--orange), #fbbf24);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 6px;
+      }
+      .stat-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      /* ───────────── QUOTE ───────────── */
+      .quote-section {
+        padding: 100px 0;
+      }
+      .quote-inner {
+        max-width: 760px;
+        margin: 0 auto;
+        text-align: center;
+      }
+      .quote-mark {
+        font-family: var(--font-display);
+        font-size: 80px;
+        line-height: 0.5;
+        color: var(--orange);
+        opacity: 0.4;
+        margin-bottom: 24px;
+      }
+      .quote-text {
+        font-family: var(--font-display);
+        font-size: clamp(20px, 2.5vw, 28px);
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.45;
+        letter-spacing: -0.02em;
+        margin-bottom: 28px;
+      }
+      .quote-author {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-3);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      /* ───────────── CTA ───────────── */
+      .cta-section {
+        padding: 100px 0;
+        border-top: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+      .cta-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--cta-glow);
+        pointer-events: none;
+      }
+      /* Diagonal orange line */
+      .cta-section::after {
+        content: '';
+        position: absolute;
+        width: 200%;
+        height: 1px;
+        top: 50%;
+        left: -50%;
+        background: linear-gradient(
+          90deg,
+          transparent 10%,
+          var(--orange) 40%,
+          var(--orange) 60%,
+          transparent 90%
+        );
+        opacity: var(--cta-line-opacity);
+        transform: rotate(-8deg);
+        pointer-events: none;
+      }
+      .cta-section h2 {
+        max-width: 600px;
+        margin: 0 auto 16px;
+      }
+      .cta-section .section-sub {
+        margin: 0 auto 44px;
+        text-align: center;
+        max-width: 460px;
+      }
+      .install-block {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-strong);
+        border-radius: 12px;
+        padding: 14px 20px;
+        margin-bottom: 32px;
+      }
+      .install-dollar {
+        color: var(--orange);
+        font-family: var(--font-mono);
+        font-size: 16px;
+      }
+      .install-cmd {
+        font-family: var(--font-mono);
+        font-size: 16px;
+        color: var(--text);
+      }
+      .install-copy {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-2);
+        background: var(--bg-2);
+        border: 1px solid var(--border-strong);
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        letter-spacing: 0.04em;
+        transition:
+          color 0.2s,
+          background 0.2s;
+      }
+      .install-copy:hover {
+        color: var(--text);
+        background: var(--install-copy-hover);
+      }
+      .cta-buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 28px;
+      }
+      .cta-meta {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.06em;
+      }
+      .cta-meta span {
+        margin: 0 10px;
+        opacity: 0.4;
+      }
+
+      /* ───────────── FOOTER ───────────── */
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 60px 0 40px;
+      }
+      .footer-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr;
+        gap: 60px;
+        margin-bottom: 48px;
+      }
+      .footer-brand-logo {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 14px;
+        text-decoration: none;
+      }
+      .footer-brand-logo img {
+        width: 24px;
+      }
+      .footer-brand-logo span {
+        font-family: var(--font-display);
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.01em;
+      }
+      .footer-brand p {
+        font-size: 15px;
+        color: var(--text-3);
+        line-height: 1.65;
+        max-width: 300px;
+      }
+      .footer-col h4 {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text-3);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 16px;
+      }
+      .footer-col ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .footer-col ul a {
+        font-size: 15px;
+        color: var(--text-2);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      .footer-col ul a:hover {
+        color: var(--text);
+      }
+      .footer-bottom {
+        padding-top: 28px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .footer-copy {
+        font-size: 12.5px;
+        color: var(--text-3);
+      }
+      .footer-gh {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12.5px;
+        color: var(--text-2);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      .footer-gh:hover {
+        color: var(--text);
+      }
+
+      /* ───────────── MOBILE MENU ───────────── */
+      .mobile-menu {
+        display: none;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        z-index: 199;
+        background: var(--mobile-menu-bg);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border);
+        padding: 16px 24px;
+        flex-direction: column;
+        gap: 4px;
+        transition: background 0.25s;
+      }
+      .mobile-menu.open {
+        display: flex;
+      }
+      .mobile-menu a {
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--text-2);
+        text-decoration: none;
+        padding: 10px 12px;
+        border-radius: 8px;
+        transition:
+          color 0.2s,
+          background 0.2s;
+      }
+      .mobile-menu a:hover {
+        color: var(--text);
+        background: var(--border);
+      }
+
+      /* ───────────── RESPONSIVE ───────────── */
+      @media (max-width: 1024px) {
+        .parallel-inner {
+          grid-template-columns: 1fr;
+          gap: 48px;
+        }
+        .features-grid {
+          grid-template-columns: 1fr;
+          gap: 0;
+        }
+        .arch-inner {
+          grid-template-columns: 1fr;
+          gap: 48px;
+        }
+        .stats-row {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .stats-row .stat-item:nth-child(3) {
+          border-right: none;
+        }
+        .stats-row .stat-item:nth-child(4),
+        .stats-row .stat-item:nth-child(5) {
+          border-top: 1px solid var(--border);
+        }
+        .footer-grid {
+          grid-template-columns: 1fr 1fr;
+          gap: 40px;
+        }
+      }
+      @media (max-width: 768px) {
+        .hero-inner {
+          grid-template-columns: 1fr;
+          gap: 48px;
+        }
+        .how-grid {
+          grid-template-columns: 1fr;
+          gap: 0;
+        }
+        .how-step,
+        .how-step:not(:first-child):not(:last-child),
+        .how-step:last-child {
+          padding: 32px 0;
+          border-right: none;
+          border-bottom: 1px solid var(--border);
+        }
+        .how-step:last-child {
+          border-bottom: none;
+        }
+        .stats-row {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .stats-row .stat-item:nth-child(2) {
+          border-right: none;
+        }
+        .stats-row .stat-item:nth-child(3) {
+          border-top: 1px solid var(--border);
+          border-right: 1px solid var(--border);
+        }
+        .nav-links {
+          display: none;
+        }
+        .nav-mobile-toggle {
+          display: flex;
+        }
+        .nav-right {
+          gap: 6px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .footer-grid {
+          grid-template-columns: 1fr;
+          gap: 32px;
+        }
+      }
+      @media (max-width: 480px) {
+        .container {
+          padding: 0 20px;
+        }
+        .install-block {
+          flex-wrap: wrap;
+        }
+        .stats-row {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- NAV -->
+    <nav id="navbar">
+      <div class="nav-inner">
+        <a class="nav-logo" href="#">
+          <img src="logo.svg" alt="AppClaw" />
+          <span class="nav-logo-name">AppClaw</span>
         </a>
-        <a class="btn-orange" href="https://github.com/AppiumTestDistribution/appclaw#quick-start">Get Started</a>
-        <button class="nav-mobile-toggle" id="mobileToggle" aria-label="Menu">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M4 6h16M4 12h16M4 18h16"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </nav>
-  <div class="mobile-menu" id="mobileMenu">
-    <a href="#parallel" onclick="closeMobile()">Parallel</a>
-    <a href="#features" onclick="closeMobile()">Features</a>
-    <a href="#how-it-works" onclick="closeMobile()">How It Works</a>
-    <a href="#architecture" onclick="closeMobile()">Architecture</a>
-    <a href="usage.html" onclick="closeMobile()">Usage Guide</a>
-  </div>
-
-  <!-- HERO -->
-  <section class="hero">
-    <div class="container">
-      <div class="hero-inner">
-        <div>
-          <div class="hero-badge reveal">
-            <div class="hero-badge-dot"></div>
-            Open Source · Apache 2.0
-          </div>
-          <h1 class="reveal reveal-delay-1">
-            The intelligent<br>agent for<br><span class="accent-line">mobile.</span>
-          </h1>
-          <p class="hero-sub reveal reveal-delay-2">
-            Describe what you want in plain English. AppClaw figures out what to tap, type, and swipe — on real Android and iOS devices. Run it from the <strong>CLI</strong> or install the extension in <strong>Cursor</strong>, <strong>Visual Studio Code</strong>, and other VS Code–compatible editors from the <a href="https://marketplace.visualstudio.com/items?itemName=AppClaw.appclaw" target="_blank" rel="noopener">Marketplace</a>.
-          </p>
-          <div class="hero-buttons reveal reveal-delay-3">
-            <a class="btn-primary" href="https://github.com/AppiumTestDistribution/appclaw#quick-start">
-              Get Started
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </a>
-            <a class="btn-secondary" href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-              View on GitHub
-            </a>
-          </div>
+        <div class="nav-links">
+          <a href="#parallel">Parallel</a>
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How It Works</a>
+          <a href="#architecture">Architecture</a>
+          <a href="usage.html">Usage Guide</a>
         </div>
-        <!-- Phone + YAML side by side -->
-        <div class="hero-right reveal reveal-delay-2">
-          <!-- Phone with demo.gif -->
-          <div class="phone-frame">
-            <div class="phone-screen">
-              <img src="demo.gif" alt="AppClaw controlling a real Android device" loading="eager">
-            </div>
-          </div>
-          <!-- YAML flow card -->
-          <div class="hero-yaml">
-            <div class="yaml-bar">
-              <div class="tdot tdot-r"></div>
-              <div class="tdot tdot-y"></div>
-              <div class="tdot tdot-g"></div>
-              <span class="yaml-fname">whatsapp.yaml</span>
-            </div>
-            <div class="yaml-body" style="font-size:12.5px; line-height:1.9; padding:16px 20px">
-              <span class="y-k">name:</span> <span class="y-v">whatsapp_hello</span><br>
-              <span class="y-k">platform:</span> <span class="y-v">android</span><br>
-              <br>
-              <span class="y-k">steps:</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">open WhatsApp</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">tap search icon</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">type "Mom"</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">tap Mom conversation</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">type "Hello!"</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">tap send button</span><br>
-              <br>
-              <span class="y-k">done:</span> <span style="color:var(--green)">"Message sent ✓"</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PROVIDERS -->
-  <section class="providers reveal">
-    <div class="container">
-      <div class="providers-label">Works with any LLM provider</div>
-      <div class="providers-logos">
-        <div class="provider-item">Anthropic</div>
-        <div class="provider-item">OpenAI</div>
-        <div class="provider-item">Google</div>
-        <div class="provider-item">Groq</div>
-        <div class="provider-item">Ollama</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="run-surface reveal">
-    <div class="container">
-      <div class="providers-label">Where you run it</div>
-      <p class="run-surface-text">
-        <a href="https://www.npmjs.com/package/appclaw" target="_blank" rel="noopener">CLI</a>
-        (<code>npx appclaw</code>) for terminals and CI, or the
-        <a href="https://marketplace.visualstudio.com/items?itemName=AppClaw.appclaw" target="_blank" rel="noopener">Visual Studio Marketplace</a>
-        extension for <strong>Cursor</strong>, <strong>VS Code</strong>, and forks that load the same extension catalog.
-      </p>
-    </div>
-  </section>
-
-  <!-- PARALLEL EXECUTION -->
-  <section class="parallel-section" id="parallel">
-    <div class="container">
-      <div class="parallel-inner">
-        <!-- Left: GIF -->
-        <div class="parallel-frame reveal">
-          <img src="parallel-demo.gif" alt="AppClaw running tests across 4 devices in parallel" loading="lazy">
-        </div>
-        <!-- Right: copy -->
-        <div class="parallel-copy reveal reveal-delay-1">
-          <div>
-            <div class="section-eyebrow">Parallel Execution</div>
-            <h2>Four devices.<br>One YAML file.</h2>
-            <p class="section-sub" style="margin-top:14px">Add <code>parallel: 4</code> and AppClaw runs your flow across every device at once — each with its own screen, step tracking, and pass/fail result.</p>
-          </div>
-          <div class="parallel-pills">
-            <div class="parallel-pill"><div class="parallel-pill-dot"></div><strong>4 devices</strong>&nbsp;at once</div>
-            <div class="parallel-pill"><div class="parallel-pill-dot"></div><strong>Per-device</strong>&nbsp;progress</div>
-            <div class="parallel-pill"><div class="parallel-pill-dot"></div><strong>Suite mode</strong></div>
-            <div class="parallel-pill"><div class="parallel-pill-dot"></div><strong>Zero</strong>&nbsp;config</div>
-          </div>
-          <div class="parallel-yaml-card">
-            <div class="yaml-bar">
-              <div class="tdot tdot-r"></div>
-              <div class="tdot tdot-y"></div>
-              <div class="tdot tdot-g"></div>
-              <span class="yaml-fname">youtube-suite.yaml</span>
-            </div>
-            <div class="yaml-body">
-              <span class="y-k">name:</span> <span class="y-v">youtube_suite</span><br>
-              <span class="y-k">platform:</span> <span class="y-v">android</span><br>
-              <span class="y-c">parallel:</span> <span class="y-n">4</span><br>
-              <span class="y-k">flows:</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">youtube.yaml</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">login.yaml</span><br>
-              &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">checkout.yaml</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- THREE MODES -->
-  <section class="features-section" id="features">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-eyebrow">Three modes</div>
-        <h2>Every way to automate,<br>covered.</h2>
-        <p class="section-sub">AI agent for complex goals, YAML flows for repeatable tests, or an interactive playground to build live.</p>
-      </div>
-      <div class="features-grid reveal reveal-delay-1">
-        <!-- Agent -->
-        <div class="feature-card">
-          <div class="feature-badge badge-agent">Agent Mode</div>
-          <h3>From prompt to completed action</h3>
-          <p>Describe a goal in plain English. AppClaw reads the screen, reasons, and executes until done.</p>
-          <div class="mini-term">
-            <div class="mini-term-bar">
-              <div class="mdot" style="background:#ff5f57"></div>
-              <div class="mdot" style="background:#febc2e"></div>
-              <div class="mdot" style="background:#28c840"></div>
-              <span class="mini-term-title">Agent Mode</span>
-            </div>
-            <div class="mini-term-body">
-              <span style="color:var(--orange)">$</span> <span style="color:var(--text)">appclaw</span> <span class="term-string">"Turn on WiFi"</span><br>
-              <br>
-              <span style="color:var(--orange)">1/3</span> <span style="color:var(--text)">launch</span> <span style="color:var(--text-3)">→ Settings</span><br>
-              <span style="color:var(--orange)">2/3</span> <span style="color:var(--text)">tap</span> <span style="color:var(--text-3)">→ Network &amp; internet</span><br>
-              <span style="color:var(--orange)">3/3</span> <span style="color:var(--text)">tap</span> <span style="color:var(--text-3)">→ Wi-Fi toggle</span><br>
-              <br>
-              <span style="color:var(--green)">✓ Done</span> <span style="color:var(--text-3)">— 3 steps, 8s, $0.002</span>
-            </div>
-          </div>
-        </div>
-        <!-- YAML -->
-        <div class="feature-card">
-          <div class="feature-badge badge-yaml">YAML Flows</div>
-          <h3>Deterministic steps, zero LLM cost</h3>
-          <p>Write plain English YAML. No AI needed at runtime. Fast, repeatable, with vision fallback.</p>
-          <div class="mini-term">
-            <div class="mini-term-bar">
-              <div class="mdot" style="background:#ff5f57"></div>
-              <div class="mdot" style="background:#febc2e"></div>
-              <div class="mdot" style="background:#28c840"></div>
-              <span class="mini-term-title">login-flow.yaml</span>
-            </div>
-            <div class="mini-term-body">
-              <span style="color:var(--syntax-k)">steps:</span><br>
-              &nbsp;&nbsp;<span style="color:var(--text-3)">-</span> <span style="color:var(--text)">open YouTube app</span><br>
-              &nbsp;&nbsp;<span style="color:var(--text-3)">-</span> <span style="color:var(--text)">click on search icon</span><br>
-              &nbsp;&nbsp;<span style="color:var(--text-3)">-</span> <span style="color:var(--text)">type "Appium 3.0"</span><br>
-              &nbsp;&nbsp;<span style="color:var(--text-3)">-</span> <span style="color:var(--text)">scroll until "TestMu" visible</span><br>
-              &nbsp;&nbsp;<span style="color:var(--text-3)">-</span> <span style="color:var(--text)">verify TestMu AI is visible</span><br>
-              <span style="color:var(--green)">done:</span> <span style="color:var(--cyan)">"Search results visible"</span>
-            </div>
-          </div>
-        </div>
-        <!-- Playground -->
-        <div class="feature-card">
-          <div class="feature-badge badge-play">Playground</div>
-          <h3>Build flows interactively</h3>
-          <p>Live REPL on a real device. Type commands, watch them execute, export to YAML.</p>
-          <div class="mini-term">
-            <div class="mini-term-bar">
-              <div class="mdot" style="background:#ff5f57"></div>
-              <div class="mdot" style="background:#febc2e"></div>
-              <div class="mdot" style="background:#28c840"></div>
-              <span class="mini-term-title">Playground</span>
-            </div>
-            <div class="mini-term-body">
-              <span style="color:var(--green)">pg&gt;</span> <span style="color:var(--text)">tap on Settings</span><br>
-              <span style="color:var(--green)">✓</span> <span style="color:var(--text-3)">Tapped "Settings"</span><br>
-              <span style="color:var(--green)">pg&gt;</span> <span style="color:var(--text)">scroll to General</span><br>
-              <span style="color:var(--green)">✓</span> <span style="color:var(--text-3)">"General" visible</span><br>
-              <span style="color:var(--green)">pg&gt;</span> <span style="color:var(--text)">verify About is visible</span><br>
-              <span style="color:var(--green)">✓</span> <span style="color:var(--text-3)">Verified</span><br>
-              <span style="color:var(--green)">pg&gt;</span> <span style="color:var(--text)">/export flow.yaml</span><br>
-              <span style="color:var(--green)">✓</span> <span style="color:var(--text-3)">Saved (3 steps)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- HOW IT WORKS -->
-  <section class="how-section" id="how-it-works">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-eyebrow">How It Works</div>
-        <h2>Three steps from<br>intent to execution.</h2>
-        <p class="section-sub">No boilerplate, no selectors, no brittle locators. Just describe what you want.</p>
-      </div>
-      <div class="how-grid">
-        <div class="how-step reveal">
-          <div class="how-num">01</div>
-          <h3>Describe your goal</h3>
-          <p>Write what you want in plain English. AppClaw accepts goals as prompts, YAML files, or playground commands.</p>
-          <div class="snippet">
-            <span style="color:var(--orange)">$</span> <span style="color:var(--text)">npx appclaw</span><br>
-            <span style="color:var(--cyan)">?</span> <span style="color:var(--text-2)">Goal:</span> <span style="color:var(--text)">Order coffee from Starbucks</span>
-          </div>
-        </div>
-        <div class="how-step reveal reveal-delay-1">
-          <div class="how-num">02</div>
-          <h3>AI perceives and reasons</h3>
-          <p>AppClaw screenshots the screen, sends it to your LLM, and receives a structured plan. Handles popups, adapts to state.</p>
-          <div class="snippet">
-            <span style="color:var(--text-2)">Reasoning: home screen visible.</span><br>
-            <span style="color:var(--text-2)">I see "Order" tab. I'll tap it.</span><br><br>
-            <span style="color:var(--orange)">Action:</span> <span style="color:var(--text)">tap("Order tab")</span>
-          </div>
-        </div>
-        <div class="how-step reveal reveal-delay-2">
-          <div class="how-num">03</div>
-          <h3>Execute and verify</h3>
-          <p>Actions run via Appium through MCP. AppClaw verifies after every step and continues until the goal is achieved.</p>
-          <div class="snippet">
-            <span style="color:var(--orange)">Step 1:</span> <span style="color:var(--text-2)">Tap "Order" tab</span> <span style="color:var(--green)">✓</span><br>
-            <span style="color:var(--orange)">Step 2:</span> <span style="color:var(--text-2)">Tap "Hot Coffees"</span> <span style="color:var(--green)">✓</span><br>
-            <span style="color:var(--orange)">Step 3:</span> <span style="color:var(--text-2)">Tap "Caffè Latte"</span> <span style="color:var(--green)">✓</span><br><br>
-            <span style="color:var(--green)">✓ Goal completed</span> <span style="color:var(--text-3)">— 4 actions, 9.8s</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ARCHITECTURE -->
-  <section class="arch-section" id="architecture">
-    <div class="container">
-      <div class="arch-inner">
-        <div>
-          <div class="section-eyebrow reveal">Architecture</div>
-          <h2 class="reveal reveal-delay-1">Pure agentic brain,<br>zero device logic.</h2>
-          <p class="section-sub reveal reveal-delay-2" style="margin-bottom:0">AppClaw is an intelligent orchestrator. All device interaction flows through the open MCP protocol — no vendor lock-in, no proprietary drivers.</p>
-        </div>
-        <div class="arch-flow reveal reveal-delay-1">
-          <div class="arch-node">
-            <div class="arch-node-icon icon-orange">🧠</div>
-            <div class="arch-node-info">
-              <div class="arch-node-name">AppClaw</div>
-              <div class="arch-node-desc">AI Agent — Perceive → Reason → Act</div>
-            </div>
-          </div>
-          <div class="arch-connector"><div class="arch-line"></div></div>
-          <div class="arch-node">
-            <div class="arch-node-icon icon-cyan">⚡</div>
-            <div class="arch-node-info">
-              <div class="arch-node-name">MCP Protocol</div>
-              <div class="arch-node-desc">JSON-RPC — open standard</div>
-            </div>
-          </div>
-          <div class="arch-connector"><div class="arch-line"></div></div>
-          <div class="arch-node">
-            <div class="arch-node-icon icon-cyan">🔧</div>
-            <div class="arch-node-info">
-              <div class="arch-node-name">appium-mcp</div>
-              <div class="arch-node-desc">32 tools — tap, type, swipe, assert…</div>
-            </div>
-          </div>
-          <div class="arch-connector"><div class="arch-line"></div></div>
-          <div class="arch-node">
-            <div class="arch-node-icon icon-green">📱</div>
-            <div class="arch-node-info">
-              <div class="arch-node-name">Appium</div>
-              <div class="arch-node-desc">Device automation layer</div>
-            </div>
-          </div>
-          <div class="arch-connector"><div class="arch-line"></div></div>
-          <div class="arch-node">
-            <div class="arch-node-icon icon-gray">📲</div>
-            <div class="arch-node-info">
-              <div class="arch-node-name">Device</div>
-              <div class="arch-node-desc">Android · iOS — real or emulator</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- STATS -->
-  <section class="stats-section">
-    <div class="container">
-      <div class="stats-row reveal">
-        <div class="stat-item">
-          <div class="stat-num">3</div>
-          <div class="stat-label">Modes</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-num">32</div>
-          <div class="stat-label">MCP Tools</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-num">16</div>
-          <div class="stat-label">Actions</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-num">5</div>
-          <div class="stat-label">Providers</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-num">2</div>
-          <div class="stat-label">Platforms</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- QUOTE -->
-  <section class="quote-section">
-    <div class="container">
-      <div class="quote-inner reveal">
-        <div class="quote-mark">"</div>
-        <div class="quote-text">AppClaw lets me automate complex mobile workflows that would take hours of manual scripting — in minutes. Just describe what you want and watch it happen.</div>
-        <div class="quote-author">Mobile QA Engineers — Teams using AppClaw for automated testing</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="cta-section">
-    <div class="container" style="position:relative;z-index:1">
-      <div class="section-eyebrow reveal" style="justify-content:center">
-        <span style="display:none"></span>Get Started
-      </div>
-      <h2 class="reveal reveal-delay-1">Ready to automate your<br>mobile apps?</h2>
-      <p class="section-sub reveal reveal-delay-2">Open source, extensible, ready to use. Bring your own LLM key and start in under a minute — from the terminal or your favorite IDE.</p>
-      <div class="reveal reveal-delay-3">
-        <div class="install-block">
-          <span class="install-dollar">$</span>
-          <span class="install-cmd">npx appclaw</span>
-          <button class="install-copy" id="copyBtn" onclick="copyInstall()">Copy</button>
-        </div>
-      </div>
-      <div class="cta-buttons reveal reveal-delay-4">
-        <a class="btn-primary" href="https://github.com/AppiumTestDistribution/appclaw#quick-start">
-          Get Started
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
-        <a class="btn-secondary" href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          GitHub
-        </a>
-      </div>
-      <div class="cta-meta reveal">CLI<span>·</span>Cursor &amp; VS Code<span>·</span>Apache 2.0<span>·</span>BYO LLM Key</div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer>
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a class="footer-brand-logo" href="#">
-            <img src="logo.svg" alt="AppClaw">
-            <span>AppClaw</span>
+        <div class="nav-right">
+          <button
+            type="button"
+            class="theme-toggle"
+            id="themeToggle"
+            aria-label="Switch to dark theme"
+            title="Theme"
+          >
+            <svg
+              class="icon-moon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+            </svg>
+            <svg
+              class="icon-sun"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+              />
+            </svg>
+          </button>
+          <a
+            class="btn-ghost"
+            href="https://github.com/AppiumTestDistribution/appclaw"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+              />
+            </svg>
+            Star
           </a>
-          <p>AI-powered mobile automation agent. Tell it what to do in plain English — it figures out the rest.</p>
-        </div>
-        <div class="footer-col">
-          <h4>Product</h4>
-          <ul>
-            <li><a href="#features">Agent Mode</a></li>
-            <li><a href="#features">YAML Flows</a></li>
-            <li><a href="#features">Playground</a></li>
-            <li><a href="#parallel">Parallel Runs</a></li>
-            <li><a href="#architecture">Architecture</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Developers</h4>
-          <ul>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw#quick-start" target="_blank" rel="noopener">Quick Start</a></li>
-            <li><a href="https://www.npmjs.com/package/appclaw" target="_blank" rel="noopener">CLI (npm)</a></li>
-            <li><a href="https://marketplace.visualstudio.com/items?itemName=AppClaw.appclaw" target="_blank" rel="noopener">VS Code &amp; Cursor extension</a></li>
-            <li><a href="usage.html">Usage Guide</a></li>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">Documentation</a></li>
-            <li><a href="https://github.com/AppiumTestDistribution/appium-mcp" target="_blank" rel="noopener">appium-mcp</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Community</h4>
-          <ul>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw/issues" target="_blank" rel="noopener">Issues</a></li>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw/discussions" target="_blank" rel="noopener">Discussions</a></li>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
-          </ul>
+          <a class="btn-orange" href="https://github.com/AppiumTestDistribution/appclaw#quick-start"
+            >Get Started</a
+          >
+          <button class="nav-mobile-toggle" id="mobileToggle" aria-label="Menu">
+            <svg
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
         </div>
       </div>
-      <div class="footer-bottom">
-        <div class="footer-copy">© 2026 AppClaw. Open source under Apache 2.0.</div>
-        <a class="footer-gh" href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          GitHub
-        </a>
-      </div>
+    </nav>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#parallel" onclick="closeMobile()">Parallel</a>
+      <a href="#features" onclick="closeMobile()">Features</a>
+      <a href="#how-it-works" onclick="closeMobile()">How It Works</a>
+      <a href="#architecture" onclick="closeMobile()">Architecture</a>
+      <a href="usage.html" onclick="closeMobile()">Usage Guide</a>
     </div>
-  </footer>
 
-  <script>
-    // Theme (default light; persisted)
-    const root = document.documentElement;
-    const themeColorMeta = document.getElementById('themeColorMeta');
-    const themeToggle = document.getElementById('themeToggle');
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-inner">
+          <div>
+            <div class="hero-badge reveal">
+              <div class="hero-badge-dot"></div>
+              Open Source · Apache 2.0
+            </div>
+            <h1 class="reveal reveal-delay-1">
+              The intelligent<br />agent for<br /><span class="accent-line">mobile.</span>
+            </h1>
+            <p class="hero-sub reveal reveal-delay-2">
+              Describe what you want in plain English. AppClaw figures out what to tap, type, and
+              swipe — on real Android and iOS devices. Run it from the <strong>CLI</strong> or
+              install the extension in <strong>Cursor</strong>, <strong>Visual Studio Code</strong>,
+              and other VS Code–compatible editors from the
+              <a
+                href="https://marketplace.visualstudio.com/items?itemName=AppClaw.appclaw"
+                target="_blank"
+                rel="noopener"
+                >Marketplace</a
+              >.
+            </p>
+            <div class="hero-buttons reveal reveal-delay-3">
+              <a
+                class="btn-primary"
+                href="https://github.com/AppiumTestDistribution/appclaw#quick-start"
+              >
+                Get Started
+                <svg
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </a>
+              <a
+                class="btn-secondary"
+                href="https://github.com/AppiumTestDistribution/appclaw"
+                target="_blank"
+                rel="noopener"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path
+                    d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                  />
+                </svg>
+                View on GitHub
+              </a>
+            </div>
+          </div>
+          <!-- Phone + YAML side by side -->
+          <div class="hero-right reveal reveal-delay-2">
+            <!-- Phone with demo.gif -->
+            <div class="phone-frame">
+              <div class="phone-screen">
+                <img
+                  src="demo.gif"
+                  alt="AppClaw controlling a real Android device"
+                  loading="eager"
+                />
+              </div>
+            </div>
+            <!-- YAML flow card -->
+            <div class="hero-yaml">
+              <div class="yaml-bar">
+                <div class="tdot tdot-r"></div>
+                <div class="tdot tdot-y"></div>
+                <div class="tdot tdot-g"></div>
+                <span class="yaml-fname">whatsapp.yaml</span>
+              </div>
+              <div
+                class="yaml-body"
+                style="font-size: 12.5px; line-height: 1.9; padding: 16px 20px"
+              >
+                <span class="y-k">name:</span> <span class="y-v">whatsapp_hello</span><br />
+                <span class="y-k">platform:</span> <span class="y-v">android</span><br />
+                <br />
+                <span class="y-k">steps:</span><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">open WhatsApp</span><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">tap search icon</span
+                ><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">type "Mom"</span><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">tap Mom conversation</span
+                ><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">type "Hello!"</span><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">tap send button</span
+                ><br />
+                <br />
+                <span class="y-k">done:</span>
+                <span style="color: var(--green)">"Message sent ✓"</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    function syncThemeUi() {
-      const dark = root.getAttribute('data-theme') === 'dark';
+    <!-- PROVIDERS -->
+    <section class="providers reveal">
+      <div class="container">
+        <div class="providers-label">Works with any LLM provider</div>
+        <div class="providers-logos">
+          <div class="provider-item">Anthropic</div>
+          <div class="provider-item">OpenAI</div>
+          <div class="provider-item">Google</div>
+          <div class="provider-item">Groq</div>
+          <div class="provider-item">Ollama</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="run-surface reveal">
+      <div class="container">
+        <div class="providers-label">Where you run it</div>
+        <p class="run-surface-text">
+          <a href="https://www.npmjs.com/package/appclaw" target="_blank" rel="noopener">CLI</a>
+          (<code>npx appclaw</code>) for terminals and CI, or the
+          <a
+            href="https://marketplace.visualstudio.com/items?itemName=AppClaw.appclaw"
+            target="_blank"
+            rel="noopener"
+            >Visual Studio Marketplace</a
+          >
+          extension for <strong>Cursor</strong>, <strong>VS Code</strong>, and forks that load the
+          same extension catalog.
+        </p>
+      </div>
+    </section>
+
+    <!-- PARALLEL EXECUTION -->
+    <section class="parallel-section" id="parallel">
+      <div class="container">
+        <div class="parallel-inner">
+          <!-- Left: GIF -->
+          <div class="parallel-frame reveal">
+            <img
+              src="parallel-demo.gif"
+              alt="AppClaw running tests across 4 devices in parallel"
+              loading="lazy"
+            />
+          </div>
+          <!-- Right: copy -->
+          <div class="parallel-copy reveal reveal-delay-1">
+            <div>
+              <div class="section-eyebrow">Parallel Execution</div>
+              <h2>Four devices.<br />One YAML file.</h2>
+              <p class="section-sub" style="margin-top: 14px">
+                Add <code>parallel: 4</code> and AppClaw runs your flow across every device at once
+                — each with its own screen, step tracking, and pass/fail result.
+              </p>
+            </div>
+            <div class="parallel-pills">
+              <div class="parallel-pill">
+                <div class="parallel-pill-dot"></div>
+                <strong>4 devices</strong>&nbsp;at once
+              </div>
+              <div class="parallel-pill">
+                <div class="parallel-pill-dot"></div>
+                <strong>Per-device</strong>&nbsp;progress
+              </div>
+              <div class="parallel-pill">
+                <div class="parallel-pill-dot"></div>
+                <strong>Suite mode</strong>
+              </div>
+              <div class="parallel-pill">
+                <div class="parallel-pill-dot"></div>
+                <strong>Zero</strong>&nbsp;config
+              </div>
+            </div>
+            <div class="parallel-yaml-card">
+              <div class="yaml-bar">
+                <div class="tdot tdot-r"></div>
+                <div class="tdot tdot-y"></div>
+                <div class="tdot tdot-g"></div>
+                <span class="yaml-fname">youtube-suite.yaml</span>
+              </div>
+              <div class="yaml-body">
+                <span class="y-k">name:</span> <span class="y-v">youtube_suite</span><br />
+                <span class="y-k">platform:</span> <span class="y-v">android</span><br />
+                <span class="y-c">parallel:</span> <span class="y-n">4</span><br />
+                <span class="y-k">flows:</span><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">youtube.yaml</span><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">login.yaml</span><br />
+                &nbsp;&nbsp;<span class="y-d">-</span> <span class="y-s">checkout.yaml</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- THREE MODES -->
+    <section class="features-section" id="features">
+      <div class="container">
+        <div class="section-header reveal">
+          <div class="section-eyebrow">Three modes</div>
+          <h2>Every way to automate,<br />covered.</h2>
+          <p class="section-sub">
+            AI agent for complex goals, YAML flows for repeatable tests, or an interactive
+            playground to build live.
+          </p>
+        </div>
+        <div class="features-grid reveal reveal-delay-1">
+          <!-- Agent -->
+          <div class="feature-card">
+            <div class="feature-badge badge-agent">Agent Mode</div>
+            <h3>From prompt to completed action</h3>
+            <p>
+              Describe a goal in plain English. AppClaw reads the screen, reasons, and executes
+              until done.
+            </p>
+            <div class="mini-term">
+              <div class="mini-term-bar">
+                <div class="mdot" style="background: #ff5f57"></div>
+                <div class="mdot" style="background: #febc2e"></div>
+                <div class="mdot" style="background: #28c840"></div>
+                <span class="mini-term-title">Agent Mode</span>
+              </div>
+              <div class="mini-term-body">
+                <span style="color: var(--orange)">$</span>
+                <span style="color: var(--text)">appclaw</span>
+                <span class="term-string">"Turn on WiFi"</span><br />
+                <br />
+                <span style="color: var(--orange)">1/3</span>
+                <span style="color: var(--text)">launch</span>
+                <span style="color: var(--text-3)">→ Settings</span><br />
+                <span style="color: var(--orange)">2/3</span>
+                <span style="color: var(--text)">tap</span>
+                <span style="color: var(--text-3)">→ Network &amp; internet</span><br />
+                <span style="color: var(--orange)">3/3</span>
+                <span style="color: var(--text)">tap</span>
+                <span style="color: var(--text-3)">→ Wi-Fi toggle</span><br />
+                <br />
+                <span style="color: var(--green)">✓ Done</span>
+                <span style="color: var(--text-3)">— 3 steps, 8s, $0.002</span>
+              </div>
+            </div>
+          </div>
+          <!-- YAML -->
+          <div class="feature-card">
+            <div class="feature-badge badge-yaml">YAML Flows</div>
+            <h3>Deterministic steps, zero LLM cost</h3>
+            <p>
+              Write plain English YAML. No AI needed at runtime. Fast, repeatable, with vision
+              fallback.
+            </p>
+            <div class="mini-term">
+              <div class="mini-term-bar">
+                <div class="mdot" style="background: #ff5f57"></div>
+                <div class="mdot" style="background: #febc2e"></div>
+                <div class="mdot" style="background: #28c840"></div>
+                <span class="mini-term-title">login-flow.yaml</span>
+              </div>
+              <div class="mini-term-body">
+                <span style="color: var(--syntax-k)">steps:</span><br />
+                &nbsp;&nbsp;<span style="color: var(--text-3)">-</span>
+                <span style="color: var(--text)">open YouTube app</span><br />
+                &nbsp;&nbsp;<span style="color: var(--text-3)">-</span>
+                <span style="color: var(--text)">click on search icon</span><br />
+                &nbsp;&nbsp;<span style="color: var(--text-3)">-</span>
+                <span style="color: var(--text)">type "Appium 3.0"</span><br />
+                &nbsp;&nbsp;<span style="color: var(--text-3)">-</span>
+                <span style="color: var(--text)">scroll until "TestMu" visible</span><br />
+                &nbsp;&nbsp;<span style="color: var(--text-3)">-</span>
+                <span style="color: var(--text)">verify TestMu AI is visible</span><br />
+                <span style="color: var(--green)">done:</span>
+                <span style="color: var(--cyan)">"Search results visible"</span>
+              </div>
+            </div>
+          </div>
+          <!-- Playground -->
+          <div class="feature-card">
+            <div class="feature-badge badge-play">Playground</div>
+            <h3>Build flows interactively</h3>
+            <p>Live REPL on a real device. Type commands, watch them execute, export to YAML.</p>
+            <div class="mini-term">
+              <div class="mini-term-bar">
+                <div class="mdot" style="background: #ff5f57"></div>
+                <div class="mdot" style="background: #febc2e"></div>
+                <div class="mdot" style="background: #28c840"></div>
+                <span class="mini-term-title">Playground</span>
+              </div>
+              <div class="mini-term-body">
+                <span style="color: var(--green)">pg&gt;</span>
+                <span style="color: var(--text)">tap on Settings</span><br />
+                <span style="color: var(--green)">✓</span>
+                <span style="color: var(--text-3)">Tapped "Settings"</span><br />
+                <span style="color: var(--green)">pg&gt;</span>
+                <span style="color: var(--text)">scroll to General</span><br />
+                <span style="color: var(--green)">✓</span>
+                <span style="color: var(--text-3)">"General" visible</span><br />
+                <span style="color: var(--green)">pg&gt;</span>
+                <span style="color: var(--text)">verify About is visible</span><br />
+                <span style="color: var(--green)">✓</span>
+                <span style="color: var(--text-3)">Verified</span><br />
+                <span style="color: var(--green)">pg&gt;</span>
+                <span style="color: var(--text)">/export flow.yaml</span><br />
+                <span style="color: var(--green)">✓</span>
+                <span style="color: var(--text-3)">Saved (3 steps)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="how-section" id="how-it-works">
+      <div class="container">
+        <div class="section-header reveal">
+          <div class="section-eyebrow">How It Works</div>
+          <h2>Three steps from<br />intent to execution.</h2>
+          <p class="section-sub">
+            No boilerplate, no selectors, no brittle locators. Just describe what you want.
+          </p>
+        </div>
+        <div class="how-grid">
+          <div class="how-step reveal">
+            <div class="how-num">01</div>
+            <h3>Describe your goal</h3>
+            <p>
+              Write what you want in plain English. AppClaw accepts goals as prompts, YAML files, or
+              playground commands.
+            </p>
+            <div class="snippet">
+              <span style="color: var(--orange)">$</span>
+              <span style="color: var(--text)">npx appclaw</span><br />
+              <span style="color: var(--cyan)">?</span>
+              <span style="color: var(--text-2)">Goal:</span>
+              <span style="color: var(--text)">Order coffee from Starbucks</span>
+            </div>
+          </div>
+          <div class="how-step reveal reveal-delay-1">
+            <div class="how-num">02</div>
+            <h3>AI perceives and reasons</h3>
+            <p>
+              AppClaw screenshots the screen, sends it to your LLM, and receives a structured plan.
+              Handles popups, adapts to state.
+            </p>
+            <div class="snippet">
+              <span style="color: var(--text-2)">Reasoning: home screen visible.</span><br />
+              <span style="color: var(--text-2)">I see "Order" tab. I'll tap it.</span><br /><br />
+              <span style="color: var(--orange)">Action:</span>
+              <span style="color: var(--text)">tap("Order tab")</span>
+            </div>
+          </div>
+          <div class="how-step reveal reveal-delay-2">
+            <div class="how-num">03</div>
+            <h3>Execute and verify</h3>
+            <p>
+              Actions run via Appium through MCP. AppClaw verifies after every step and continues
+              until the goal is achieved.
+            </p>
+            <div class="snippet">
+              <span style="color: var(--orange)">Step 1:</span>
+              <span style="color: var(--text-2)">Tap "Order" tab</span>
+              <span style="color: var(--green)">✓</span><br />
+              <span style="color: var(--orange)">Step 2:</span>
+              <span style="color: var(--text-2)">Tap "Hot Coffees"</span>
+              <span style="color: var(--green)">✓</span><br />
+              <span style="color: var(--orange)">Step 3:</span>
+              <span style="color: var(--text-2)">Tap "Caffè Latte"</span>
+              <span style="color: var(--green)">✓</span><br /><br />
+              <span style="color: var(--green)">✓ Goal completed</span>
+              <span style="color: var(--text-3)">— 4 actions, 9.8s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE -->
+    <section class="arch-section" id="architecture">
+      <div class="container">
+        <div class="arch-inner">
+          <div>
+            <div class="section-eyebrow reveal">Architecture</div>
+            <h2 class="reveal reveal-delay-1">Pure agentic brain,<br />zero device logic.</h2>
+            <p class="section-sub reveal reveal-delay-2" style="margin-bottom: 0">
+              AppClaw is an intelligent orchestrator. All device interaction flows through the open
+              MCP protocol — no vendor lock-in, no proprietary drivers.
+            </p>
+          </div>
+          <div class="arch-flow reveal reveal-delay-1">
+            <div class="arch-node">
+              <div class="arch-node-icon icon-orange">🧠</div>
+              <div class="arch-node-info">
+                <div class="arch-node-name">AppClaw</div>
+                <div class="arch-node-desc">AI Agent — Perceive → Reason → Act</div>
+              </div>
+            </div>
+            <div class="arch-connector"><div class="arch-line"></div></div>
+            <div class="arch-node">
+              <div class="arch-node-icon icon-cyan">⚡</div>
+              <div class="arch-node-info">
+                <div class="arch-node-name">MCP Protocol</div>
+                <div class="arch-node-desc">JSON-RPC — open standard</div>
+              </div>
+            </div>
+            <div class="arch-connector"><div class="arch-line"></div></div>
+            <div class="arch-node">
+              <div class="arch-node-icon icon-cyan">🔧</div>
+              <div class="arch-node-info">
+                <div class="arch-node-name">appium-mcp</div>
+                <div class="arch-node-desc">32 tools — tap, type, swipe, assert…</div>
+              </div>
+            </div>
+            <div class="arch-connector"><div class="arch-line"></div></div>
+            <div class="arch-node">
+              <div class="arch-node-icon icon-green">📱</div>
+              <div class="arch-node-info">
+                <div class="arch-node-name">Appium</div>
+                <div class="arch-node-desc">Device automation layer</div>
+              </div>
+            </div>
+            <div class="arch-connector"><div class="arch-line"></div></div>
+            <div class="arch-node">
+              <div class="arch-node-icon icon-gray">📲</div>
+              <div class="arch-node-info">
+                <div class="arch-node-name">Device</div>
+                <div class="arch-node-desc">Android · iOS — real or emulator</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS -->
+    <section class="stats-section">
+      <div class="container">
+        <div class="stats-row reveal">
+          <div class="stat-item">
+            <div class="stat-num">3</div>
+            <div class="stat-label">Modes</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">32</div>
+            <div class="stat-label">MCP Tools</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">16</div>
+            <div class="stat-label">Actions</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">5</div>
+            <div class="stat-label">Providers</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">2</div>
+            <div class="stat-label">Platforms</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUOTE -->
+    <section class="quote-section">
+      <div class="container">
+        <div class="quote-inner reveal">
+          <div class="quote-mark">"</div>
+          <div class="quote-text">
+            AppClaw lets me automate complex mobile workflows that would take hours of manual
+            scripting — in minutes. Just describe what you want and watch it happen.
+          </div>
+          <div class="quote-author">
+            Mobile QA Engineers — Teams using AppClaw for automated testing
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="container" style="position: relative; z-index: 1">
+        <div class="section-eyebrow reveal" style="justify-content: center">
+          <span style="display: none"></span>Get Started
+        </div>
+        <h2 class="reveal reveal-delay-1">Ready to automate your<br />mobile apps?</h2>
+        <p class="section-sub reveal reveal-delay-2">
+          Open source, extensible, ready to use. Bring your own LLM key and start in under a minute
+          — from the terminal or your favorite IDE.
+        </p>
+        <div class="reveal reveal-delay-3">
+          <div class="install-block">
+            <span class="install-dollar">$</span>
+            <span class="install-cmd">npx appclaw</span>
+            <button class="install-copy" id="copyBtn" onclick="copyInstall()">Copy</button>
+          </div>
+        </div>
+        <div class="cta-buttons reveal reveal-delay-4">
+          <a
+            class="btn-primary"
+            href="https://github.com/AppiumTestDistribution/appclaw#quick-start"
+          >
+            Get Started
+            <svg
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              viewBox="0 0 24 24"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a
+            class="btn-secondary"
+            href="https://github.com/AppiumTestDistribution/appclaw"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+              />
+            </svg>
+            GitHub
+          </a>
+        </div>
+        <div class="cta-meta reveal">
+          CLI<span>·</span>Cursor &amp; VS Code<span>·</span>Apache 2.0<span>·</span>BYO LLM Key
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="footer-brand-logo" href="#">
+              <img src="logo.svg" alt="AppClaw" />
+              <span>AppClaw</span>
+            </a>
+            <p>
+              AI-powered mobile automation agent. Tell it what to do in plain English — it figures
+              out the rest.
+            </p>
+          </div>
+          <div class="footer-col">
+            <h4>Product</h4>
+            <ul>
+              <li><a href="#features">Agent Mode</a></li>
+              <li><a href="#features">YAML Flows</a></li>
+              <li><a href="#features">Playground</a></li>
+              <li><a href="#parallel">Parallel Runs</a></li>
+              <li><a href="#architecture">Architecture</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h4>Developers</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appclaw#quick-start"
+                  target="_blank"
+                  rel="noopener"
+                  >Quick Start</a
+                >
+              </li>
+              <li>
+                <a href="https://www.npmjs.com/package/appclaw" target="_blank" rel="noopener"
+                  >CLI (npm)</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://marketplace.visualstudio.com/items?itemName=AppClaw.appclaw"
+                  target="_blank"
+                  rel="noopener"
+                  >VS Code &amp; Cursor extension</a
+                >
+              </li>
+              <li><a href="usage.html">Usage Guide</a></li>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appclaw"
+                  target="_blank"
+                  rel="noopener"
+                  >Documentation</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appium-mcp"
+                  target="_blank"
+                  rel="noopener"
+                  >appium-mcp</a
+                >
+              </li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h4>Community</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appclaw/issues"
+                  target="_blank"
+                  rel="noopener"
+                  >Issues</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appclaw/discussions"
+                  target="_blank"
+                  rel="noopener"
+                  >Discussions</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appclaw/blob/main/LICENSE"
+                  target="_blank"
+                  rel="noopener"
+                  >License</a
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <div class="footer-copy">© 2026 AppClaw. Open source under Apache 2.0.</div>
+          <a
+            class="footer-gh"
+            href="https://github.com/AppiumTestDistribution/appclaw"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+              />
+            </svg>
+            GitHub
+          </a>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Theme (default light; persisted)
+      const root = document.documentElement;
+      const themeColorMeta = document.getElementById('themeColorMeta');
+      const themeToggle = document.getElementById('themeToggle');
+
+      function syncThemeUi() {
+        const dark = root.getAttribute('data-theme') === 'dark';
+        if (themeToggle) {
+          themeToggle.setAttribute(
+            'aria-label',
+            dark ? 'Switch to light theme' : 'Switch to dark theme'
+          );
+          themeToggle.setAttribute('title', dark ? 'Light theme' : 'Dark theme');
+        }
+        if (themeColorMeta) {
+          themeColorMeta.setAttribute('content', dark ? '#020c18' : '#ffffff');
+        }
+      }
+      syncThemeUi();
       if (themeToggle) {
-        themeToggle.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
-        themeToggle.setAttribute('title', dark ? 'Light theme' : 'Dark theme');
+        themeToggle.addEventListener('click', () => {
+          if (root.getAttribute('data-theme') === 'dark') {
+            root.removeAttribute('data-theme');
+            try {
+              localStorage.setItem('appclaw-theme', 'light');
+            } catch (e) {}
+          } else {
+            root.setAttribute('data-theme', 'dark');
+            try {
+              localStorage.setItem('appclaw-theme', 'dark');
+            } catch (e) {}
+          }
+          syncThemeUi();
+        });
       }
-      if (themeColorMeta) {
-        themeColorMeta.setAttribute('content', dark ? '#020c18' : '#ffffff');
+
+      // Navbar scroll
+      const navbar = document.getElementById('navbar');
+      window.addEventListener(
+        'scroll',
+        () => {
+          navbar.classList.toggle('scrolled', window.scrollY > 10);
+        },
+        { passive: true }
+      );
+
+      // Reveal on scroll
+      const revealObs = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add('visible');
+              revealObs.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+      document.querySelectorAll('.reveal').forEach((el) => revealObs.observe(el));
+
+      // Copy install command
+      function copyInstall() {
+        navigator.clipboard.writeText('npx appclaw').then(() => {
+          const btn = document.getElementById('copyBtn');
+          btn.textContent = 'Copied!';
+          setTimeout(() => (btn.textContent = 'Copy'), 2000);
+        });
       }
-    }
-    syncThemeUi();
-    if (themeToggle) {
-      themeToggle.addEventListener('click', () => {
-        if (root.getAttribute('data-theme') === 'dark') {
-          root.removeAttribute('data-theme');
-          try { localStorage.setItem('appclaw-theme', 'light'); } catch (e) {}
-        } else {
-          root.setAttribute('data-theme', 'dark');
-          try { localStorage.setItem('appclaw-theme', 'dark'); } catch (e) {}
-        }
-        syncThemeUi();
-      });
-    }
 
-    // Navbar scroll
-    const navbar = document.getElementById('navbar');
-    window.addEventListener('scroll', () => {
-      navbar.classList.toggle('scrolled', window.scrollY > 10);
-    }, { passive: true });
-
-    // Reveal on scroll
-    const revealObs = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-          revealObs.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
-
-    // Copy install command
-    function copyInstall() {
-      navigator.clipboard.writeText('npx appclaw').then(() => {
-        const btn = document.getElementById('copyBtn');
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 2000);
-      });
-    }
-
-    // Mobile menu
-    const mobileToggle = document.getElementById('mobileToggle');
-    const mobileMenu = document.getElementById('mobileMenu');
-    mobileToggle.addEventListener('click', () => mobileMenu.classList.toggle('open'));
-    function closeMobile() { mobileMenu.classList.remove('open'); }
-    document.addEventListener('click', (e) => {
-      if (!mobileMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
+      // Mobile menu
+      const mobileToggle = document.getElementById('mobileToggle');
+      const mobileMenu = document.getElementById('mobileMenu');
+      mobileToggle.addEventListener('click', () => mobileMenu.classList.toggle('open'));
+      function closeMobile() {
         mobileMenu.classList.remove('open');
       }
-    });
-  </script>
-</body>
+      document.addEventListener('click', (e) => {
+        if (!mobileMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
+          mobileMenu.classList.remove('open');
+        }
+      });
+    </script>
+  </body>
 </html>

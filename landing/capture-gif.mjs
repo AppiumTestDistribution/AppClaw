@@ -47,7 +47,7 @@ async function main() {
 
   // Wait for fonts to load
   await page.evaluate(() => document.fonts.ready);
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   for (let i = 0; i < TOTAL_FRAMES; i++) {
     const frameNum = String(i).padStart(4, '0');
@@ -57,7 +57,7 @@ async function main() {
     });
 
     // Wait for next frame
-    await new Promise(r => setTimeout(r, FRAME_INTERVAL));
+    await new Promise((r) => setTimeout(r, FRAME_INTERVAL));
 
     if (i % 30 === 0) {
       console.log(`  Frame ${i}/${TOTAL_FRAMES}`);
@@ -75,17 +75,17 @@ async function main() {
   // Generate palette for better color quality
   execSync(
     `ffmpeg -y -framerate ${FPS} -i "${FRAMES_DIR}/frame-%04d.png" ` +
-    `-vf "fps=${FPS},scale=360:-1:flags=lanczos,palettegen=max_colors=128:stats_mode=diff" ` +
-    `"${palettePath}"`,
+      `-vf "fps=${FPS},scale=360:-1:flags=lanczos,palettegen=max_colors=128:stats_mode=diff" ` +
+      `"${palettePath}"`,
     { stdio: 'pipe' }
   );
 
   // Generate GIF using palette
   execSync(
     `ffmpeg -y -framerate ${FPS} -i "${FRAMES_DIR}/frame-%04d.png" ` +
-    `-i "${palettePath}" ` +
-    `-lavfi "fps=${FPS},scale=360:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=3" ` +
-    `"${OUTPUT_GIF}"`,
+      `-i "${palettePath}" ` +
+      `-lavfi "fps=${FPS},scale=360:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=3" ` +
+      `"${OUTPUT_GIF}"`,
     { stdio: 'pipe' }
   );
 
@@ -99,7 +99,7 @@ async function main() {
   console.log(`   Size: ${(size / 1024 / 1024).toFixed(2)} MB`);
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Error:', err.message);
   process.exit(1);
 });

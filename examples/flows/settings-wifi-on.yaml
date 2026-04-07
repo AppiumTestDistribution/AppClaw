@@ -16,11 +16,11 @@ name: Open Settings and turn Wi‑Fi ON
 ---
 - launchApp
 - wait: 2
-- tap: "Connections"
+- tap: 'Connections'
 - wait: 1
-- tap: "Internet"
+- tap: 'Internet'
 - wait: 1
 # Top-of-screen Wi‑Fi switch row; if this fails, try tap: "Wi‑Fi" or the exact label your UI shows
-- tap: "Wi‑Fi"
+- tap: 'Wi‑Fi'
 - wait: 1
-- done: "Wi‑Fi turned on (verify on device)"
+- done: 'Wi‑Fi turned on (verify on device)'

@@ -7,17 +7,70 @@
  * sessions and devices running the same app version.
  */
 
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
 /** Common words stripped from goals before keyword extraction */
 const STOP_WORDS = new Set([
-  "a", "an", "the", "and", "or", "but", "in", "on", "at", "to",
-  "for", "of", "with", "by", "from", "is", "it", "this", "that",
-  "be", "are", "was", "were", "been", "being", "have", "has", "had",
-  "do", "does", "did", "will", "would", "could", "should", "may",
-  "might", "shall", "can", "into", "if", "then", "than", "so",
-  "up", "out", "about", "i", "me", "my", "we", "you", "your",
-  "make", "sure", "please", "using", "use", "app", "device",
+  'a',
+  'an',
+  'the',
+  'and',
+  'or',
+  'but',
+  'in',
+  'on',
+  'at',
+  'to',
+  'for',
+  'of',
+  'with',
+  'by',
+  'from',
+  'is',
+  'it',
+  'this',
+  'that',
+  'be',
+  'are',
+  'was',
+  'were',
+  'been',
+  'being',
+  'have',
+  'has',
+  'had',
+  'do',
+  'does',
+  'did',
+  'will',
+  'would',
+  'could',
+  'should',
+  'may',
+  'might',
+  'shall',
+  'can',
+  'into',
+  'if',
+  'then',
+  'than',
+  'so',
+  'up',
+  'out',
+  'about',
+  'i',
+  'me',
+  'my',
+  'we',
+  'you',
+  'your',
+  'make',
+  'sure',
+  'please',
+  'using',
+  'use',
+  'app',
+  'device',
 ]);
 
 /**
@@ -53,8 +106,8 @@ export function extractScreenLabels(dom: string): string[] {
  * even if dynamic content (timestamps, counts) differs.
  */
 export function computeSemanticFingerprint(labels: string[]): string {
-  const key = labels.slice(0, 15).join("|");
-  return createHash("md5").update(key).digest("hex").slice(0, 12);
+  const key = labels.slice(0, 15).join('|');
+  return createHash('md5').update(key).digest('hex').slice(0, 12);
 }
 
 /**
@@ -66,9 +119,9 @@ export function computeSemanticFingerprint(labels: string[]): string {
 export function extractGoalKeywords(goal: string): string[] {
   const words = goal
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter(w => w.length >= 2 && !STOP_WORDS.has(w));
+    .filter((w) => w.length >= 2 && !STOP_WORDS.has(w));
 
   // Deduplicate, take top 6
   return [...new Set(words)].slice(0, 6);

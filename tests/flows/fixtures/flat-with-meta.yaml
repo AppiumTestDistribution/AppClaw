@@ -5,5 +5,5 @@ name: WiFi Toggle
 ---
 - launchApp
 - wait: 2
-- tap: "WiFi"
-- done: "WiFi toggled"
+- tap: 'WiFi'
+- done: 'WiFi toggled'

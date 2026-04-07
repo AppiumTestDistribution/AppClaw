@@ -8,9 +8,9 @@
  *   files or inline `env:` blocks in the YAML header.
  */
 
-import { readFileSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
-import { parse as parseYaml } from "yaml";
+import { readFileSync, existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { parse as parseYaml } from 'yaml';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -41,16 +41,16 @@ export function loadEnvironmentFile(filePath: string): VariableBindings {
     throw new Error(`Environment file not found: ${filePath}`);
   }
 
-  const raw = readFileSync(filePath, "utf-8");
+  const raw = readFileSync(filePath, 'utf-8');
   const doc = parseYaml(raw);
 
-  if (!doc || typeof doc !== "object") {
+  if (!doc || typeof doc !== 'object') {
     throw new Error(`Environment file must be a YAML object: ${filePath}`);
   }
 
   const bindings: VariableBindings = { variables: {} };
 
-  if (doc.variables && typeof doc.variables === "object") {
+  if (doc.variables && typeof doc.variables === 'object') {
     for (const [key, val] of Object.entries(doc.variables)) {
       if (val === null || val === undefined) continue;
       bindings.variables[key] = val as string | number | boolean;
@@ -66,7 +66,7 @@ export function loadEnvironmentFile(filePath: string): VariableBindings {
 export function loadInlineBindings(env: Record<string, unknown>): VariableBindings {
   const bindings: VariableBindings = { variables: {} };
 
-  if (env.variables && typeof env.variables === "object") {
+  if (env.variables && typeof env.variables === 'object') {
     for (const [key, val] of Object.entries(env.variables as Record<string, unknown>)) {
       if (val === null || val === undefined) continue;
       bindings.variables[key] = val as string | number | boolean;
@@ -79,7 +79,10 @@ export function loadInlineBindings(env: Record<string, unknown>): VariableBindin
 // ── Merging ────────────────────────────────────────────────────────
 
 /** Merge two bindings, with `override` taking precedence. */
-export function mergeBindings(base: VariableBindings, override: VariableBindings): VariableBindings {
+export function mergeBindings(
+  base: VariableBindings,
+  override: VariableBindings
+): VariableBindings {
   return {
     variables: { ...base.variables, ...override.variables },
   };
@@ -108,25 +111,27 @@ export function interpolate(template: string, bindings: VariableBindings): Resol
   let redacted = template;
 
   resolved = resolved.replace(PLACEHOLDER_RE, (_match, scope: string, key: string) => {
-    if (scope === "secrets") {
+    if (scope === 'secrets') {
       const value = process.env[key];
       if (value === undefined) {
         throw new Error(
           `Undefined secret: "\${secrets.${key}}". ` +
-          `Set the environment variable "${key}" in your shell or .env file.`
+            `Set the environment variable "${key}" in your shell or .env file.`
         );
       }
       return value;
     }
     if (!(key in bindings.variables)) {
-      throw new Error(`Undefined variable: "\${variables.${key}}". Define it in your environment file.`);
+      throw new Error(
+        `Undefined variable: "\${variables.${key}}". Define it in your environment file.`
+      );
     }
     return String(bindings.variables[key]);
   });
 
   redacted = redacted.replace(PLACEHOLDER_RE, (_match, scope: string, key: string) => {
-    if (scope === "secrets") return "***";
-    if (scope === "variables" && key in bindings.variables) {
+    if (scope === 'secrets') return '***';
+    if (scope === 'variables' && key in bindings.variables) {
       return String(bindings.variables[key]);
     }
     return _match;
@@ -154,7 +159,7 @@ export function interpolateStep<T extends Record<string, unknown>>(
   // Check if any interpolation is needed (variables in bindings or secrets in step strings)
   const hasVars = Object.keys(bindings.variables).length > 0;
   const hasSecretPlaceholders = Object.values(step).some(
-    v => typeof v === "string" && /\$\{secrets\.[^}]+\}/.test(v)
+    (v) => typeof v === 'string' && /\$\{secrets\.[^}]+\}/.test(v)
   );
   if (!hasVars && !hasSecretPlaceholders) {
     return step;
@@ -164,16 +169,19 @@ export function interpolateStep<T extends Record<string, unknown>>(
 
   // First pass: resolve all string fields (except verbatim)
   for (const [key, val] of Object.entries(result)) {
-    if (key === "verbatim") continue;
-    if (typeof val === "string" && hasPlaceholders(val)) {
+    if (key === 'verbatim') continue;
+    if (typeof val === 'string' && hasPlaceholders(val)) {
       const { resolved } = interpolate(val, bindings);
       (result as Record<string, unknown>)[key] = resolved;
     }
   }
 
   // Second pass: set verbatim to redacted form (secrets hidden, variables shown)
-  if (typeof result.verbatim === "string" && hasPlaceholders(result.verbatim)) {
-    (result as Record<string, unknown>).verbatim = interpolate(result.verbatim as string, bindings).redacted;
+  if (typeof result.verbatim === 'string' && hasPlaceholders(result.verbatim)) {
+    (result as Record<string, unknown>).verbatim = interpolate(
+      result.verbatim as string,
+      bindings
+    ).redacted;
   }
 
   return result;

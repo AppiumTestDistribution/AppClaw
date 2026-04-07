@@ -5,21 +5,21 @@
  * Single entry point for all modes (agent, flow, explorer, replay).
  */
 
-export { resolvePlatform } from "./platform-picker.js";
-export { discoverAndSelectDevice } from "./device-picker.js";
-export type { DeviceInfo, DeviceSelection } from "./device-picker.js";
-export { setupSimulator, checkRealDeviceWDA } from "./ios-setup.js";
-export { createPlatformSession } from "./session.js";
-export type { SessionResult } from "./session.js";
+export { resolvePlatform } from './platform-picker.js';
+export { discoverAndSelectDevice } from './device-picker.js';
+export type { DeviceInfo, DeviceSelection } from './device-picker.js';
+export { setupSimulator, checkRealDeviceWDA } from './ios-setup.js';
+export { createPlatformSession } from './session.js';
+export type { SessionResult } from './session.js';
 
-import type { MCPClient } from "../mcp/types.js";
-import type { AppClawConfig } from "../config.js";
-import type { Platform, DeviceType } from "../index.js";
-import { resolvePlatform } from "./platform-picker.js";
-import { discoverAndSelectDevice } from "./device-picker.js";
-import { setupSimulator, checkRealDeviceWDA } from "./ios-setup.js";
-import { createPlatformSession } from "./session.js";
-import type { SessionResult } from "./session.js";
+import type { MCPClient } from '../mcp/types.js';
+import type { AppClawConfig } from '../config.js';
+import type { Platform, DeviceType } from '../index.js';
+import { resolvePlatform } from './platform-picker.js';
+import { discoverAndSelectDevice } from './device-picker.js';
+import { setupSimulator, checkRealDeviceWDA } from './ios-setup.js';
+import { createPlatformSession } from './session.js';
+import type { SessionResult } from './session.js';
 
 export interface DeviceSetupArgs {
   cliPlatform: Platform | null;
@@ -61,7 +61,7 @@ export interface DeviceSetupResult {
  */
 export async function setupDevice(
   mcp: MCPClient,
-  args: DeviceSetupArgs,
+  args: DeviceSetupArgs
 ): Promise<DeviceSetupResult> {
   // Step 1: Resolve platform + device type
   const { platform, deviceType } = await resolvePlatform({
@@ -82,18 +82,29 @@ export async function setupDevice(
   const forceDevicePicker = !explicitDevice && !explicitPlatform;
 
   const selection = await discoverAndSelectDevice(
-    mcp, platform, deviceType, udid, deviceName, forceDevicePicker,
+    mcp,
+    platform,
+    deviceType,
+    udid,
+    deviceName,
+    forceDevicePicker
   );
 
   // Step 3: iOS-specific setup
-  if (platform === "ios" && deviceType === "simulator") {
+  if (platform === 'ios' && deviceType === 'simulator') {
     await setupSimulator(mcp, selection.device.udid);
-  } else if (platform === "ios" && deviceType === "real") {
+  } else if (platform === 'ios' && deviceType === 'real') {
     await checkRealDeviceWDA();
   }
 
   // Step 4: Create session
-  const session = await createPlatformSession(mcp, args.config, platform, deviceType, args.extraCaps);
+  const session = await createPlatformSession(
+    mcp,
+    args.config,
+    platform,
+    deviceType,
+    args.extraCaps
+  );
 
   return {
     platform,

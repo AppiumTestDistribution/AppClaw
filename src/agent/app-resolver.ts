@@ -3,8 +3,8 @@
  * app names to package IDs for direct launching.
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import * as ui from "../ui/terminal.js";
+import type { MCPClient } from '../mcp/types.js';
+import * as ui from '../ui/terminal.js';
 
 export interface InstalledApp {
   packageName: string;
@@ -13,95 +13,95 @@ export interface InstalledApp {
 
 /** Well-known package names for common Android apps */
 const WELL_KNOWN_ANDROID_APPS: Record<string, string> = {
-  settings: "com.android.settings",
-  chrome: "com.android.chrome",
-  whatsapp: "com.whatsapp",
-  instagram: "com.instagram.android",
-  facebook: "com.facebook.katana",
-  messenger: "com.facebook.orca",
-  twitter: "com.twitter.android",
-  x: "com.twitter.android",
-  youtube: "com.google.android.youtube",
-  gmail: "com.google.android.gm",
-  maps: "com.google.android.apps.maps",
-  "google maps": "com.google.android.apps.maps",
-  calendar: "com.google.android.calendar",
-  camera: "com.android.camera",
-  phone: "com.android.dialer",
-  contacts: "com.android.contacts",
-  messages: "com.google.android.apps.messaging",
-  calculator: "com.android.calculator2",
-  clock: "com.android.deskclock",
-  files: "com.google.android.apps.nbu.files",
-  photos: "com.google.android.apps.photos",
-  spotify: "com.spotify.music",
-  telegram: "org.telegram.messenger",
-  slack: "com.Slack",
-  netflix: "com.netflix.mediaclient",
-  uber: "com.ubercab",
-  rapido: "com.rapido.passenger",
-  ola: "com.olacabs.customer",
-  swiggy: "in.swiggy.android",
-  zomato: "com.application.zomato",
-  paytm: "net.one97.paytm",
-  phonepe: "com.phonepe.app",
-  gpay: "com.google.android.apps.nbu.paisa.user",
-  amazon: "in.amazon.mShop.android.shopping",
-  flipkart: "com.flipkart.android",
-  snapchat: "com.snapchat.android",
-  linkedin: "com.linkedin.android",
-  truecaller: "com.truecaller",
-  makemytrip: "com.makemytrip",
-  booking: "com.booking",
-  airbnb: "com.airbnb.android",
+  settings: 'com.android.settings',
+  chrome: 'com.android.chrome',
+  whatsapp: 'com.whatsapp',
+  instagram: 'com.instagram.android',
+  facebook: 'com.facebook.katana',
+  messenger: 'com.facebook.orca',
+  twitter: 'com.twitter.android',
+  x: 'com.twitter.android',
+  youtube: 'com.google.android.youtube',
+  gmail: 'com.google.android.gm',
+  maps: 'com.google.android.apps.maps',
+  'google maps': 'com.google.android.apps.maps',
+  calendar: 'com.google.android.calendar',
+  camera: 'com.android.camera',
+  phone: 'com.android.dialer',
+  contacts: 'com.android.contacts',
+  messages: 'com.google.android.apps.messaging',
+  calculator: 'com.android.calculator2',
+  clock: 'com.android.deskclock',
+  files: 'com.google.android.apps.nbu.files',
+  photos: 'com.google.android.apps.photos',
+  spotify: 'com.spotify.music',
+  telegram: 'org.telegram.messenger',
+  slack: 'com.Slack',
+  netflix: 'com.netflix.mediaclient',
+  uber: 'com.ubercab',
+  rapido: 'com.rapido.passenger',
+  ola: 'com.olacabs.customer',
+  swiggy: 'in.swiggy.android',
+  zomato: 'com.application.zomato',
+  paytm: 'net.one97.paytm',
+  phonepe: 'com.phonepe.app',
+  gpay: 'com.google.android.apps.nbu.paisa.user',
+  amazon: 'in.amazon.mShop.android.shopping',
+  flipkart: 'com.flipkart.android',
+  snapchat: 'com.snapchat.android',
+  linkedin: 'com.linkedin.android',
+  truecaller: 'com.truecaller',
+  makemytrip: 'com.makemytrip',
+  booking: 'com.booking',
+  airbnb: 'com.airbnb.android',
 };
 
 /** Well-known bundle IDs for common iOS apps */
 const WELL_KNOWN_IOS_APPS: Record<string, string> = {
-  settings: "com.apple.Preferences",
-  safari: "com.apple.mobilesafari",
-  chrome: "com.google.chrome.ios",
-  whatsapp: "net.whatsapp.WhatsApp",
-  instagram: "com.burbn.instagram",
-  facebook: "com.facebook.Facebook",
-  messenger: "com.facebook.Messenger",
-  twitter: "com.atebits.Tweetie2",
-  x: "com.atebits.Tweetie2",
-  youtube: "com.google.ios.youtube",
-  gmail: "com.google.Gmail",
-  maps: "com.apple.Maps",
-  "google maps": "com.google.Maps",
-  "apple maps": "com.apple.Maps",
-  calendar: "com.apple.mobilecal",
-  camera: "com.apple.camera",
-  phone: "com.apple.mobilephone",
-  contacts: "com.apple.MobileAddressBook",
-  messages: "com.apple.MobileSMS",
-  calculator: "com.apple.calculator",
-  clock: "com.apple.mobiletimer",
-  files: "com.apple.DocumentsApp",
-  photos: "com.apple.mobileslideshow",
-  music: "com.apple.Music",
-  spotify: "com.spotify.client",
-  telegram: "ph.telegra.Telegraph",
-  slack: "com.tinyspeck.chatlyio",
-  netflix: "com.netflix.Netflix",
-  uber: "com.ubercab.UberClient",
-  snapchat: "com.toyopagroup.picaboo",
-  linkedin: "com.linkedin.LinkedIn",
-  notes: "com.apple.mobilenotes",
-  reminders: "com.apple.reminders",
-  weather: "com.apple.weather",
-  mail: "com.apple.mobilemail",
-  "app store": "com.apple.AppStore",
-  podcasts: "com.apple.podcasts",
-  news: "com.apple.news",
-  health: "com.apple.Health",
-  wallet: "com.apple.Passbook",
-  "find my": "com.apple.findmy",
-  shortcuts: "com.apple.shortcuts",
-  airbnb: "com.airbnb.app",
-  amazon: "com.amazon.Amazon",
+  settings: 'com.apple.Preferences',
+  safari: 'com.apple.mobilesafari',
+  chrome: 'com.google.chrome.ios',
+  whatsapp: 'net.whatsapp.WhatsApp',
+  instagram: 'com.burbn.instagram',
+  facebook: 'com.facebook.Facebook',
+  messenger: 'com.facebook.Messenger',
+  twitter: 'com.atebits.Tweetie2',
+  x: 'com.atebits.Tweetie2',
+  youtube: 'com.google.ios.youtube',
+  gmail: 'com.google.Gmail',
+  maps: 'com.apple.Maps',
+  'google maps': 'com.google.Maps',
+  'apple maps': 'com.apple.Maps',
+  calendar: 'com.apple.mobilecal',
+  camera: 'com.apple.camera',
+  phone: 'com.apple.mobilephone',
+  contacts: 'com.apple.MobileAddressBook',
+  messages: 'com.apple.MobileSMS',
+  calculator: 'com.apple.calculator',
+  clock: 'com.apple.mobiletimer',
+  files: 'com.apple.DocumentsApp',
+  photos: 'com.apple.mobileslideshow',
+  music: 'com.apple.Music',
+  spotify: 'com.spotify.client',
+  telegram: 'ph.telegra.Telegraph',
+  slack: 'com.tinyspeck.chatlyio',
+  netflix: 'com.netflix.Netflix',
+  uber: 'com.ubercab.UberClient',
+  snapchat: 'com.toyopagroup.picaboo',
+  linkedin: 'com.linkedin.LinkedIn',
+  notes: 'com.apple.mobilenotes',
+  reminders: 'com.apple.reminders',
+  weather: 'com.apple.weather',
+  mail: 'com.apple.mobilemail',
+  'app store': 'com.apple.AppStore',
+  podcasts: 'com.apple.podcasts',
+  news: 'com.apple.news',
+  health: 'com.apple.Health',
+  wallet: 'com.apple.Passbook',
+  'find my': 'com.apple.findmy',
+  shortcuts: 'com.apple.shortcuts',
+  airbnb: 'com.airbnb.app',
+  amazon: 'com.amazon.Amazon',
 };
 
 export class AppResolver {
@@ -113,23 +113,21 @@ export class AppResolver {
   /** All package name segments for fuzzy searching */
   private packageSegments: Array<{ segment: string; packageName: string }> = [];
   private initialized = false;
-  private platform: "android" | "ios" = "android";
+  private platform: 'android' | 'ios' = 'android';
 
   /** Fetch installed apps from device and build lookup */
-  async initialize(mcp: MCPClient, platform?: "android" | "ios"): Promise<void> {
+  async initialize(mcp: MCPClient, platform?: 'android' | 'ios'): Promise<void> {
     if (platform) this.platform = platform;
 
     // Populate well-known apps first (always available, even if device fetch fails)
-    const wellKnownApps = this.platform === "ios" ? WELL_KNOWN_IOS_APPS : WELL_KNOWN_ANDROID_APPS;
+    const wellKnownApps = this.platform === 'ios' ? WELL_KNOWN_IOS_APPS : WELL_KNOWN_ANDROID_APPS;
     for (const [name, pkg] of Object.entries(wellKnownApps)) {
       this.wellKnown.set(name.toLowerCase(), pkg);
     }
 
     try {
-      const result = await mcp.callTool("appium_list_apps", {});
-      const text = result.content
-        ?.map((c: any) => c.text ?? "")
-        .join("\n") ?? "";
+      const result = await mcp.callTool('appium_list_apps', {});
+      const text = result.content?.map((c: any) => c.text ?? '').join('\n') ?? '';
 
       this.apps = parseAppList(text);
 
@@ -140,9 +138,12 @@ export class AppResolver {
         }
 
         // Index all meaningful segments of the package name
-        const segments = app.packageName.split(".");
+        const segments = app.packageName.split('.');
         for (const seg of segments) {
-          if (seg.length >= 3 && !["com", "org", "net", "android", "app", "sec", "google", "samsung"].includes(seg)) {
+          if (
+            seg.length >= 3 &&
+            !['com', 'org', 'net', 'android', 'app', 'sec', 'google', 'samsung'].includes(seg)
+          ) {
             this.appsByName.set(seg.toLowerCase(), app.packageName);
             this.packageSegments.push({ segment: seg.toLowerCase(), packageName: app.packageName });
           }
@@ -160,7 +161,7 @@ export class AppResolver {
   /** Resolve an app name to its package ID */
   resolve(name: string): string | null {
     const lower = name.toLowerCase().trim();
-    const withS = lower.endsWith("s") ? lower.slice(0, -1) : lower + "s";
+    const withS = lower.endsWith('s') ? lower.slice(0, -1) : lower + 's';
 
     // 1. Well-known apps (highest priority — exact match)
     if (this.wellKnown.has(lower)) {
@@ -181,7 +182,7 @@ export class AppResolver {
     }
 
     // 3. Check if input is already a package name
-    if (lower.includes(".") && lower.split(".").length >= 2) {
+    if (lower.includes('.') && lower.split('.').length >= 2) {
       // Verify it exists in installed apps
       const exists = this.apps.some((a) => a.packageName.toLowerCase() === lower);
       if (exists) return lower;
@@ -212,23 +213,25 @@ export class AppResolver {
   /** Get compact app list string for LLM context */
   getAppListForContext(): string {
     if (this.apps.length === 0) {
-      return "App list not available. Use well-known package names.";
+      return 'App list not available. Use well-known package names.';
     }
     // Filter to user-facing apps (exclude system/overlay packages)
     const userApps = this.apps.filter((a) => {
       const pkg = a.packageName;
-      return !pkg.includes("overlay") &&
-        !pkg.includes("systemui") &&
-        !pkg.includes("provider") &&
-        !pkg.includes("internal") &&
-        !pkg.startsWith("android.") &&
-        !pkg.includes(".SMT.") &&
-        !pkg.includes("navbar");
+      return (
+        !pkg.includes('overlay') &&
+        !pkg.includes('systemui') &&
+        !pkg.includes('provider') &&
+        !pkg.includes('internal') &&
+        !pkg.startsWith('android.') &&
+        !pkg.includes('.SMT.') &&
+        !pkg.includes('navbar')
+      );
     });
     return userApps
       .slice(0, 60)
       .map((a) => a.packageName)
-      .join(", ");
+      .join(', ');
   }
 }
 
@@ -236,15 +239,15 @@ function parseAppList(text: string): InstalledApp[] {
   const apps: InstalledApp[] = [];
 
   // Try to extract JSON — handle "Installed apps: [...]" prefix
-  const jsonStart = text.indexOf("[");
-  const jsonEnd = text.lastIndexOf("]");
+  const jsonStart = text.indexOf('[');
+  const jsonEnd = text.lastIndexOf(']');
   if (jsonStart !== -1 && jsonEnd !== -1) {
     try {
       const parsed = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
       if (Array.isArray(parsed)) {
         for (const item of parsed) {
-          const pkg = item.packageName || item.package || item.appPackage || "";
-          const label = item.label || item.appName || item.name || "";
+          const pkg = item.packageName || item.package || item.appPackage || '';
+          const label = item.label || item.appName || item.name || '';
           if (pkg) {
             apps.push({ packageName: pkg, label });
           }
@@ -257,12 +260,15 @@ function parseAppList(text: string): InstalledApp[] {
   }
 
   // Fallback: parse text format
-  const lines = text.split("\n");
+  const lines = text.split('\n');
   for (const line of lines) {
     const pkgMatch = line.match(/([a-zA-Z][a-zA-Z0-9_.]*\.[a-zA-Z][a-zA-Z0-9_.]+)/);
     if (pkgMatch) {
       const pkg = pkgMatch[1];
-      const label = line.replace(pkg, "").replace(/[:\-|]/g, "").trim();
+      const label = line
+        .replace(pkg, '')
+        .replace(/[:\-|]/g, '')
+        .trim();
       apps.push({ packageName: pkg, label: label || pkg });
     }
   }

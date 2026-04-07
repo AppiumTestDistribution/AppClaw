@@ -16,6 +16,7 @@ This skill reviews code changes in AppClaw to catch breakage across two surfaces
 ## Why this matters
 
 AppClaw has three main failure modes when code changes:
+
 1. **CLI ↔ Extension drift** — The CLI's `src/json-emitter.ts` defines event types. The extension's `vscode-extension/src/bridge.ts` mirrors those types manually. When someone adds a field to one side, the other silently ignores it, causing subtle bugs.
 2. **YAML flow parsing regressions** — Natural language parsing in `src/flow/natural-line.ts` uses regex patterns that interact in surprising ways. A change to one regex can break another flow format.
 3. **Config drift** — The CLI reads env vars via `src/config.ts` (Zod schema). The extension maps VS Code settings to env vars in `bridge.ts:getEnvFromSettings()`. New config options added to one side may not appear in the other.
@@ -38,18 +39,21 @@ Run `git diff` (staged + unstaged) and `git diff --cached` to see all pending ch
 If any shared contract files changed, or if extension/CLI files changed:
 
 **Event type check:**
+
 - Read `src/json-emitter.ts` (the `JsonEvent` type union)
 - Read `vscode-extension/src/bridge.ts` (the `AppclawEvent` type and individual event interfaces)
 - Compare every event variant — field names, types, optional vs required
 - Flag any mismatch (missing fields, type differences, new events not mirrored)
 
 **Config mapping check:**
+
 - Read `src/config.ts` (the Zod schema for env vars)
 - Read the `getEnvFromSettings()` function in `vscode-extension/src/bridge.ts`
 - Read `vscode-extension/package.json` contributes.configuration section
 - Verify every env var the CLI reads has a corresponding VS Code setting + mapping
 
 **Report format:**
+
 ```
 ## Cross-Surface Consistency
 

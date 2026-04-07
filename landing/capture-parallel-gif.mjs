@@ -14,18 +14,18 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FRAMES_DIR  = join(__dirname, '.frames-parallel');
-const OUTPUT_GIF  = join(__dirname, 'parallel-demo.gif');
-const HTML_FILE   = join(__dirname, 'parallel-demo.html');
+const FRAMES_DIR = join(__dirname, '.frames-parallel');
+const OUTPUT_GIF = join(__dirname, 'parallel-demo.gif');
+const HTML_FILE = join(__dirname, 'parallel-demo.html');
 
 // Animation: 4 devices connect, 9 steps each (staggered), hold result, fade
-const FPS          = 15;
+const FPS = 15;
 const DURATION_SEC = 22;
 const TOTAL_FRAMES = FPS * DURATION_SEC;
-const FRAME_MS     = 1000 / FPS;
+const FRAME_MS = 1000 / FPS;
 
 // Panel dimensions (must match parallel-demo.html body size)
-const WIDTH  = 720;
+const WIDTH = 720;
 const HEIGHT = 600;
 
 async function main() {
@@ -54,7 +54,7 @@ async function main() {
   await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 2 });
   await page.goto(`file://${HTML_FILE}`, { waitUntil: 'networkidle0' });
   await page.evaluate(() => document.fonts.ready);
-  await new Promise(r => setTimeout(r, 600)); // let initial render settle
+  await new Promise((r) => setTimeout(r, 600)); // let initial render settle
 
   for (let i = 0; i < TOTAL_FRAMES; i++) {
     const frameNum = String(i).padStart(4, '0');
@@ -63,7 +63,7 @@ async function main() {
       clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT },
       omitBackground: false,
     });
-    await new Promise(r => setTimeout(r, FRAME_MS));
+    await new Promise((r) => setTimeout(r, FRAME_MS));
     if (i % 30 === 0) console.log(`  frame ${i}/${TOTAL_FRAMES}`);
   }
 
@@ -74,16 +74,16 @@ async function main() {
 
   execSync(
     `ffmpeg -y -framerate ${FPS} -i "${FRAMES_DIR}/frame-%04d.png" ` +
-    `-vf "fps=${FPS},scale=${WIDTH}:-1:flags=lanczos,palettegen=max_colors=128:stats_mode=diff" ` +
-    `"${palette}"`,
+      `-vf "fps=${FPS},scale=${WIDTH}:-1:flags=lanczos,palettegen=max_colors=128:stats_mode=diff" ` +
+      `"${palette}"`,
     { stdio: 'pipe' }
   );
 
   execSync(
     `ffmpeg -y -framerate ${FPS} -i "${FRAMES_DIR}/frame-%04d.png" ` +
-    `-i "${palette}" ` +
-    `-lavfi "fps=${FPS},scale=${WIDTH}:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=3" ` +
-    `"${OUTPUT_GIF}"`,
+      `-i "${palette}" ` +
+      `-lavfi "fps=${FPS},scale=${WIDTH}:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=3" ` +
+      `"${OUTPUT_GIF}"`,
     { stdio: 'pipe' }
   );
 
@@ -94,7 +94,7 @@ async function main() {
   console.log(`   ${(size / 1024 / 1024).toFixed(2)} MB`);
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Error:', err.message);
   process.exit(1);
 });

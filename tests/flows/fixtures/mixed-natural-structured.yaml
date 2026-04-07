@@ -6,7 +6,7 @@ platform: android
 - wait: 2
 - click on Login button
 - type 'hello@world.com' in email field
-- tap: "Submit"
+- tap: 'Submit'
 - wait 3s
 - verify Dashboard is visible
 - done

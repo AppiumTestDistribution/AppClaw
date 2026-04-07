@@ -11,20 +11,17 @@ type UsageShape = {
 };
 
 function num(v: unknown): number | undefined {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
   return undefined;
 }
 
 /** Google generateContent usageMetadata (mixed camelCase / snake_case). */
 function fromGoogleUsageMetadata(meta: unknown): { input: number; output: number } | null {
-  if (!meta || typeof meta !== "object") return null;
+  if (!meta || typeof meta !== 'object') return null;
   const m = meta as Record<string, unknown>;
-  const prompt =
-    num(m.promptTokenCount) ?? num(m.prompt_token_count);
-  const candidates =
-    num(m.candidatesTokenCount) ?? num(m.candidates_token_count);
-  const thoughts =
-    num(m.thoughtsTokenCount) ?? num(m.thoughts_token_count) ?? 0;
+  const prompt = num(m.promptTokenCount) ?? num(m.prompt_token_count);
+  const candidates = num(m.candidatesTokenCount) ?? num(m.candidates_token_count);
+  const thoughts = num(m.thoughtsTokenCount) ?? num(m.thoughts_token_count) ?? 0;
   const total = num(m.totalTokenCount) ?? num(m.total_token_count);
 
   if (prompt != null || candidates != null) {
@@ -38,11 +35,11 @@ function fromGoogleUsageMetadata(meta: unknown): { input: number; output: number
 
 function bodyRecord(body: unknown): Record<string, unknown> | null {
   if (body == null) return null;
-  if (typeof body === "object" && !Array.isArray(body)) return body as Record<string, unknown>;
-  if (typeof body === "string") {
+  if (typeof body === 'object' && !Array.isArray(body)) return body as Record<string, unknown>;
+  if (typeof body === 'string') {
     try {
       const o = JSON.parse(body) as unknown;
-      return typeof o === "object" && o !== null && !Array.isArray(o)
+      return typeof o === 'object' && o !== null && !Array.isArray(o)
         ? (o as Record<string, unknown>)
         : null;
     } catch {
@@ -53,11 +50,11 @@ function bodyRecord(body: unknown): Record<string, unknown> | null {
 }
 
 function fromProviderMetadata(meta: unknown): { input: number; output: number } | null {
-  if (!meta || typeof meta !== "object") return null;
+  if (!meta || typeof meta !== 'object') return null;
   const root = meta as Record<string, unknown>;
-  for (const key of ["google", "vertex"]) {
+  for (const key of ['google', 'vertex']) {
     const block = root[key];
-    if (block && typeof block === "object") {
+    if (block && typeof block === 'object') {
       const u = (block as Record<string, unknown>).usageMetadata;
       const parsed = fromGoogleUsageMetadata(u);
       if (parsed) return parsed;

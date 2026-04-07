@@ -4,6 +4,6 @@ name: Structured Keys
 ---
 - launchApp
 - wait: 3
-- tap: "Login"
-- type: "user@example.com"
-- done: "Login complete"
+- tap: 'Login'
+- type: 'user@example.com'
+- done: 'Login complete'

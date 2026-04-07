@@ -9,19 +9,16 @@
  * 5. Return all collected text
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import { getPageSource } from "../mcp/tools.js";
-import type { ActionResult } from "../llm/schemas.js";
-import { detectPlatform } from "../perception/screen.js";
-import { parseAndroidPageSource } from "../perception/android-parser.js";
-import { parseIOSPageSource } from "../perception/ios-parser.js";
+import type { MCPClient } from '../mcp/types.js';
+import { getPageSource } from '../mcp/tools.js';
+import type { ActionResult } from '../llm/schemas.js';
+import { detectPlatform } from '../perception/screen.js';
+import { parseAndroidPageSource } from '../perception/android-parser.js';
+import { parseIOSPageSource } from '../perception/ios-parser.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function readScreen(
-  mcp: MCPClient,
-  maxScrolls: number = 5
-): Promise<ActionResult> {
+export async function readScreen(mcp: MCPClient, maxScrolls: number = 5): Promise<ActionResult> {
   const allTexts: Set<string> = new Set();
   let prevTextCount = 0;
   let scrollCount = 0;
@@ -31,9 +28,10 @@ export async function readScreen(
       // Get current screen elements
       const pageSource = await getPageSource(mcp);
       const platform = detectPlatform(pageSource);
-      const elements = platform === "android"
-        ? parseAndroidPageSource(pageSource)
-        : parseIOSPageSource(pageSource);
+      const elements =
+        platform === 'android'
+          ? parseAndroidPageSource(pageSource)
+          : parseIOSPageSource(pageSource);
 
       // Collect all text from elements
       for (const el of elements) {
@@ -51,13 +49,13 @@ export async function readScreen(
 
       // Scroll down for more content (skip on last iteration)
       if (i < maxScrolls) {
-        await mcp.callTool("appium_scroll", { direction: "down" });
+        await mcp.callTool('appium_scroll', { direction: 'down' });
         scrollCount++;
         await sleep(500);
       }
     }
 
-    const collectedText = Array.from(allTexts).join("\n");
+    const collectedText = Array.from(allTexts).join('\n');
 
     return {
       success: true,

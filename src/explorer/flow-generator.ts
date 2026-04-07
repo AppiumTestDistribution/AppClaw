@@ -6,17 +6,29 @@
  * executable YAML flows.
  */
 
-import { generateObject } from "ai";
-import { z } from "zod";
-import type { PRDAnalysis, ScreenGraph, GeneratedFlow } from "./types.js";
+import { generateObject } from 'ai';
+import { z } from 'zod';
+import type { PRDAnalysis, ScreenGraph, GeneratedFlow } from './types.js';
 
 const generatedFlowSchema = z.object({
-  flows: z.array(z.object({
-    comment: z.string().describe("A one-line comment describing what this flow does (will be placed as a YAML comment on the first line)"),
-    name: z.string().describe("Descriptive name for this test flow (e.g. 'YouTube — search Appium 3.0 and verify TestMu AI video')"),
-    steps: z.array(z.string()).describe("Ordered steps as natural language strings. Each string is one flow step."),
-  })),
-  reasoning: z.string().describe("Why these specific flows were chosen"),
+  flows: z.array(
+    z.object({
+      comment: z
+        .string()
+        .describe(
+          'A one-line comment describing what this flow does (will be placed as a YAML comment on the first line)'
+        ),
+      name: z
+        .string()
+        .describe(
+          "Descriptive name for this test flow (e.g. 'YouTube — search Appium 3.0 and verify TestMu AI video')"
+        ),
+      steps: z
+        .array(z.string())
+        .describe('Ordered steps as natural language strings. Each string is one flow step.'),
+    })
+  ),
+  reasoning: z.string().describe('Why these specific flows were chosen'),
 });
 
 const FLOW_GENERATOR_PROMPT = `You are a mobile test automation expert generating YAML flow files for AppClaw.
@@ -81,12 +93,12 @@ export async function generateFlows(
   numFlows: number,
   model: any,
   providerOptions?: Record<string, any>,
-  screenGraph?: ScreenGraph,
+  screenGraph?: ScreenGraph
 ): Promise<GeneratedFlow[]> {
   // Build context about available screens
-  let screenContext = "";
+  let screenContext = '';
   if (screenGraph && screenGraph.screens.length > 0) {
-    screenContext = "\n\n## Real Device Screen Data\n";
+    screenContext = '\n\n## Real Device Screen Data\n';
     screenContext += `Discovered ${screenGraph.screens.length} screens with ${screenGraph.transitions.length} transitions.\n\n`;
 
     for (const screen of screenGraph.screens) {
@@ -94,16 +106,17 @@ export async function generateFlows(
       if (screen.reachedVia) {
         screenContext += `Reached via: ${screen.reachedVia.action} from ${screen.reachedVia.fromScreen}\n`;
       }
-      screenContext += `Visible texts: ${screen.visibleTexts.slice(0, 20).join(", ")}\n`;
-      screenContext += `Tappable elements: ${screen.tappableElements.map(e => `"${e.label}" (${e.type})`).join(", ")}\n\n`;
+      screenContext += `Visible texts: ${screen.visibleTexts.slice(0, 20).join(', ')}\n`;
+      screenContext += `Tappable elements: ${screen.tappableElements.map((e) => `"${e.label}" (${e.type})`).join(', ')}\n\n`;
     }
 
-    screenContext += "### Navigation Paths\n";
+    screenContext += '### Navigation Paths\n';
     for (const t of screenGraph.transitions) {
       screenContext += `- ${t.fromScreen} → tap "${t.element}" → ${t.toScreen}\n`;
     }
 
-    screenContext += "\nIMPORTANT: Use the REAL element labels from screen data above. They are the actual UI labels on the device.";
+    screenContext +=
+      '\nIMPORTANT: Use the REAL element labels from screen data above. They are the actual UI labels on the device.';
   }
 
   // Build journey context
@@ -112,23 +125,27 @@ export async function generateFlows(
       const priority = { high: 0, medium: 1, low: 2 };
       return priority[a.priority] - priority[b.priority];
     })
-    .map((j, i) => `${i + 1}. [${j.priority}] ${j.name}: ${j.description}\n   Steps: ${j.steps.join(" → ")}`)
-    .join("\n");
+    .map(
+      (j, i) =>
+        `${i + 1}. [${j.priority}] ${j.name}: ${j.description}\n   Steps: ${j.steps.join(' → ')}`
+    )
+    .join('\n');
 
   const featureContext = analysis.features
-    .map(f => `- ${f.name}: ${f.description} (elements: ${f.expectedElements.join(", ")})`)
-    .join("\n");
+    .map((f) => `- ${f.name}: ${f.description} (elements: ${f.expectedElements.join(', ')})`)
+    .join('\n');
 
   const { object } = await generateObject({
     model,
     schema: generatedFlowSchema,
     system: FLOW_GENERATOR_PROMPT,
-    messages: [{
-      role: "user",
-      content: `Generate exactly ${numFlows} YAML test flows for this mobile app.
+    messages: [
+      {
+        role: 'user',
+        content: `Generate exactly ${numFlows} YAML test flows for this mobile app.
 
 ## App: ${analysis.appName}
-${analysis.appId ? `Package: ${analysis.appId}` : ""}
+${analysis.appId ? `Package: ${analysis.appId}` : ''}
 Platform: ${analysis.platform}
 
 ## Features
@@ -142,7 +159,8 @@ Generate ${numFlows} diverse flows covering the most important journeys. Include
 - Core happy-path flows (high priority journeys)
 - Secondary feature flows
 - At least one edge case or error recovery flow if applicable`,
-    }],
+      },
+    ],
     ...(providerOptions ? { providerOptions } : {}),
   });
 
@@ -156,21 +174,21 @@ Generate ${numFlows} diverse flows covering the most important journeys. Include
     const lines: string[] = [];
     lines.push(`# ${flow.comment}`);
     lines.push(`name: ${flow.name}`);
-    lines.push("---");
+    lines.push('---');
     for (const step of flow.steps) {
       lines.push(`- ${step}`);
     }
 
     // Auto-append "done" if the last step isn't already a done step
     const lastStep = flow.steps[flow.steps.length - 1];
-    if (!lastStep || !lastStep.toLowerCase().startsWith("done")) {
-      lines.push("- done");
+    if (!lastStep || !lastStep.toLowerCase().startsWith('done')) {
+      lines.push('- done');
     }
 
     return {
       name: flow.name,
       description: flow.comment,
-      yamlContent: lines.join("\n"),
+      yamlContent: lines.join('\n'),
       journey: analysis.userJourneys[i]?.name ?? flow.name,
     };
   });

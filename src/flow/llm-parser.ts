@@ -5,45 +5,45 @@
  * and gets back a concrete FlowStep. Supports any language or phrasing.
  */
 
-import { generateObject } from "ai";
-import { z } from "zod";
-import { buildModel } from "../llm/provider.js";
-import { Config } from "../config.js";
-import type { FlowStep } from "./types.js";
+import { generateObject } from 'ai';
+import { z } from 'zod';
+import { buildModel } from '../llm/provider.js';
+import { Config } from '../config.js';
+import type { FlowStep } from './types.js';
 
-const stepSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("openApp"), query: z.string().describe("App name to open") }),
-  z.object({ kind: z.literal("tap"), label: z.string().describe("Element label/text to tap") }),
+const stepSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('openApp'), query: z.string().describe('App name to open') }),
+  z.object({ kind: z.literal('tap'), label: z.string().describe('Element label/text to tap') }),
   z.object({
-    kind: z.literal("type"),
-    text: z.string().describe("Text to type"),
-    target: z.string().optional().describe("Target field to type into"),
+    kind: z.literal('type'),
+    text: z.string().describe('Text to type'),
+    target: z.string().optional().describe('Target field to type into'),
   }),
-  z.object({ kind: z.literal("enter") }),
-  z.object({ kind: z.literal("back") }),
-  z.object({ kind: z.literal("home") }),
+  z.object({ kind: z.literal('enter') }),
+  z.object({ kind: z.literal('back') }),
+  z.object({ kind: z.literal('home') }),
   z.object({
-    kind: z.literal("swipe"),
-    direction: z.enum(["up", "down", "left", "right"]),
+    kind: z.literal('swipe'),
+    direction: z.enum(['up', 'down', 'left', 'right']),
     repeat: z.number().optional(),
   }),
-  z.object({ kind: z.literal("wait"), seconds: z.number().describe("Seconds to wait, default 2") }),
+  z.object({ kind: z.literal('wait'), seconds: z.number().describe('Seconds to wait, default 2') }),
   z.object({
-    kind: z.literal("waitUntil"),
-    condition: z.enum(["visible", "gone", "screenLoaded"]),
-    text: z.string().optional().describe("Text/element to wait for (not needed for screenLoaded)"),
-    timeoutSeconds: z.number().describe("Timeout in seconds, default 10"),
+    kind: z.literal('waitUntil'),
+    condition: z.enum(['visible', 'gone', 'screenLoaded']),
+    text: z.string().optional().describe('Text/element to wait for (not needed for screenLoaded)'),
+    timeoutSeconds: z.number().describe('Timeout in seconds, default 10'),
   }),
-  z.object({ kind: z.literal("assert"), text: z.string().describe("Text to verify is visible") }),
+  z.object({ kind: z.literal('assert'), text: z.string().describe('Text to verify is visible') }),
   z.object({
-    kind: z.literal("scrollAssert"),
+    kind: z.literal('scrollAssert'),
     text: z.string(),
-    direction: z.enum(["up", "down", "left", "right"]),
+    direction: z.enum(['up', 'down', 'left', 'right']),
     maxScrolls: z.number(),
   }),
-  z.object({ kind: z.literal("getInfo"), query: z.string() }),
-  z.object({ kind: z.literal("done"), message: z.string().optional() }),
-  z.object({ kind: z.literal("launchApp") }),
+  z.object({ kind: z.literal('getInfo'), query: z.string() }),
+  z.object({ kind: z.literal('done'), message: z.string().optional() }),
+  z.object({ kind: z.literal('launchApp') }),
 ]);
 
 const SYSTEM_PROMPT =
@@ -77,7 +77,7 @@ export async function resolveNaturalStep(instruction: string): Promise<FlowStep>
     prompt: instruction,
     providerOptions: {
       google: { thinkingConfig: { thinkingBudget: 0 } },
-      anthropic: { thinking: { type: "disabled" } },
+      anthropic: { thinking: { type: 'disabled' } },
     },
   });
 

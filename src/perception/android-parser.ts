@@ -3,13 +3,13 @@
  * Parse Android UiAutomator2 page source XML from Appium into UIElement trees.
  */
 
-import { XMLParser } from "fast-xml-parser";
-import type { UIElement } from "./types.js";
+import { XMLParser } from 'fast-xml-parser';
+import type { UIElement } from './types.js';
 
 export function parseAndroidPageSource(xmlContent: string): UIElement[] {
   const parser = new XMLParser({
     ignoreAttributes: false,
-    attributeNamePrefix: "@_",
+    attributeNamePrefix: '@_',
     allowBooleanAttributes: true,
   });
 
@@ -17,49 +17,49 @@ export function parseAndroidPageSource(xmlContent: string): UIElement[] {
   try {
     parsed = parser.parse(xmlContent);
   } catch {
-    console.warn("Warning: Error parsing Android XML. The screen might be loading.");
+    console.warn('Warning: Error parsing Android XML. The screen might be loading.');
     return [];
   }
 
   const elements: UIElement[] = [];
 
   function walk(node: any, parentLabel: string, depth: number): void {
-    if (!node || typeof node !== "object") return;
+    if (!node || typeof node !== 'object') return;
 
-    if (node["@_bounds"]) {
-      const isClickable = node["@_clickable"] === "true";
-      const isLongClickable = node["@_long-clickable"] === "true";
-      const isScrollable = node["@_scrollable"] === "true";
-      const isEnabled = node["@_enabled"] !== "false";
-      const isChecked = node["@_checked"] === "true";
-      const isFocused = node["@_focused"] === "true";
-      const isSelected = node["@_selected"] === "true";
+    if (node['@_bounds']) {
+      const isClickable = node['@_clickable'] === 'true';
+      const isLongClickable = node['@_long-clickable'] === 'true';
+      const isScrollable = node['@_scrollable'] === 'true';
+      const isEnabled = node['@_enabled'] !== 'false';
+      const isChecked = node['@_checked'] === 'true';
+      const isFocused = node['@_focused'] === 'true';
+      const isSelected = node['@_selected'] === 'true';
 
-      const elementClass: string = node["@_class"] ?? "";
+      const elementClass: string = node['@_class'] ?? '';
       const isEditable =
-        elementClass.includes("EditText") ||
-        elementClass.includes("AutoCompleteTextView") ||
-        node["@_editable"] === "true";
+        elementClass.includes('EditText') ||
+        elementClass.includes('AutoCompleteTextView') ||
+        node['@_editable'] === 'true';
 
-      const text: string = node["@_text"] ?? "";
-      const desc: string = node["@_content-desc"] ?? "";
-      const resourceId: string = node["@_resource-id"] ?? "";
-      const hint: string = node["@_hint"] ?? "";
+      const text: string = node['@_text'] ?? '';
+      const desc: string = node['@_content-desc'] ?? '';
+      const resourceId: string = node['@_resource-id'] ?? '';
+      const hint: string = node['@_hint'] ?? '';
 
-      const typeName = elementClass.split(".").pop() ?? "";
-      const nodeLabel = text || desc || resourceId.split("/").pop() || typeName;
+      const typeName = elementClass.split('.').pop() ?? '';
+      const nodeLabel = text || desc || resourceId.split('/').pop() || typeName;
 
       const isInteractive = isClickable || isEditable || isLongClickable || isScrollable;
       const hasContent = !!(text || desc);
 
       if (isInteractive || hasContent) {
-        const bounds: string = node["@_bounds"];
+        const bounds: string = node['@_bounds'];
         try {
           const coords = bounds
-            .replace("][", ",")
-            .replace("[", "")
-            .replace("]", "")
-            .split(",")
+            .replace('][', ',')
+            .replace('[', '')
+            .replace(']', '')
+            .split(',')
             .map(Number);
 
           const [x1, y1, x2, y2] = coords;
@@ -70,16 +70,16 @@ export function parseAndroidPageSource(xmlContent: string): UIElement[] {
             const centerX = Math.floor((x1 + x2) / 2);
             const centerY = Math.floor((y1 + y2) / 2);
 
-            let suggestedAction: UIElement["action"];
-            if (isEditable) suggestedAction = "type";
-            else if (isLongClickable && !isClickable) suggestedAction = "longpress";
-            else if (isScrollable && !isClickable) suggestedAction = "scroll";
-            else if (isClickable) suggestedAction = "tap";
-            else suggestedAction = "read";
+            let suggestedAction: UIElement['action'];
+            if (isEditable) suggestedAction = 'type';
+            else if (isLongClickable && !isClickable) suggestedAction = 'longpress';
+            else if (isScrollable && !isClickable) suggestedAction = 'scroll';
+            else if (isClickable) suggestedAction = 'tap';
+            else suggestedAction = 'read';
 
             elements.push({
               id: resourceId,
-              accessibilityId: desc || resourceId.split("/").pop() || "",
+              accessibilityId: desc || resourceId.split('/').pop() || '',
               text: text || desc,
               type: typeName,
               bounds,
@@ -97,7 +97,7 @@ export function parseAndroidPageSource(xmlContent: string): UIElement[] {
               action: suggestedAction,
               parent: parentLabel,
               depth,
-              platform: "android",
+              platform: 'android',
             });
           }
         } catch {
@@ -115,16 +115,16 @@ export function parseAndroidPageSource(xmlContent: string): UIElement[] {
   function walkChildren(node: any, parentLabel: string, depth: number): void {
     // Appium page source nests children directly as element type keys
     for (const key of Object.keys(node)) {
-      if (key.startsWith("@_")) continue; // skip attributes
+      if (key.startsWith('@_')) continue; // skip attributes
       const child = node[key];
       if (Array.isArray(child)) {
         for (const item of child) walk(item, parentLabel, depth);
-      } else if (typeof child === "object" && child !== null) {
+      } else if (typeof child === 'object' && child !== null) {
         walk(child, parentLabel, depth);
       }
     }
   }
 
-  walk(parsed, "root", 0);
+  walk(parsed, 'root', 0);
   return elements;
 }

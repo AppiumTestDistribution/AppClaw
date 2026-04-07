@@ -1,0 +1,12 @@
+{
+  "name": "appclaw-landing",
+  "private": true,
+  "description": "Static marketing site — deploy to Cloudflare Pages",
+  "scripts": {
+    "deploy": "wrangler pages deploy . --project-name=appclaw-landing",
+    "deploy:prod": "wrangler pages deploy . --project-name=appclaw --branch=main"
+  },
+  "devDependencies": {
+    "wrangler": "^4.80.0"
+  }
+}

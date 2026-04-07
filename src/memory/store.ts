@@ -5,14 +5,14 @@
  * Supports atomic writes, per-app eviction, and confidence decay.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { homedir } from "node:os";
-import { randomUUID } from "node:crypto";
-import type { TrajectoryEntry, TrajectoryStore } from "./types.js";
+import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { homedir } from 'node:os';
+import { randomUUID } from 'node:crypto';
+import type { TrajectoryEntry, TrajectoryStore } from './types.js';
 
-const DEFAULT_STORE_DIR = join(homedir(), ".appclaw");
-const DEFAULT_STORE_FILE = "trajectories.json";
+const DEFAULT_STORE_DIR = join(homedir(), '.appclaw');
+const DEFAULT_STORE_FILE = 'trajectories.json';
 const MAX_ENTRIES_PER_APP = 100;
 /** Confidence half-life in days — older entries decay */
 const HALF_LIFE_DAYS = 30;
@@ -26,7 +26,7 @@ function getStorePath(overridePath?: string): string {
 export function loadStore(overridePath?: string): TrajectoryStore {
   const path = getStorePath(overridePath);
   try {
-    const raw = readFileSync(path, "utf-8");
+    const raw = readFileSync(path, 'utf-8');
     const parsed = JSON.parse(raw);
     if (parsed?.version === 1 && Array.isArray(parsed.entries)) {
       return parsed as TrajectoryStore;
@@ -43,8 +43,8 @@ export function saveStore(store: TrajectoryStore, overridePath?: string): void {
   const dir = dirname(path);
   mkdirSync(dir, { recursive: true });
 
-  const tmp = path + ".tmp." + process.pid;
-  writeFileSync(tmp, JSON.stringify(store, null, 2), "utf-8");
+  const tmp = path + '.tmp.' + process.pid;
+  writeFileSync(tmp, JSON.stringify(store, null, 2), 'utf-8');
   renameSync(tmp, path);
 }
 
@@ -58,9 +58,8 @@ export function getEffectiveConfidence(entry: TrajectoryEntry): number {
   const timeDecay = Math.exp(-ageDays / HALF_LIFE_DAYS);
   // Reliability: penalize failures but don't punish new entries.
   // 1 success, 0 fails → 1.0. 1 success, 1 fail → 0.5. 3 success, 1 fail → 0.75.
-  const reliability = entry.failCount === 0
-    ? 1.0
-    : entry.successCount / (entry.successCount + entry.failCount);
+  const reliability =
+    entry.failCount === 0 ? 1.0 : entry.successCount / (entry.successCount + entry.failCount);
   return entry.confidence * timeDecay * reliability;
 }
 
@@ -73,7 +72,7 @@ export function getEffectiveConfidence(entry: TrajectoryEntry): number {
  */
 export function addTrajectory(
   store: TrajectoryStore,
-  entry: Omit<TrajectoryEntry, "id" | "timestamp" | "confidence" | "successCount" | "failCount">
+  entry: Omit<TrajectoryEntry, 'id' | 'timestamp' | 'confidence' | 'successCount' | 'failCount'>
 ): TrajectoryStore {
   // Check for existing match — same app, screen, and tool action.
   // For vision mode, selectors are natural-language descriptions that vary
@@ -81,7 +80,7 @@ export function addTrajectory(
   // Match on: platform + app + screen fingerprint + tool name (NOT exact selector).
   // When a match is found, keep the selector with the highest successCount.
   const existing = store.entries.find(
-    e =>
+    (e) =>
       e.platform === entry.platform &&
       e.appId === entry.appId &&
       e.screenFingerprint === entry.screenFingerprint &&
@@ -114,14 +113,14 @@ export function addTrajectory(
   store.entries.push(full);
 
   // Evict if over per-app limit
-  const appEntries = store.entries.filter(e => e.appId === entry.appId);
+  const appEntries = store.entries.filter((e) => e.appId === entry.appId);
   if (appEntries.length > MAX_ENTRIES_PER_APP) {
     // Sort by effective confidence, remove the weakest
     appEntries.sort((a, b) => getEffectiveConfidence(a) - getEffectiveConfidence(b));
     const toRemove = new Set(
-      appEntries.slice(0, appEntries.length - MAX_ENTRIES_PER_APP).map(e => e.id)
+      appEntries.slice(0, appEntries.length - MAX_ENTRIES_PER_APP).map((e) => e.id)
     );
-    store.entries = store.entries.filter(e => !toRemove.has(e.id));
+    store.entries = store.entries.filter((e) => !toRemove.has(e.id));
   }
 
   return store;
@@ -134,7 +133,7 @@ export function addTrajectory(
  * If confidence drops below 0.1, the entry is removed.
  */
 export function markStale(store: TrajectoryStore, entryId: string): TrajectoryStore {
-  const entry = store.entries.find(e => e.id === entryId);
+  const entry = store.entries.find((e) => e.id === entryId);
   if (!entry) return store;
 
   entry.failCount += 1;
@@ -142,7 +141,7 @@ export function markStale(store: TrajectoryStore, entryId: string): TrajectorySt
 
   // Remove if effectively dead
   if (getEffectiveConfidence(entry) < 0.05) {
-    store.entries = store.entries.filter(e => e.id !== entryId);
+    store.entries = store.entries.filter((e) => e.id !== entryId);
   }
 
   return store;

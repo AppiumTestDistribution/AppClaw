@@ -2,10 +2,10 @@
  * Session logger — writes step-by-step execution logs to disk.
  */
 
-import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { join } from "path";
-import type { AgentResult, StepRecord } from "./agent/loop.js";
-import * as ui from "./ui/terminal.js";
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
+import type { AgentResult, StepRecord } from './agent/loop.js';
+import * as ui from './ui/terminal.js';
 
 export class SessionLogger {
   private logDir: string;
@@ -14,7 +14,7 @@ export class SessionLogger {
 
   constructor(logDir: string) {
     this.logDir = logDir;
-    this.sessionId = new Date().toISOString().replace(/[:.]/g, "-");
+    this.sessionId = new Date().toISOString().replace(/[:.]/g, '-');
     if (!existsSync(logDir)) {
       mkdirSync(logDir, { recursive: true });
     }
@@ -38,7 +38,7 @@ export class SessionLogger {
     const filename = `${this.sessionId}.json`;
     const filepath = join(this.logDir, filename);
     writeFileSync(filepath, JSON.stringify(log, null, 2));
-    ui.printFileSaved("Session log:", filepath);
+    ui.printFileSaved('Session log:', filepath);
     return filepath;
   }
 }

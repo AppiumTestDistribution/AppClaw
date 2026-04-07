@@ -8,7 +8,7 @@
  * Typical compression: 50KB raw XML → 3-8KB trimmed (~800-2000 tokens).
  */
 
-import { XMLParser } from "fast-xml-parser";
+import { XMLParser } from 'fast-xml-parser';
 
 interface TrimmedNode {
   tag: string;
@@ -32,12 +32,12 @@ export interface TrimDOMResult {
  */
 export function trimDOM(
   xmlContent: string,
-  platform: "android" | "ios",
+  platform: 'android' | 'ios',
   maxElements: number = 80
 ): TrimDOMResult {
   const parser = new XMLParser({
     ignoreAttributes: false,
-    attributeNamePrefix: "@_",
+    attributeNamePrefix: '@_',
     allowBooleanAttributes: true,
   });
 
@@ -45,12 +45,16 @@ export function trimDOM(
   try {
     parsed = parser.parse(xmlContent);
   } catch {
-    return { xml: "<screen><!-- Failed to parse page source --></screen>", elementCount: 0, editableCount: 0 };
+    return {
+      xml: '<screen><!-- Failed to parse page source --></screen>',
+      elementCount: 0,
+      editableCount: 0,
+    };
   }
 
   const nodes: TrimmedNode[] = [];
 
-  if (platform === "android") {
+  if (platform === 'android') {
     walkAndroid(parsed, nodes);
   } else {
     walkIOS(parsed, nodes);
@@ -64,20 +68,21 @@ export function trimDOM(
   // This gives the LLM instant awareness of screen complexity (~15 tokens)
   // without an extra LLM call — a lightweight "room label".
   const interactiveCount = top.filter(
-    n => n.attrs.clickable === "true" || n.attrs.editable === "true" || n.attrs.scrollable === "true"
+    (n) =>
+      n.attrs.clickable === 'true' || n.attrs.editable === 'true' || n.attrs.scrollable === 'true'
   ).length;
-  const editableCount = top.filter(n => n.attrs.editable === "true").length;
+  const editableCount = top.filter((n) => n.attrs.editable === 'true').length;
 
   // Build compact XML with element numbering
   const lines = top.map((node, i) => {
     const attrs = Object.entries(node.attrs)
       .map(([k, v]) => `${k}="${escapeXml(v)}"`)
-      .join(" ");
+      .join(' ');
     return `<${node.tag} idx="${i + 1}" ${attrs}/>`;
   });
 
   return {
-    xml: `<screen elements="${top.length}" interactive="${interactiveCount}" editable="${editableCount}">\n${lines.join("\n")}\n</screen>`,
+    xml: `<screen elements="${top.length}" interactive="${interactiveCount}" editable="${editableCount}">\n${lines.join('\n')}\n</screen>`,
     elementCount: top.length,
     editableCount,
   };
@@ -99,35 +104,35 @@ export function extractTexts(xmlContent: string): string[] {
 
 // ─── Android walker ─────────────────────────────────────
 
-function walkAndroid(node: any, result: TrimmedNode[], parentContext: string = ""): void {
-  if (!node || typeof node !== "object") return;
+function walkAndroid(node: any, result: TrimmedNode[], parentContext: string = ''): void {
+  if (!node || typeof node !== 'object') return;
 
-  if (node["@_bounds"]) {
-    const className: string = node["@_class"] ?? "";
-    const tag = className.split(".").pop() || "View";
-    const text: string = node["@_text"] ?? "";
-    const desc: string = node["@_content-desc"] ?? "";
-    const resourceId: string = node["@_resource-id"] ?? "";
-    const hint: string = node["@_hint"] ?? "";
-    const bounds: string = node["@_bounds"];
+  if (node['@_bounds']) {
+    const className: string = node['@_class'] ?? '';
+    const tag = className.split('.').pop() || 'View';
+    const text: string = node['@_text'] ?? '';
+    const desc: string = node['@_content-desc'] ?? '';
+    const resourceId: string = node['@_resource-id'] ?? '';
+    const hint: string = node['@_hint'] ?? '';
+    const bounds: string = node['@_bounds'];
 
-    const clickable = node["@_clickable"] === "true";
-    const enabled = node["@_enabled"] !== "false";
-    const focused = node["@_focused"] === "true";
-    const scrollable = node["@_scrollable"] === "true";
-    const checked = node["@_checked"] === "true";
+    const clickable = node['@_clickable'] === 'true';
+    const enabled = node['@_enabled'] !== 'false';
+    const focused = node['@_focused'] === 'true';
+    const scrollable = node['@_scrollable'] === 'true';
+    const checked = node['@_checked'] === 'true';
     const editable =
-      className.includes("EditText") ||
-      className.includes("AutoCompleteTextView") ||
-      node["@_editable"] === "true";
+      className.includes('EditText') ||
+      className.includes('AutoCompleteTextView') ||
+      node['@_editable'] === 'true';
 
     // Parse bounds to skip zero-size elements
     try {
       const coords = bounds
-        .replace("][", ",")
-        .replace("[", "")
-        .replace("]", "")
-        .split(",")
+        .replace('][', ',')
+        .replace('[', '')
+        .replace(']', '')
+        .split(',')
         .map(Number);
       const width = coords[2] - coords[0];
       const height = coords[3] - coords[1];
@@ -141,8 +146,8 @@ function walkAndroid(node: any, result: TrimmedNode[], parentContext: string = "
     }
 
     // Determine context label to pass to children
-    const ridShort = resourceId.includes("/") ? resourceId.split("/").pop()! : resourceId;
-    const contextLabel = desc || ridShort || "";
+    const ridShort = resourceId.includes('/') ? resourceId.split('/').pop()! : resourceId;
+    const contextLabel = desc || ridShort || '';
     const childContext = contextLabel ? contextLabel.slice(0, 30) : parentContext;
 
     const isInteractive = clickable || editable || scrollable;
@@ -166,12 +171,12 @@ function walkAndroid(node: any, result: TrimmedNode[], parentContext: string = "
       if (desc) attrs.desc = desc;
       if (hint) attrs.hint = hint;
       attrs.bounds = bounds;
-      if (clickable) attrs.clickable = "true";
-      if (!enabled) attrs.enabled = "false";
-      if (focused) attrs.focused = "true";
-      if (scrollable) attrs.scrollable = "true";
-      if (checked) attrs.checked = "true";
-      if (editable) attrs.editable = "true";
+      if (clickable) attrs.clickable = 'true';
+      if (!enabled) attrs.enabled = 'false';
+      if (focused) attrs.focused = 'true';
+      if (scrollable) attrs.scrollable = 'true';
+      if (checked) attrs.checked = 'true';
+      if (editable) attrs.editable = 'true';
       // Add parent context for disambiguation
       if (parentContext && parentContext !== ridShort && parentContext !== desc) {
         attrs.in = parentContext;
@@ -187,13 +192,13 @@ function walkAndroid(node: any, result: TrimmedNode[], parentContext: string = "
   walkChildrenAndroid(node, result, parentContext);
 }
 
-function walkChildrenAndroid(node: any, result: TrimmedNode[], parentContext: string = ""): void {
+function walkChildrenAndroid(node: any, result: TrimmedNode[], parentContext: string = ''): void {
   for (const key of Object.keys(node)) {
-    if (key.startsWith("@_")) continue;
+    if (key.startsWith('@_')) continue;
     const child = node[key];
     if (Array.isArray(child)) {
       for (const item of child) walkAndroid(item, result, parentContext);
-    } else if (typeof child === "object" && child !== null) {
+    } else if (typeof child === 'object' && child !== null) {
       walkAndroid(child, result, parentContext);
     }
   }
@@ -201,48 +206,45 @@ function walkChildrenAndroid(node: any, result: TrimmedNode[], parentContext: st
 
 // ─── iOS walker ─────────────────────────────────────────
 
-function walkIOS(node: any, result: TrimmedNode[], parentContext: string = ""): void {
-  if (!node || typeof node !== "object") return;
+function walkIOS(node: any, result: TrimmedNode[], parentContext: string = ''): void {
+  if (!node || typeof node !== 'object') return;
 
-  const hasPosition = node["@_x"] !== undefined && node["@_y"] !== undefined;
+  const hasPosition = node['@_x'] !== undefined && node['@_y'] !== undefined;
 
   if (hasPosition) {
-    const x = parseInt(node["@_x"] ?? "0", 10);
-    const y = parseInt(node["@_y"] ?? "0", 10);
-    const width = parseInt(node["@_width"] ?? "0", 10);
-    const height = parseInt(node["@_height"] ?? "0", 10);
+    const x = parseInt(node['@_x'] ?? '0', 10);
+    const y = parseInt(node['@_y'] ?? '0', 10);
+    const width = parseInt(node['@_width'] ?? '0', 10);
+    const height = parseInt(node['@_height'] ?? '0', 10);
 
     if (width <= 0 || height <= 0) {
       walkChildrenIOS(node, result, parentContext);
       return;
     }
 
-    const elementType: string = node["@_type"] ?? "";
-    const tag = elementType.replace("XCUIElementType", "") || "View";
-    const label: string = node["@_label"] ?? "";
-    const name: string = node["@_name"] ?? "";
-    const value: string = node["@_value"] ?? "";
-    const hint: string = node["@_placeholderValue"] ?? "";
+    const elementType: string = node['@_type'] ?? '';
+    const tag = elementType.replace('XCUIElementType', '') || 'View';
+    const label: string = node['@_label'] ?? '';
+    const name: string = node['@_name'] ?? '';
+    const value: string = node['@_value'] ?? '';
+    const hint: string = node['@_placeholderValue'] ?? '';
 
-    const isVisible = node["@_visible"] !== "false";
-    const isEnabled = node["@_enabled"] !== "false";
-    const isAccessible = node["@_accessible"] === "true";
-    const isFocused = node["@_hasFocus"] === "true";
-    const isSelected = node["@_selected"] === "true";
+    const isVisible = node['@_visible'] !== 'false';
+    const isEnabled = node['@_enabled'] !== 'false';
+    const isAccessible = node['@_accessible'] === 'true';
+    const isFocused = node['@_hasFocus'] === 'true';
+    const isSelected = node['@_selected'] === 'true';
 
-    const editableTypes = ["TextField", "SecureTextField", "TextEditor", "SearchField"];
+    const editableTypes = ['TextField', 'SecureTextField', 'TextEditor', 'SearchField'];
     const editable = editableTypes.some((t) => tag.includes(t));
     const clickable =
       isAccessible ||
-      ["Button", "Cell", "Link", "Switch", "Slider", "Tab"].some((t) => tag.includes(t));
-    const scrollable = ["ScrollView", "Table", "CollectionView"].some((t) =>
-      tag.includes(t)
-    );
-    const checked =
-      value === "1" && (tag === "Switch" || tag === "CheckBox");
+      ['Button', 'Cell', 'Link', 'Switch', 'Slider', 'Tab'].some((t) => tag.includes(t));
+    const scrollable = ['ScrollView', 'Table', 'CollectionView'].some((t) => tag.includes(t));
+    const checked = value === '1' && (tag === 'Switch' || tag === 'CheckBox');
 
     // Determine context label to pass to children
-    const contextLabel = name || label || "";
+    const contextLabel = name || label || '';
     const childContext = contextLabel ? contextLabel.slice(0, 30) : parentContext;
 
     const displayText = label || name || value;
@@ -264,13 +266,13 @@ function walkIOS(node: any, result: TrimmedNode[], parentContext: string = ""): 
       if (value && value !== label) attrs.value = value;
       if (hint) attrs.hint = hint;
       attrs.bounds = `[${x},${y}][${x + width},${y + height}]`;
-      if (clickable) attrs.clickable = "true";
-      if (!isEnabled) attrs.enabled = "false";
-      if (isFocused) attrs.focused = "true";
-      if (scrollable) attrs.scrollable = "true";
-      if (checked) attrs.checked = "true";
-      if (editable) attrs.editable = "true";
-      if (isSelected) attrs.selected = "true";
+      if (clickable) attrs.clickable = 'true';
+      if (!isEnabled) attrs.enabled = 'false';
+      if (isFocused) attrs.focused = 'true';
+      if (scrollable) attrs.scrollable = 'true';
+      if (checked) attrs.checked = 'true';
+      if (editable) attrs.editable = 'true';
+      if (isSelected) attrs.selected = 'true';
       // Add parent context for disambiguation
       if (parentContext && parentContext !== name && parentContext !== label) {
         attrs.in = parentContext;
@@ -286,13 +288,13 @@ function walkIOS(node: any, result: TrimmedNode[], parentContext: string = ""): 
   walkChildrenIOS(node, result, parentContext);
 }
 
-function walkChildrenIOS(node: any, result: TrimmedNode[], parentContext: string = ""): void {
+function walkChildrenIOS(node: any, result: TrimmedNode[], parentContext: string = ''): void {
   for (const key of Object.keys(node)) {
-    if (key.startsWith("@_")) continue;
+    if (key.startsWith('@_')) continue;
     const child = node[key];
     if (Array.isArray(child)) {
       for (const item of child) walkIOS(item, result, parentContext);
-    } else if (typeof child === "object" && child !== null) {
+    } else if (typeof child === 'object' && child !== null) {
       walkIOS(child, result, parentContext);
     }
   }
@@ -302,8 +304,8 @@ function walkChildrenIOS(node: any, result: TrimmedNode[], parentContext: string
 
 function escapeXml(str: string): string {
   return str
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }

@@ -6,10 +6,10 @@
  * and executes them directly via MCP tools.
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import { activateAppWithFallback } from "../mcp/activate-app.js";
-import type { AppResolver } from "./app-resolver.js";
-import * as ui from "../ui/terminal.js";
+import type { MCPClient } from '../mcp/types.js';
+import { activateAppWithFallback } from '../mcp/activate-app.js';
+import type { AppResolver } from './app-resolver.js';
+import * as ui from '../ui/terminal.js';
 
 export interface PreprocessResult {
   handled: boolean;
@@ -37,13 +37,13 @@ export async function preprocessAction(
   );
   if (compoundMatch) {
     // Strip trailing "app"/"application" from capture if regex didn't consume it
-    const appName = compoundMatch[1].replace(/\s+(?:app|application)$/i, "").trim();
+    const appName = compoundMatch[1].replace(/\s+(?:app|application)$/i, '').trim();
     const packageId = appResolver.resolve(appName);
     if (packageId) {
       ui.printStepDetail(`activateApp("${packageId}") for "${appName}"`);
       const r = await activateAppWithFallback(mcp, packageId);
       if (r.success) {
-        return { handled: true, action: "launch", message: `Launched ${appName} (${packageId})` };
+        return { handled: true, action: 'launch', message: `Launched ${appName} (${packageId})` };
       }
       return { handled: false };
     }
@@ -58,9 +58,9 @@ export async function preprocessAction(
 
     // Check if it's a URL
     if (/^https?:\/\//i.test(appName)) {
-      const browserPkg = appResolver.resolve("chrome") ?? "com.android.chrome";
-      await mcp.callTool("appium_activate_app", { id: browserPkg });
-      return { handled: true, action: "open_url", message: `Opened browser for ${appName}` };
+      const browserPkg = appResolver.resolve('chrome') ?? 'com.android.chrome';
+      await mcp.callTool('appium_activate_app', { id: browserPkg });
+      return { handled: true, action: 'open_url', message: `Opened browser for ${appName}` };
     }
 
     // Resolve app name to package ID
@@ -69,7 +69,7 @@ export async function preprocessAction(
       ui.printStepDetail(`activateApp("${packageId}") for "${appName}"`);
       const r = await activateAppWithFallback(mcp, packageId);
       if (r.success) {
-        return { handled: true, action: "launch", message: `Launched ${appName} (${packageId})` };
+        return { handled: true, action: 'launch', message: `Launched ${appName} (${packageId})` };
       }
       return { handled: false };
     }
@@ -82,14 +82,11 @@ export async function preprocessAction(
  * Check if the LLM's "launch" action can be resolved and executed directly.
  * Called from the action executor when the LLM returns action: "launch".
  */
-export function resolveAppId(
-  appId: string | undefined,
-  appResolver: AppResolver
-): string | null {
+export function resolveAppId(appId: string | undefined, appResolver: AppResolver): string | null {
   if (!appId) return null;
 
   // Already a valid package name
-  if (appId.includes(".") && appId.split(".").length >= 2) {
+  if (appId.includes('.') && appId.split('.').length >= 2) {
     return appId;
   }
 

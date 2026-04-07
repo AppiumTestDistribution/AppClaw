@@ -3,10 +3,10 @@
  * API image tokens scale with resolution (see Gemini token docs); device captures stay full-res for Stark / Appium.
  */
 
-import sharp from "sharp";
+import sharp from 'sharp';
 
 function isSupportedBase64ImagePrefix(data: string): boolean {
-  return data.startsWith("iVBOR") || data.startsWith("/9j/");
+  return data.startsWith('iVBOR') || data.startsWith('/9j/');
 }
 
 /**
@@ -21,20 +21,20 @@ export async function prepareScreenshotForLlm(
   if (!isSupportedBase64ImagePrefix(rawBase64)) return rawBase64;
 
   try {
-    const input = Buffer.from(rawBase64, "base64");
+    const input = Buffer.from(rawBase64, 'base64');
     const meta = await sharp(input).metadata();
     const resized = await sharp(input)
       .rotate()
       .resize({
         width: maxEdgePx,
         height: maxEdgePx,
-        fit: "inside",
+        fit: 'inside',
         withoutEnlargement: true,
       })
       .jpeg({ quality: 80 })
       .toBuffer();
 
-    if (process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true") {
+    if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
       const resizedMeta = await sharp(resized).metadata();
       const rawKB = Math.round(input.length / 1024);
       const outKB = Math.round(resized.length / 1024);
@@ -43,7 +43,7 @@ export async function prepareScreenshotForLlm(
       );
     }
 
-    return resized.toString("base64");
+    return resized.toString('base64');
   } catch {
     return rawBase64;
   }

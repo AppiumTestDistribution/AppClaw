@@ -10,18 +10,18 @@
  * caches (e.g. window-size.ts) automatically partition state per worker.
  */
 
-import type { MCPClient, MCPToolResult, MCPToolInfo } from "./types.js";
+import type { MCPClient, MCPToolResult, MCPToolInfo } from './types.js';
 
 /**
  * Tools that operate before or outside a specific session.
  * These must NOT receive a sessionId injection.
  */
 const PRE_SESSION_TOOLS = new Set([
-  "create_session",
-  "select_platform",
-  "select_device",
-  "delete_all_sessions",
-  "list_sessions",
+  'create_session',
+  'select_platform',
+  'select_device',
+  'delete_all_sessions',
+  'list_sessions',
 ]);
 
 export class SessionScopedMCPClient implements MCPClient {
@@ -34,9 +34,7 @@ export class SessionScopedMCPClient implements MCPClient {
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<MCPToolResult> {
-    const injected = PRE_SESSION_TOOLS.has(name)
-      ? args
-      : { sessionId: this.sessionId, ...args };
+    const injected = PRE_SESSION_TOOLS.has(name) ? args : { sessionId: this.sessionId, ...args };
     return this.base.callTool(name, injected);
   }
 

@@ -9,25 +9,21 @@
  * The LLM discovers tools dynamically via tool-converter.ts.
  */
 
-import type { MCPClient, LocatorStrategy, MCPToolResult } from "./types.js";
+import type { MCPClient, LocatorStrategy, MCPToolResult } from './types.js';
 
-function logVisionLocate(
-  phase: "attempt" | "success",
-  description: string,
-  detail?: string
-): void {
-  if (process.env.MCP_DEBUG !== "1" && process.env.MCP_DEBUG !== "true") return;
+function logVisionLocate(phase: 'attempt' | 'success', description: string, detail?: string): void {
+  if (process.env.MCP_DEBUG !== '1' && process.env.MCP_DEBUG !== 'true') return;
   const short = description.length > 90 ? `${description.slice(0, 90)}…` : description;
-  const extra = detail ? ` ${detail}` : "";
+  const extra = detail ? ` ${detail}` : '';
   console.log(`[vision-locate] ${phase} | stark-vision (df-vision + Gemini) | "${short}"${extra}`);
 }
 
 /** Extract text content from an MCP tool result */
 export function extractText(result: MCPToolResult): string {
   for (const content of result.content) {
-    if (content.type === "text") return content.text;
+    if (content.type === 'text') return content.text;
   }
-  return "";
+  return '';
 }
 
 /**
@@ -38,7 +34,7 @@ export function extractText(result: MCPToolResult): string {
  */
 export function isMCPError(result: MCPToolResult): boolean {
   const text = extractText(result).toLowerCase();
-  return text.includes("failed") || text.includes("error");
+  return text.includes('failed') || text.includes('error');
 }
 
 /**
@@ -50,10 +46,10 @@ export async function findElement(
   strategy: LocatorStrategy,
   selector: string
 ): Promise<string> {
-  const result = await client.callTool("appium_find_element", { strategy, selector });
+  const result = await client.callTool('appium_find_element', { strategy, selector });
   const text = extractText(result);
 
-  if (text.includes("Failed to find element") || text.includes("NoSuchElementError")) {
+  if (text.includes('Failed to find element') || text.includes('NoSuchElementError')) {
     throw new Error(`Element not found: "${selector}" (strategy: ${strategy})`);
   }
 
@@ -66,28 +62,28 @@ export async function findElement(
 
 /** Get the page source XML as a string */
 export async function getPageSource(client: MCPClient): Promise<string> {
-  const result = await client.callTool("appium_get_page_source", {});
+  const result = await client.callTool('appium_get_page_source', {});
   return extractText(result);
 }
 
 /** Take a screenshot and return base64 image data, or null if unavailable */
 export async function screenshot(client: MCPClient, elementUUID?: string): Promise<string | null> {
-  const result = await client.callTool("appium_screenshot", {
+  const result = await client.callTool('appium_screenshot', {
     ...(elementUUID && { elementUUID }),
   });
   for (const content of result.content) {
-    if (content.type === "image") return content.data;
+    if (content.type === 'image') return content.data;
   }
   const text = extractText(result);
-  if (text.startsWith("iVBOR") || text.startsWith("/9j/")) {
+  if (text.startsWith('iVBOR') || text.startsWith('/9j/')) {
     return text;
   }
-  if (text.includes("screenshot") && text.includes("/")) {
+  if (text.includes('screenshot') && text.includes('/')) {
     try {
       const pathMatch = text.match(/:\s*(.+\.png)/);
       if (pathMatch) {
-        const { readFileSync } = await import("fs");
-        return readFileSync(pathMatch[1]).toString("base64");
+        const { readFileSync } = await import('fs');
+        return readFileSync(pathMatch[1]).toString('base64');
       }
     } catch {
       // File read failed
@@ -109,15 +105,15 @@ export async function findElementByVision(
   description: string,
   existingScreenshot?: string | null
 ): Promise<string> {
-  logVisionLocate("attempt", description);
-  const { starkLocateTapTarget } = await import("../vision/stark-locate.js");
+  logVisionLocate('attempt', description);
+  const { starkLocateTapTarget } = await import('../vision/stark-locate.js');
   const located = await starkLocateTapTarget(client, description, existingScreenshot);
   logVisionLocate(
-    "success",
+    'success',
     description,
     `→ (${Math.round(located.x)}, ${Math.round(located.y)}) ${located.syntheticUuid}`
   );
-  if (process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true") {
+  if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
     console.log(
       `        [vision-debug] stark: "${description.slice(0, 60)}" -> (${located.x}, ${located.y})`
     );

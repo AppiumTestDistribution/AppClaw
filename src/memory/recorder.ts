@@ -5,23 +5,19 @@
  * to the trajectory store on successful completion.
  */
 
-import type { TrajectoryEntry, TrajectoryStore } from "./types.js";
-import type { TrajectoryMatch } from "./types.js";
-import { addTrajectory, loadStore, saveStore, markStale } from "./store.js";
+import type { TrajectoryEntry, TrajectoryStore } from './types.js';
+import type { TrajectoryMatch } from './types.js';
+import { addTrajectory, loadStore, saveStore, markStale } from './store.js';
 import {
   extractScreenLabels,
   computeSemanticFingerprint,
   extractGoalKeywords,
   extractAppIdFromDom,
   extractAppIdFromText,
-} from "./fingerprint.js";
+} from './fingerprint.js';
 
 /** Actions worth remembering (skip navigation/meta actions) */
-const RECORDABLE_ACTIONS = new Set([
-  "find_and_click",
-  "find_and_type",
-  "launch_app",
-]);
+const RECORDABLE_ACTIONS = new Set(['find_and_click', 'find_and_type', 'launch_app']);
 
 /** A step captured during the run */
 interface RecordedStep {
@@ -36,17 +32,17 @@ interface RecordedStep {
 export class EpisodicRecorder {
   private steps: RecordedStep[] = [];
   private goalKeywords: string[];
-  private platform: "android" | "ios";
-  private agentMode: "dom" | "vision";
+  private platform: 'android' | 'ios';
+  private agentMode: 'dom' | 'vision';
   private storePath?: string;
-  currentAppId: string = "";
+  currentAppId: string = '';
   /** IDs of trajectories that were injected as hints — track for staleness */
   private injectedTrajectoryIds: Set<string> = new Set();
 
   constructor(
     goal: string,
-    platform: "android" | "ios",
-    agentMode: "dom" | "vision",
+    platform: 'android' | 'ios',
+    agentMode: 'dom' | 'vision',
     storePath?: string
   ) {
     this.goalKeywords = extractGoalKeywords(goal);
@@ -60,7 +56,7 @@ export class EpisodicRecorder {
   }
 
   /** Update detected platform (may change after first screen state) */
-  setPlatform(platform: "android" | "ios"): void {
+  setPlatform(platform: 'android' | 'ios'): void {
     this.platform = platform;
   }
 
@@ -88,16 +84,11 @@ export class EpisodicRecorder {
    * Record a step during the run.
    * Only captures recordable actions (find_and_click, find_and_type, launch_app).
    */
-  recordStep(
-    dom: string,
-    toolName: string,
-    args: Record<string, unknown>,
-    success: boolean
-  ): void {
+  recordStep(dom: string, toolName: string, args: Record<string, unknown>, success: boolean): void {
     if (!RECORDABLE_ACTIONS.has(toolName)) return;
 
     // Update app ID from launch_app
-    if (toolName === "launch_app" && args.appId) {
+    if (toolName === 'launch_app' && args.appId) {
       this.currentAppId = String(args.appId);
     }
 
@@ -136,7 +127,7 @@ export class EpisodicRecorder {
       const store = loadStore(this.storePath);
       let changed = false;
       for (const id of this.injectedTrajectoryIds) {
-        const entry = store.entries.find(e => e.id === id);
+        const entry = store.entries.find((e) => e.id === id);
         if (entry && entry.action.selector === failedSelector) {
           markStale(store, id);
           this.injectedTrajectoryIds.delete(id);
@@ -165,7 +156,7 @@ export class EpisodicRecorder {
     }
 
     const winningSteps = this.steps.filter(
-      s => s.success && s.appId && RECORDABLE_ACTIONS.has(s.toolName)
+      (s) => s.success && s.appId && RECORDABLE_ACTIONS.has(s.toolName)
     );
 
     if (winningSteps.length === 0) return;
@@ -174,7 +165,10 @@ export class EpisodicRecorder {
       const store = loadStore(this.storePath);
 
       for (const step of winningSteps) {
-        const entry: Omit<TrajectoryEntry, "id" | "timestamp" | "confidence" | "successCount" | "failCount"> = {
+        const entry: Omit<
+          TrajectoryEntry,
+          'id' | 'timestamp' | 'confidence' | 'successCount' | 'failCount'
+        > = {
           platform: this.platform,
           appId: step.appId,
           screenFingerprint: step.screenFingerprint,
@@ -184,7 +178,7 @@ export class EpisodicRecorder {
           action: {
             toolName: step.toolName,
             strategy: step.args.strategy as string | undefined,
-            selector: String(step.args.selector ?? step.args.appId ?? ""),
+            selector: String(step.args.selector ?? step.args.appId ?? ''),
             text: step.args.text as string | undefined,
           },
           stepsInRun: stepsUsed,

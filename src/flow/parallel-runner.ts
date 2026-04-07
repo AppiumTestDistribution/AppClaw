@@ -17,25 +17,25 @@
  *   so stale sessions from previous runs never cause conflicts.
  */
 
-import { resolve, dirname } from "path";
-import * as crypto from "crypto";
-import * as net from "net";
-import { acquireSharedMCPClient } from "../mcp/client.js";
-import type { AppClawConfig } from "../config.js";
-import type { Platform, DeviceType } from "../index.js";
-import { extractText } from "../mcp/tools.js";
-import { parseDeviceList } from "../device/device-picker.js";
-import { setupDevice } from "../device/index.js";
-import type { DeviceSetupArgs } from "../device/index.js";
-import { AppResolver } from "../agent/app-resolver.js";
-import { runYamlFlow } from "./run-yaml-flow.js";
-import type { RunYamlFlowOptions, RunYamlFlowResult } from "./run-yaml-flow.js";
-import type { ParsedFlow, ParsedSuite } from "./types.js";
-import { parseFlowYamlFile } from "./parse-yaml-flow.js";
-import { RunArtifactCollector, writeSuiteEntry } from "../report/writer.js";
-import { emitJson, isJsonMode } from "../json-emitter.js";
-import * as ui from "../ui/terminal.js";
-import chalk from "chalk";
+import { resolve, dirname } from 'path';
+import * as crypto from 'crypto';
+import * as net from 'net';
+import { acquireSharedMCPClient } from '../mcp/client.js';
+import type { AppClawConfig } from '../config.js';
+import type { Platform, DeviceType } from '../index.js';
+import { extractText } from '../mcp/tools.js';
+import { parseDeviceList } from '../device/device-picker.js';
+import { setupDevice } from '../device/index.js';
+import type { DeviceSetupArgs } from '../device/index.js';
+import { AppResolver } from '../agent/app-resolver.js';
+import { runYamlFlow } from './run-yaml-flow.js';
+import type { RunYamlFlowOptions, RunYamlFlowResult } from './run-yaml-flow.js';
+import type { ParsedFlow, ParsedSuite } from './types.js';
+import { parseFlowYamlFile } from './parse-yaml-flow.js';
+import { RunArtifactCollector, writeSuiteEntry } from '../report/writer.js';
+import { emitJson, isJsonMode } from '../json-emitter.js';
+import * as ui from '../ui/terminal.js';
+import chalk from 'chalk';
 
 // ── Free port discovery ─────────────────────────────────────────────
 
@@ -43,11 +43,11 @@ import chalk from "chalk";
 function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(0, '127.0.0.1', () => {
       const addr = server.address() as net.AddressInfo;
       server.close(() => resolve(addr.port));
     });
-    server.on("error", reject);
+    server.on('error', reject);
   });
 }
 
@@ -82,21 +82,21 @@ interface DiscoveredDevice {
  * Returns a sorted list (booted first).
  */
 async function discoverDevices(
-  mcp: import("../mcp/types.js").MCPClient,
+  mcp: import('../mcp/types.js').MCPClient,
   platform: Platform,
-  deviceType?: DeviceType,
+  deviceType?: DeviceType
 ): Promise<DiscoveredDevice[]> {
   const args: Record<string, unknown> = { platform };
-  if (platform === "ios" && deviceType) args.iosDeviceType = deviceType;
+  if (platform === 'ios' && deviceType) args.iosDeviceType = deviceType;
 
-  const result = await mcp.callTool("select_platform", args);
+  const result = await mcp.callTool('select_platform', args);
   const text = extractText(result);
   const devices = parseDeviceList(text, platform);
 
   // Sort: booted first, then by name
   devices.sort((a, b) => {
-    const aBooted = a.state?.toLowerCase() === "booted" ? 0 : 1;
-    const bBooted = b.state?.toLowerCase() === "booted" ? 0 : 1;
+    const aBooted = a.state?.toLowerCase() === 'booted' ? 0 : 1;
+    const bBooted = b.state?.toLowerCase() === 'booted' ? 0 : 1;
     if (aBooted !== bBooted) return aBooted - bBooted;
     return a.name.localeCompare(b.name);
   });
@@ -112,22 +112,22 @@ interface WorkerCapsResult {
 }
 
 async function buildWorkerCaps(platform: Platform): Promise<WorkerCapsResult> {
-  if (platform === "android") {
+  if (platform === 'android') {
     const [systemPort, mjpegPort] = await Promise.all([findFreePort(), findFreePort()]);
     const mjpegUrl = `http://127.0.0.1:${mjpegPort}`;
     return {
       caps: {
-        "appium:systemPort": systemPort,
-        "appium:mjpegServerPort": mjpegPort,
-        "appium:mjpegScreenshotUrl": mjpegUrl,
+        'appium:systemPort': systemPort,
+        'appium:mjpegServerPort': mjpegPort,
+        'appium:mjpegScreenshotUrl': mjpegUrl,
       },
       mjpegUrl,
     };
   }
-  if (platform === "ios") {
+  if (platform === 'ios') {
     const wdaPort = await findFreePort();
     return {
-      caps: { "appium:wdaLocalPort": wdaPort },
+      caps: { 'appium:wdaLocalPort': wdaPort },
     };
   }
   return { caps: {} };
@@ -147,9 +147,9 @@ async function runWorkerJob(
   workerIndex: number,
   device: DiscoveredDevice,
   baseSetupArgs: DeviceSetupArgs,
-  sharedMcp: import("../mcp/types.js").MCPClient,
+  sharedMcp: import('../mcp/types.js').MCPClient,
   options: RunYamlFlowOptions,
-  platform: Platform,
+  platform: Platform
 ): Promise<WorkerFlowResult> {
   const label = chalk.cyan(`[worker:${workerIndex + 1}]`);
 
@@ -164,15 +164,18 @@ async function runWorkerJob(
   const deviceResult = await setupDevice(sharedMcp, {
     ...baseSetupArgs,
     cliUdid: device.udid,
-    extraCaps: { "appium:udid": device.udid, ...workerCaps },
+    extraCaps: { 'appium:udid': device.udid, ...workerCaps },
   });
 
-  emitJson({ event: "device_ready", data: { platform, device: deviceResult.deviceName, mjpegUrl } });
+  emitJson({
+    event: 'device_ready',
+    data: { platform, device: deviceResult.deviceName, mjpegUrl },
+  });
 
   const scopedMcp = deviceResult.scopedMcp;
 
   try {
-    console.log(`${label} ${chalk.green("ready")} — ${deviceResult.deviceName}`);
+    console.log(`${label} ${chalk.green('ready')} — ${deviceResult.deviceName}`);
 
     const appResolver = new AppResolver();
     await appResolver.initialize(scopedMcp, deviceResult.platform);
@@ -183,13 +186,24 @@ async function runWorkerJob(
       deviceResult.platform,
       deviceResult.deviceName,
       job.suiteId,
-      job.suiteName,
+      job.suiteName
     );
 
     const deviceLabel = deviceResult.deviceName;
     const workerOnFlowStep = isJsonMode()
-      ? (step: number, total: number, kind: string, target: string | undefined, status: "running" | "passed" | "failed", error?: string, message?: string) => {
-          emitJson({ event: "flow_step", data: { step, total, kind, target, status, error, message, device: deviceLabel } });
+      ? (
+          step: number,
+          total: number,
+          kind: string,
+          target: string | undefined,
+          status: 'running' | 'passed' | 'failed',
+          error?: string,
+          message?: string
+        ) => {
+          emitJson({
+            event: 'flow_step',
+            data: { step, total, kind, target, status, error, message, device: deviceLabel },
+          });
         }
       : undefined;
 
@@ -197,19 +211,33 @@ async function runWorkerJob(
       scopedMcp,
       job.parsed.meta,
       job.parsed.steps,
-      { ...options, appResolver, artifactCollector, deviceUdid: deviceResult.deviceUdid, onFlowStep: workerOnFlowStep },
-      job.parsed.phases,
+      {
+        ...options,
+        appResolver,
+        artifactCollector,
+        deviceUdid: deviceResult.deviceUdid,
+        onFlowStep: workerOnFlowStep,
+      },
+      job.parsed.phases
     );
 
-    const status = result.success ? chalk.green("passed") : chalk.red("failed");
-    console.log(`${label} ${status} — ${job.flowFile} (${result.stepsExecuted}/${result.stepsTotal} steps)`);
+    const status = result.success ? chalk.green('passed') : chalk.red('failed');
+    console.log(
+      `${label} ${status} — ${job.flowFile} (${result.stepsExecuted}/${result.stepsTotal} steps)`
+    );
 
-    try { await scopedMcp.callTool("delete_session", { sessionId: deviceResult.sessionId }); } catch { /* ignore */ }
+    try {
+      await scopedMcp.callTool('delete_session', { sessionId: deviceResult.sessionId });
+    } catch {
+      /* ignore */
+    }
 
     try {
       const runId = await artifactCollector.finalize(process.cwd(), result);
       console.log(`${label} report saved: .appclaw/runs/${runId}`);
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
 
     return {
       flowFile: job.flowFile,
@@ -220,8 +248,12 @@ async function runWorkerJob(
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`${label} ${chalk.red("error")} — ${job.flowFile}: ${message}`);
-    try { await scopedMcp.callTool("delete_session", { sessionId: deviceResult.sessionId }); } catch { /* ignore */ }
+    console.error(`${label} ${chalk.red('error')} — ${job.flowFile}: ${message}`);
+    try {
+      await scopedMcp.callTool('delete_session', { sessionId: deviceResult.sessionId });
+    } catch {
+      /* ignore */
+    }
     return {
       flowFile: job.flowFile,
       workerIndex,
@@ -244,9 +276,9 @@ async function dispatchQueue(
   devices: DiscoveredDevice[],
   parallelCount: number,
   baseSetupArgs: DeviceSetupArgs,
-  sharedMcp: import("../mcp/types.js").MCPClient,
+  sharedMcp: import('../mcp/types.js').MCPClient,
   options: RunYamlFlowOptions,
-  platform: Platform,
+  platform: Platform
 ): Promise<WorkerFlowResult[]> {
   const queue = [...jobs];
   const results: WorkerFlowResult[] = [];
@@ -257,15 +289,21 @@ async function dispatchQueue(
     while (true) {
       const job = queue.shift();
       if (!job) break;
-      const result = await runWorkerJob(job, workerIndex, device, baseSetupArgs, sharedMcp, options, platform);
+      const result = await runWorkerJob(
+        job,
+        workerIndex,
+        device,
+        baseSetupArgs,
+        sharedMcp,
+        options,
+        platform
+      );
       results.push(result);
     }
   }
 
   // Launch all workers in parallel
-  await Promise.all(
-    Array.from({ length: parallelCount }, (_, i) => workerLoop(i))
-  );
+  await Promise.all(Array.from({ length: parallelCount }, (_, i) => workerLoop(i)));
 
   return results;
 }
@@ -282,11 +320,15 @@ export async function runFlowOnDevices(
   parallelCount: number,
   baseSetupArgs: DeviceSetupArgs,
   config: AppClawConfig,
-  options: RunYamlFlowOptions,
+  options: RunYamlFlowOptions
 ): Promise<ParallelRunResult> {
-  const platform = (baseSetupArgs.cliPlatform ?? parsed.meta.platform ?? "android") as Platform;
+  const platform = (baseSetupArgs.cliPlatform ?? parsed.meta.platform ?? 'android') as Platform;
   const deviceType = baseSetupArgs.cliDeviceType ?? undefined;
-  const mcpConfig = { transport: config.MCP_TRANSPORT, host: config.MCP_HOST, port: config.MCP_PORT };
+  const mcpConfig = {
+    transport: config.MCP_TRANSPORT,
+    host: config.MCP_HOST,
+    port: config.MCP_PORT,
+  };
 
   // One shared appium-mcp process for all workers
   const sharedMcp = await acquireSharedMCPClient(mcpConfig);
@@ -298,29 +340,50 @@ export async function runFlowOnDevices(
     if (devices.length < parallelCount) {
       throw new Error(
         `parallel: ${parallelCount} requires ${parallelCount} ${platform} device(s), ` +
-        `but only ${devices.length} found. Available: ${devices.map(d => d.name).join(", ")}`
+          `but only ${devices.length} found. Available: ${devices.map((d) => d.name).join(', ')}`
       );
     }
 
     const selected = devices.slice(0, parallelCount);
-    ui.printInfo(`Workers: ${selected.map((d, i) => `[${i + 1}] ${d.name}`).join("  ")}`);
+    ui.printInfo(`Workers: ${selected.map((d, i) => `[${i + 1}] ${d.name}`).join('  ')}`);
 
     const suiteId = generateSuiteId();
-    const suiteName = parsed.meta.name ?? flowFile.split("/").pop()?.replace(/\.ya?ml$/, "");
+    const suiteName =
+      parsed.meta.name ??
+      flowFile
+        .split('/')
+        .pop()
+        ?.replace(/\.ya?ml$/, '');
 
     const startedAt = new Date().toISOString();
     const jobs: WorkerJob[] = selected.map(() => ({ flowFile, parsed, suiteId, suiteName }));
-    const workerResults = await dispatchQueue(jobs, selected, parallelCount, baseSetupArgs, sharedMcp, options, platform);
+    const workerResults = await dispatchQueue(
+      jobs,
+      selected,
+      parallelCount,
+      baseSetupArgs,
+      sharedMcp,
+      options,
+      platform
+    );
 
     const result = summarize(workerResults);
     const durationMs = Date.now() - new Date(startedAt).getTime();
 
     try {
       await writeSuiteEntry(process.cwd(), {
-        suiteId, suiteName, platform, startedAt, durationMs, runIds: [],
-        passedCount: result.passedCount, failedCount: result.failedCount,
+        suiteId,
+        suiteName,
+        platform,
+        startedAt,
+        durationMs,
+        runIds: [],
+        passedCount: result.passedCount,
+        failedCount: result.failedCount,
       });
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
 
     return result;
   } finally {
@@ -341,11 +404,15 @@ export async function runSuite(
   parallelCount: number,
   baseSetupArgs: DeviceSetupArgs,
   config: AppClawConfig,
-  baseOptions: RunYamlFlowOptions,
+  baseOptions: RunYamlFlowOptions
 ): Promise<ParallelRunResult> {
-  const platform = (baseSetupArgs.cliPlatform ?? suite.meta.platform ?? "android") as Platform;
+  const platform = (baseSetupArgs.cliPlatform ?? suite.meta.platform ?? 'android') as Platform;
   const deviceType = baseSetupArgs.cliDeviceType ?? undefined;
-  const mcpConfig = { transport: config.MCP_TRANSPORT, host: config.MCP_HOST, port: config.MCP_PORT };
+  const mcpConfig = {
+    transport: config.MCP_TRANSPORT,
+    host: config.MCP_HOST,
+    port: config.MCP_PORT,
+  };
 
   // One shared appium-mcp process for all workers
   const sharedMcp = await acquireSharedMCPClient(mcpConfig);
@@ -357,12 +424,12 @@ export async function runSuite(
     if (devices.length < parallelCount) {
       throw new Error(
         `parallel: ${parallelCount} requires ${parallelCount} ${platform} device(s), ` +
-        `but only ${devices.length} found. Available: ${devices.map(d => d.name).join(", ")}`
+          `but only ${devices.length} found. Available: ${devices.map((d) => d.name).join(', ')}`
       );
     }
 
     const selected = devices.slice(0, parallelCount);
-    ui.printInfo(`Workers: ${selected.map((d, i) => `[${i + 1}] ${d.name}`).join("  ")}`);
+    ui.printInfo(`Workers: ${selected.map((d, i) => `[${i + 1}] ${d.name}`).join('  ')}`);
 
     const suiteId = generateSuiteId();
     const suiteName = suite.meta.name;
@@ -381,17 +448,33 @@ export async function runSuite(
       jobs.push({ flowFile, parsed, suiteId, suiteName });
     }
 
-    const workerResults = await dispatchQueue(jobs, selected, parallelCount, baseSetupArgs, sharedMcp, baseOptions, platform);
+    const workerResults = await dispatchQueue(
+      jobs,
+      selected,
+      parallelCount,
+      baseSetupArgs,
+      sharedMcp,
+      baseOptions,
+      platform
+    );
 
     const result = summarize(workerResults);
     const durationMs = Date.now() - new Date(startedAt).getTime();
 
     try {
       await writeSuiteEntry(process.cwd(), {
-        suiteId, suiteName, platform, startedAt, durationMs, runIds: [],
-        passedCount: result.passedCount, failedCount: result.failedCount,
+        suiteId,
+        suiteName,
+        platform,
+        startedAt,
+        durationMs,
+        runIds: [],
+        passedCount: result.passedCount,
+        failedCount: result.failedCount,
       });
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
 
     return result;
   } finally {
@@ -403,13 +486,13 @@ export async function runSuite(
 
 function generateSuiteId(): string {
   const now = new Date();
-  const ts = now.toISOString().replace(/[-:]/g, "").replace("T", "T").split(".")[0];
-  const suffix = crypto.randomBytes(3).toString("hex");
+  const ts = now.toISOString().replace(/[-:]/g, '').replace('T', 'T').split('.')[0];
+  const suffix = crypto.randomBytes(3).toString('hex');
   return `suite-${ts}-${suffix}`;
 }
 
 function summarize(workers: WorkerFlowResult[]): ParallelRunResult {
-  const passedCount = workers.filter(w => w.result.success).length;
+  const passedCount = workers.filter((w) => w.result.success).length;
   return {
     workers,
     allPassed: passedCount === workers.length,
@@ -421,14 +504,14 @@ function summarize(workers: WorkerFlowResult[]): ParallelRunResult {
 /** Print a human-readable summary table after a parallel/suite run. */
 export function printParallelSummary(result: ParallelRunResult): void {
   console.log();
-  console.log(chalk.bold("── Run Summary ──────────────────────────────────────────"));
+  console.log(chalk.bold('── Run Summary ──────────────────────────────────────────'));
   for (const w of result.workers) {
-    const icon = w.result.success ? chalk.green("✓") : chalk.red("✗");
+    const icon = w.result.success ? chalk.green('✓') : chalk.red('✗');
     const steps = `${w.result.stepsExecuted}/${w.result.stepsTotal}`;
     const device = chalk.dim(`[${w.deviceName}]`);
-    const flowName = w.flowFile.split("/").pop() ?? w.flowFile;
+    const flowName = w.flowFile.split('/').pop() ?? w.flowFile;
     const reason = w.error ?? w.result.reason;
-    const tail = reason ? chalk.red(` — ${reason}`) : "";
+    const tail = reason ? chalk.red(` — ${reason}`) : '';
     console.log(`  ${icon} ${flowName} ${device} ${steps} steps${tail}`);
   }
   console.log();

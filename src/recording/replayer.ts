@@ -8,21 +8,28 @@
  * 4. Falls back to recorded coordinates if no match found
  */
 
-import { readFileSync } from "fs";
-import type { MCPClient } from "../mcp/types.js";
-import { activateAppWithFallback } from "../mcp/activate-app.js";
-import { findElement, getPageSource } from "../mcp/tools.js";
-import type { ActionResult } from "../llm/schemas.js";
-import type { UIElement, CompactUIElement } from "../perception/types.js";
-import { detectPlatform } from "../perception/screen.js";
-import { parseAndroidPageSource } from "../perception/android-parser.js";
-import { parseIOSPageSource } from "../perception/ios-parser.js";
-import { compactElement } from "../perception/element-filter.js";
-import { findElementWithFallback, tapAtCoordinates, findByIdStrategies, findByVision, isAIElement, parseAIElementCoords } from "../agent/element-finder.js";
-import type { Recording, RecordedStep, ContextElement } from "./recorder.js";
-import { isVisionLocateEnabled } from "../vision/locate-enabled.js";
-import type { ToolCallDecision } from "../llm/provider.js";
-import * as ui from "../ui/terminal.js";
+import { readFileSync } from 'fs';
+import type { MCPClient } from '../mcp/types.js';
+import { activateAppWithFallback } from '../mcp/activate-app.js';
+import { findElement, getPageSource } from '../mcp/tools.js';
+import type { ActionResult } from '../llm/schemas.js';
+import type { UIElement, CompactUIElement } from '../perception/types.js';
+import { detectPlatform } from '../perception/screen.js';
+import { parseAndroidPageSource } from '../perception/android-parser.js';
+import { parseIOSPageSource } from '../perception/ios-parser.js';
+import { compactElement } from '../perception/element-filter.js';
+import {
+  findElementWithFallback,
+  tapAtCoordinates,
+  findByIdStrategies,
+  findByVision,
+  isAIElement,
+  parseAIElementCoords,
+} from '../agent/element-finder.js';
+import type { Recording, RecordedStep, ContextElement } from './recorder.js';
+import { isVisionLocateEnabled } from '../vision/locate-enabled.js';
+import type { ToolCallDecision } from '../llm/provider.js';
+import * as ui from '../ui/terminal.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -53,7 +60,7 @@ export interface ReplayFailure {
 
 /** Load a recording from a JSON file */
 export function loadRecording(filepath: string): Recording {
-  const raw = readFileSync(filepath, "utf-8");
+  const raw = readFileSync(filepath, 'utf-8');
   return JSON.parse(raw) as Recording;
 }
 
@@ -72,18 +79,14 @@ function findMatchingElement(
 
   // Priority 2: exact text match
   if (recorded.text) {
-    const textMatch = currentElements.find(
-      (el) => el.text === recorded.text
-    );
+    const textMatch = currentElements.find((el) => el.text === recorded.text);
     if (textMatch) return textMatch;
   }
 
   // Priority 3: case-insensitive text match
   if (recorded.text) {
     const lower = recorded.text.toLowerCase();
-    const fuzzyMatch = currentElements.find(
-      (el) => el.text.toLowerCase() === lower
-    );
+    const fuzzyMatch = currentElements.find((el) => el.text.toLowerCase() === lower);
     if (fuzzyMatch) return fuzzyMatch;
   }
 
@@ -105,12 +108,7 @@ export async function replayRecording(
   recording: Recording,
   options: ReplayOptions = {}
 ): Promise<ReplayResult> {
-  const {
-    adaptive = true,
-    stepDelay = 500,
-    maxElements = 40,
-    onStep,
-  } = options;
+  const { adaptive = true, stepDelay = 500, maxElements = 40, onStep } = options;
 
   let adaptedSteps = 0;
   const failedSteps: ReplayFailure[] = [];
@@ -124,8 +122,8 @@ export async function replayRecording(
     const args = { ...action.args }; // mutable copy for adaptation
 
     // Skip "done" actions
-    if (toolName === "done") {
-      ui.printReplayStep(i + 1, recording.steps.length, "done", false, true);
+    if (toolName === 'done') {
+      ui.printReplayStep(i + 1, recording.steps.length, 'done', false, true);
       break;
     }
 
@@ -133,13 +131,17 @@ export async function replayRecording(
     let screenElements: CompactUIElement[] = [];
 
     // If adaptive mode, try to match elements to current screen
-    if (adaptive && (toolName === "smart_tap" || toolName === "smart_type" || toolName === "smart_long_press")) {
+    if (
+      adaptive &&
+      (toolName === 'smart_tap' || toolName === 'smart_type' || toolName === 'smart_long_press')
+    ) {
       try {
         const pageSource = await getPageSource(mcp);
         const platform = detectPlatform(pageSource);
-        const elements = platform === "android"
-          ? parseAndroidPageSource(pageSource)
-          : parseIOSPageSource(pageSource);
+        const elements =
+          platform === 'android'
+            ? parseAndroidPageSource(pageSource)
+            : parseIOSPageSource(pageSource);
         screenElements = elements.map(compactElement);
 
         // Find the target element from recording context
@@ -207,7 +209,7 @@ async function executeReplayAction(
 ): Promise<ActionResult> {
   try {
     switch (toolName) {
-      case "smart_tap": {
+      case 'smart_tap': {
         const elementId = args.elementId as string | undefined;
         const coordX = args.coordX as number | undefined;
         const coordY = args.coordY as number | undefined;
@@ -217,7 +219,7 @@ async function executeReplayAction(
         const uuid = await findElementWithFallback(mcp, screenElements, elementId, coords);
 
         if (uuid) {
-          await mcp.callTool("appium_click", { elementUUID: uuid });
+          await mcp.callTool('appium_click', { elementUUID: uuid });
           return { success: true, message: `Tapped ${elementId || `[${coordX}, ${coordY}]`}` };
         }
 
@@ -230,11 +232,14 @@ async function executeReplayAction(
               if (visionCoords) {
                 const tapped = await tapAtCoordinates(mcp, visionCoords.x, visionCoords.y);
                 if (tapped) {
-                  return { success: true, message: `Tapped "${visionDescription}" via AI vision at [${visionCoords.x}, ${visionCoords.y}]` };
+                  return {
+                    success: true,
+                    message: `Tapped "${visionDescription}" via AI vision at [${visionCoords.x}, ${visionCoords.y}]`,
+                  };
                 }
               }
             } else {
-              await mcp.callTool("appium_click", { elementUUID: visionUuid });
+              await mcp.callTool('appium_click', { elementUUID: visionUuid });
               return { success: true, message: `Tapped "${visionDescription}" via AI vision` };
             }
           }
@@ -252,26 +257,24 @@ async function executeReplayAction(
         return { success: false, message: `Could not find element ${target} on screen` };
       }
 
-      case "smart_type": {
+      case 'smart_type': {
         const elementId = args.elementId as string | undefined;
         const coordX = args.coordX as number | undefined;
         const coordY = args.coordY as number | undefined;
-        const text = (args.text as string) ?? "";
+        const text = (args.text as string) ?? '';
         const coords: [number, number] | undefined =
           coordX !== undefined && coordY !== undefined ? [coordX, coordY] : undefined;
 
         // Check if the target is an editable element in current screen context
-        const targetEl = elementId
-          ? screenElements.find(el => el.id === elementId)
-          : undefined;
+        const targetEl = elementId ? screenElements.find((el) => el.id === elementId) : undefined;
 
         if (targetEl?.editable) {
           // Target is directly editable — use it
           const uuid = await findElementWithFallback(mcp, screenElements, elementId, coords);
           if (uuid) {
-            await mcp.callTool("appium_click", { elementUUID: uuid });
-            await mcp.callTool("appium_clear_element", { elementUUID: uuid }).catch(() => {});
-            await mcp.callTool("appium_set_value", { elementUUID: uuid, text });
+            await mcp.callTool('appium_click', { elementUUID: uuid });
+            await mcp.callTool('appium_clear_element', { elementUUID: uuid }).catch(() => {});
+            await mcp.callTool('appium_set_value', { elementUUID: uuid, text });
             return { success: true, message: `Typed "${text}"` };
           }
         }
@@ -280,57 +283,61 @@ async function executeReplayAction(
         // page source to find the actual editable element
         const clickUuid = await findElementWithFallback(mcp, screenElements, elementId, coords);
         if (clickUuid) {
-          await mcp.callTool("appium_click", { elementUUID: clickUuid });
+          await mcp.callTool('appium_click', { elementUUID: clickUuid });
         }
 
         // Re-read page source to discover the real editable element
         const freshSource = await getPageSource(mcp);
         const platform = detectPlatform(freshSource);
-        const freshElements = platform === "android"
-          ? parseAndroidPageSource(freshSource)
-          : parseIOSPageSource(freshSource);
+        const freshElements =
+          platform === 'android'
+            ? parseAndroidPageSource(freshSource)
+            : parseIOSPageSource(freshSource);
 
-        const editableElements = freshElements.filter(el => el.editable && el.enabled);
+        const editableElements = freshElements.filter((el) => el.editable && el.enabled);
 
         let typeUuid: string | null = null;
         if (editableElements.length >= 1) {
           const el = editableElements[0];
-          typeUuid = await findByIdStrategies(mcp, el.accessibilityId || el.id, el.text).catch(() => null);
+          typeUuid = await findByIdStrategies(mcp, el.accessibilityId || el.id, el.text).catch(
+            () => null
+          );
         }
 
         if (!typeUuid) {
-          const target = elementId ? `"${elementId}"` : "any editable field";
+          const target = elementId ? `"${elementId}"` : 'any editable field';
           return { success: false, message: `Could not find an editable input near ${target}` };
         }
 
-        await mcp.callTool("appium_click", { elementUUID: typeUuid });
-        await mcp.callTool("appium_clear_element", { elementUUID: typeUuid }).catch(() => {});
-        await mcp.callTool("appium_set_value", { elementUUID: typeUuid, text });
+        await mcp.callTool('appium_click', { elementUUID: typeUuid });
+        await mcp.callTool('appium_clear_element', { elementUUID: typeUuid }).catch(() => {});
+        await mcp.callTool('appium_set_value', { elementUUID: typeUuid, text });
         return { success: true, message: `Typed "${text}"` };
       }
 
-      case "launch_app": {
-        const id = (args.appId as string) ?? "";
+      case 'launch_app': {
+        const id = (args.appId as string) ?? '';
         const r = await activateAppWithFallback(mcp, id);
         return { success: r.success, message: r.success ? `Launched ${id}` : r.message };
       }
 
-      case "go_back":
-        await mcp.callTool("appium_mobile_press_key", { key: "BACK" });
-        return { success: true, message: "Back" };
+      case 'go_back':
+        await mcp.callTool('appium_mobile_press_key', { key: 'BACK' });
+        return { success: true, message: 'Back' };
 
-      case "go_home":
-        await mcp.callTool("appium_mobile_press_key", { key: "HOME" });
-        return { success: true, message: "Home" };
+      case 'go_home':
+        await mcp.callTool('appium_mobile_press_key', { key: 'HOME' });
+        return { success: true, message: 'Home' };
 
       default:
         // Forward any other tool call directly to MCP
         try {
           const result = await mcp.callTool(toolName, args);
-          const text = result.content
-            ?.map((c: any) => (c.type === "text" ? c.text : ""))
-            .filter(Boolean)
-            .join(" ") ?? "";
+          const text =
+            result.content
+              ?.map((c: any) => (c.type === 'text' ? c.text : ''))
+              .filter(Boolean)
+              .join(' ') ?? '';
           return { success: true, message: text.slice(0, 200) || `${toolName} executed` };
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);

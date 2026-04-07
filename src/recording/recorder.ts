@@ -6,11 +6,11 @@
  * deterministically later without LLM costs.
  */
 
-import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { join } from "path";
-import type { ToolCallDecision } from "../llm/provider.js";
-import type { CompactUIElement } from "../perception/types.js";
-import * as ui from "../ui/terminal.js";
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
+import type { ToolCallDecision } from '../llm/provider.js';
+import type { CompactUIElement } from '../perception/types.js';
+import * as ui from '../ui/terminal.js';
 
 export interface RecordedStep {
   step: number;
@@ -43,7 +43,7 @@ export interface VisionInfo {
 export interface Recording {
   id: string;
   goal: string;
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
   createdAt: string;
   steps: RecordedStep[];
   metadata: {
@@ -56,16 +56,16 @@ export interface Recording {
 export class ActionRecorder {
   private steps: RecordedStep[] = [];
   private startTime: number;
-  private platform: "android" | "ios" = "android";
+  private platform: 'android' | 'ios' = 'android';
 
   constructor(
     private goal: string,
-    private outputDir: string = "recordings"
+    private outputDir: string = 'recordings'
   ) {
     this.startTime = Date.now();
   }
 
-  setPlatform(platform: "android" | "ios"): void {
+  setPlatform(platform: 'android' | 'ios'): void {
     this.platform = platform;
   }
 
@@ -115,7 +115,7 @@ export class ActionRecorder {
     const filename = `${id}.json`;
     const filepath = join(this.outputDir, filename);
     writeFileSync(filepath, JSON.stringify(recording, null, 2));
-    ui.printFileSaved("Recording:", filepath);
+    ui.printFileSaved('Recording:', filepath);
     return filepath;
   }
 

@@ -17,9 +17,13 @@
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit",
+    "lint": "npm run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:vsix": "cd vscode-extension && npm run build && npx vsce package"
+    "build:vsix": "cd vscode-extension && npm run build && npx vsce package",
+    "deploy:landing": "npm run deploy --prefix landing"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.0",
@@ -46,6 +50,7 @@
   "devDependencies": {
     "@types/bun": "^1.1.0",
     "@types/gradient-string": "^1.1.6",
+    "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.6.0",
     "vitest": "^4.1.2"

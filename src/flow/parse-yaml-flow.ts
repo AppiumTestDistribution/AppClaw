@@ -34,14 +34,21 @@
  * after parsing via the VariableResolver — the parser itself is pure structure.
  */
 
-import { readFileSync } from "fs";
-import { parseAllDocuments } from "yaml";
+import { readFileSync } from 'fs';
+import { parseAllDocuments } from 'yaml';
 
-import type { FlowMeta, FlowStep, FlowPhase, PhasedStep, ParsedFlow, ParsedSuite } from "./types.js";
-import { tryParseNaturalFlowLine } from "./natural-line.js";
-import { resolveNaturalStep } from "./llm-parser.js";
-import { existsSync } from "fs";
-import { resolve, dirname } from "path";
+import type {
+  FlowMeta,
+  FlowStep,
+  FlowPhase,
+  PhasedStep,
+  ParsedFlow,
+  ParsedSuite,
+} from './types.js';
+import { tryParseNaturalFlowLine } from './natural-line.js';
+import { resolveNaturalStep } from './llm-parser.js';
+import { existsSync } from 'fs';
+import { resolve, dirname } from 'path';
 import {
   interpolateStep,
   emptyBindings,
@@ -49,17 +56,17 @@ import {
   loadEnvironmentFile,
   loadInlineBindings,
   type VariableBindings,
-} from "./variable-resolver.js";
+} from './variable-resolver.js';
 
 // ── Step normalizer (unchanged logic, extracted for SRP) ───────────
 
 export function normalizeStructured(raw: unknown, index: number): FlowStep | null {
-  if (typeof raw === "string") {
+  if (typeof raw === 'string') {
     const s = raw.trim();
-    if (s === "launchApp") return { kind: "launchApp" };
-    if (s === "enter") return { kind: "enter" };
-    if (s === "goBack" || s === "back") return { kind: "back" };
-    if (s === "goHome" || s === "home") return { kind: "home" };
+    if (s === 'launchApp') return { kind: 'launchApp' };
+    if (s === 'enter') return { kind: 'enter' };
+    if (s === 'goBack' || s === 'back') return { kind: 'back' };
+    if (s === 'goHome' || s === 'home') return { kind: 'home' };
 
     const nl = tryParseNaturalFlowLine(s);
     if (nl) return nl;
@@ -68,84 +75,110 @@ export function normalizeStructured(raw: unknown, index: number): FlowStep | nul
     return null;
   }
 
-  if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+  if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
     const o = raw as Record<string, unknown>;
     const keys = Object.keys(o);
 
     // ── Multi-key: waitUntil with timeout ──
-    if (keys.includes("waitUntil") || keys.includes("waitUntilGone")) {
-      const isGone = keys.includes("waitUntilGone");
-      const key = isGone ? "waitUntilGone" : "waitUntil";
+    if (keys.includes('waitUntil') || keys.includes('waitUntilGone')) {
+      const isGone = keys.includes('waitUntilGone');
+      const key = isGone ? 'waitUntilGone' : 'waitUntil';
       const val = String(o[key]).trim();
       const timeout = Number(o.timeout ?? 10);
       if (!Number.isFinite(timeout) || timeout < 1) {
         throw new Error(`Step ${index + 1}: waitUntil timeout must be a positive number`);
       }
       const valLower = val.toLowerCase();
-      if (!isGone && (valLower === "screen loaded" || valLower === "screenloaded" || valLower === "screen ready" || valLower === "screen stable")) {
-        return { kind: "waitUntil", condition: "screenLoaded", timeoutSeconds: timeout };
+      if (
+        !isGone &&
+        (valLower === 'screen loaded' ||
+          valLower === 'screenloaded' ||
+          valLower === 'screen ready' ||
+          valLower === 'screen stable')
+      ) {
+        return { kind: 'waitUntil', condition: 'screenLoaded', timeoutSeconds: timeout };
       }
       return {
-        kind: "waitUntil",
-        condition: isGone ? "gone" : "visible",
+        kind: 'waitUntil',
+        condition: isGone ? 'gone' : 'visible',
         text: val,
         timeoutSeconds: timeout,
       };
     }
 
     // ── Multi-key: scrollAssert ──
-    if (keys.includes("scrollAssert") || keys.includes("scrollVerify") || keys.includes("scrollCheck")) {
-      const textKey = keys.find(k => k === "scrollAssert" || k === "scrollVerify" || k === "scrollCheck")!;
+    if (
+      keys.includes('scrollAssert') ||
+      keys.includes('scrollVerify') ||
+      keys.includes('scrollCheck')
+    ) {
+      const textKey = keys.find(
+        (k) => k === 'scrollAssert' || k === 'scrollVerify' || k === 'scrollCheck'
+      )!;
       const text = String(o[textKey]);
-      const dir = String(o.direction ?? "down").toLowerCase();
-      if (!["up", "down", "left", "right"].includes(dir)) {
-        throw new Error(`Step ${index + 1}: scrollAssert direction must be up/down/left/right, got "${dir}"`);
+      const dir = String(o.direction ?? 'down').toLowerCase();
+      if (!['up', 'down', 'left', 'right'].includes(dir)) {
+        throw new Error(
+          `Step ${index + 1}: scrollAssert direction must be up/down/left/right, got "${dir}"`
+        );
       }
       const maxScrolls = Number(o.maxScrolls ?? 3);
       if (!Number.isFinite(maxScrolls) || maxScrolls < 1) {
         throw new Error(`Step ${index + 1}: scrollAssert maxScrolls must be a positive number`);
       }
       return {
-        kind: "scrollAssert",
+        kind: 'scrollAssert',
         text,
-        direction: dir as "up" | "down" | "left" | "right",
+        direction: dir as 'up' | 'down' | 'left' | 'right',
         maxScrolls,
       };
     }
 
     if (keys.length !== 1) {
-      throw new Error(`Step ${index + 1}: expected a single key per object (e.g. tap: "Label"), got: ${keys.join(", ")}`);
+      throw new Error(
+        `Step ${index + 1}: expected a single key per object (e.g. tap: "Label"), got: ${keys.join(', ')}`
+      );
     }
     const k = keys[0];
     const v = o[k];
 
-    if (k === "wait") {
+    if (k === 'wait') {
       const sec = Number(v);
       if (!Number.isFinite(sec) || sec < 0) {
         throw new Error(`Step ${index + 1}: wait must be a non-negative number (seconds)`);
       }
-      return { kind: "wait", seconds: sec };
+      return { kind: 'wait', seconds: sec };
     }
-    if (k === "waitUntil") {
+    if (k === 'waitUntil') {
       const val = String(v).trim().toLowerCase();
-      if (val === "screen loaded" || val === "screenloaded" || val === "screen ready" || val === "screen stable") {
-        return { kind: "waitUntil", condition: "screenLoaded", timeoutSeconds: 10 };
+      if (
+        val === 'screen loaded' ||
+        val === 'screenloaded' ||
+        val === 'screen ready' ||
+        val === 'screen stable'
+      ) {
+        return { kind: 'waitUntil', condition: 'screenLoaded', timeoutSeconds: 10 };
       }
-      return { kind: "waitUntil", condition: "visible", text: String(v).trim(), timeoutSeconds: 10 };
+      return {
+        kind: 'waitUntil',
+        condition: 'visible',
+        text: String(v).trim(),
+        timeoutSeconds: 10,
+      };
     }
-    if (k === "waitUntilGone") {
-      return { kind: "waitUntil", condition: "gone", text: String(v).trim(), timeoutSeconds: 10 };
+    if (k === 'waitUntilGone') {
+      return { kind: 'waitUntil', condition: 'gone', text: String(v).trim(), timeoutSeconds: 10 };
     }
-    if (k === "tap") return { kind: "tap", label: String(v) };
-    if (k === "type") return { kind: "type", text: String(v) };
-    if (k === "assert" || k === "verify" || k === "check") {
-      return { kind: "assert", text: String(v) };
+    if (k === 'tap') return { kind: 'tap', label: String(v) };
+    if (k === 'type') return { kind: 'type', text: String(v) };
+    if (k === 'assert' || k === 'verify' || k === 'check') {
+      return { kind: 'assert', text: String(v) };
     }
-    if (k === "getInfo") {
-      return { kind: "getInfo", query: String(v) };
+    if (k === 'getInfo') {
+      return { kind: 'getInfo', query: String(v) };
     }
-    if (k === "done") {
-      return { kind: "done", message: v == null || v === "" ? undefined : String(v) };
+    if (k === 'done') {
+      return { kind: 'done', message: v == null || v === '' ? undefined : String(v) };
     }
     throw new Error(`Step ${index + 1}: unknown action "${k}"`);
   }
@@ -182,8 +215,8 @@ interface RawExtraction {
   rawAssertions?: unknown[];
 }
 
-const PHASE_KEYS = new Set(["setup", "steps", "assertions"]);
-const META_KEYS = new Set(["appId", "name", "description", "platform", "env", "parallel"]);
+const PHASE_KEYS = new Set(['setup', 'steps', 'assertions']);
+const META_KEYS = new Set(['appId', 'name', 'description', 'platform', 'env', 'parallel']);
 
 function extractRaw(docs: ReturnType<typeof parseAllDocuments>): RawExtraction {
   let meta: FlowMeta = {};
@@ -191,12 +224,12 @@ function extractRaw(docs: ReturnType<typeof parseAllDocuments>): RawExtraction {
   // ── Two-document format ──
   if (docs.length >= 2) {
     const m = docs[0].toJS();
-    if (m && typeof m === "object" && !Array.isArray(m)) {
+    if (m && typeof m === 'object' && !Array.isArray(m)) {
       const { env: envBlock, ...rest } = m as Record<string, unknown>;
       meta = rest as FlowMeta;
-      if (envBlock && typeof envBlock === "object") {
+      if (envBlock && typeof envBlock === 'object') {
         meta.inlineEnv = envBlock as Record<string, unknown>;
-      } else if (typeof envBlock === "string") {
+      } else if (typeof envBlock === 'string') {
         meta.env = envBlock;
       }
     }
@@ -209,7 +242,7 @@ function extractRaw(docs: ReturnType<typeof parseAllDocuments>): RawExtraction {
     }
 
     // doc2 is an object — could be phased or { steps: [...] }
-    if (doc2 && typeof doc2 === "object") {
+    if (doc2 && typeof doc2 === 'object') {
       const obj = doc2 as Record<string, unknown>;
       return extractPhasedOrFlat(meta, obj);
     }
@@ -222,12 +255,12 @@ function extractRaw(docs: ReturnType<typeof parseAllDocuments>): RawExtraction {
   if (Array.isArray(j)) {
     return { meta, rawSteps: j };
   }
-  if (j && typeof j === "object") {
+  if (j && typeof j === 'object') {
     const obj = j as Record<string, unknown>;
     // Pull meta keys out
     for (const key of META_KEYS) {
       if (key in obj) {
-        if (key === "env" && typeof obj[key] === "object") {
+        if (key === 'env' && typeof obj[key] === 'object') {
           meta.inlineEnv = obj[key] as Record<string, unknown>;
         } else {
           (meta as Record<string, unknown>)[key] = obj[key];
@@ -237,17 +270,17 @@ function extractRaw(docs: ReturnType<typeof parseAllDocuments>): RawExtraction {
     return extractPhasedOrFlat(meta, obj);
   }
 
-  throw new Error("Invalid flow YAML root");
+  throw new Error('Invalid flow YAML root');
 }
 
 function extractPhasedOrFlat(meta: FlowMeta, obj: Record<string, unknown>): RawExtraction {
   // Suite detection: object has a `flows:` key containing file paths
-  if (Array.isArray(obj.flows) && obj.flows.every(f => typeof f === "string")) {
+  if (Array.isArray(obj.flows) && obj.flows.every((f) => typeof f === 'string')) {
     // Handled upstream — caller checks for suite before calling this
-    throw new Error("Suite YAML (flows: [...]) must be parsed with parseFlowOrSuiteFile");
+    throw new Error('Suite YAML (flows: [...]) must be parsed with parseFlowOrSuiteFile');
   }
 
-  const hasPhaseKeys = Object.keys(obj).some(k => PHASE_KEYS.has(k));
+  const hasPhaseKeys = Object.keys(obj).some((k) => PHASE_KEYS.has(k));
 
   if (hasPhaseKeys) {
     // Phased format
@@ -256,7 +289,7 @@ function extractPhasedOrFlat(meta: FlowMeta, obj: Record<string, unknown>): RawE
     const rawAssertions = Array.isArray(obj.assertions) ? obj.assertions : undefined;
 
     if (!rawMain && !rawSetup && !rawAssertions) {
-      throw new Error("Phased flow must have at least one of: setup, steps, assertions");
+      throw new Error('Phased flow must have at least one of: setup, steps, assertions');
     }
 
     return { meta, rawSetup, rawMain, rawAssertions };
@@ -268,8 +301,8 @@ function extractPhasedOrFlat(meta: FlowMeta, obj: Record<string, unknown>): RawE
   }
 
   throw new Error(
-    "Expected a YAML sequence of steps, or two documents (meta --- steps), " +
-    "or an object with `steps: []`, or phased sections (setup/steps/assertions)"
+    'Expected a YAML sequence of steps, or two documents (meta --- steps), ' +
+      'or an object with `steps: []`, or phased sections (setup/steps/assertions)'
   );
 }
 
@@ -286,12 +319,12 @@ export async function parseFlowYamlString(
 ): Promise<ParsedFlow> {
   const docs = parseAllDocuments(content);
   if (docs.length === 0) {
-    throw new Error("Empty YAML");
+    throw new Error('Empty YAML');
   }
 
   for (const doc of docs) {
     if (doc.errors.length > 0) {
-      throw new Error(doc.errors.map(e => e.message).join("; "));
+      throw new Error(doc.errors.map((e) => e.message).join('; '));
     }
   }
 
@@ -307,7 +340,7 @@ export async function parseFlowYamlString(
       const setupSteps = await parseRawSteps(raw.rawSetup);
       for (const s of setupSteps) {
         const resolved = interpolateStep(s as Record<string, unknown>, bindings) as FlowStep;
-        phases.push({ step: resolved, phase: "setup" });
+        phases.push({ step: resolved, phase: 'setup' });
         allSteps.push(resolved);
       }
     }
@@ -316,7 +349,7 @@ export async function parseFlowYamlString(
       const mainSteps = await parseRawSteps(raw.rawMain);
       for (const s of mainSteps) {
         const resolved = interpolateStep(s as Record<string, unknown>, bindings) as FlowStep;
-        phases.push({ step: resolved, phase: "test" });
+        phases.push({ step: resolved, phase: 'test' });
         allSteps.push(resolved);
       }
     }
@@ -329,7 +362,7 @@ export async function parseFlowYamlString(
         // it's in the assertions section, leave it. If it's a raw string that parsed
         // as something other than assert, keep it — the user may want to do actions
         // in assertions. But if it didn't parse (and was LLM-resolved), trust the LLM.
-        phases.push({ step: resolved, phase: "assertion" });
+        phases.push({ step: resolved, phase: 'assertion' });
         allSteps.push(resolved);
       }
     }
@@ -339,14 +372,14 @@ export async function parseFlowYamlString(
 
   // ── Flat format (legacy) ──
   if (!raw.rawSteps || !Array.isArray(raw.rawSteps)) {
-    throw new Error("Flow steps must be a YAML array");
+    throw new Error('Flow steps must be a YAML array');
   }
 
   const steps = await parseRawSteps(raw.rawSteps);
   const resolvedSteps = steps.map(
-    s => interpolateStep(s as Record<string, unknown>, bindings) as FlowStep
+    (s) => interpolateStep(s as Record<string, unknown>, bindings) as FlowStep
   );
-  const phases: PhasedStep[] = resolvedSteps.map(step => ({ step, phase: "test" as FlowPhase }));
+  const phases: PhasedStep[] = resolvedSteps.map((step) => ({ step, phase: 'test' as FlowPhase }));
 
   return { meta: raw.meta, steps: resolvedSteps, phases };
 }
@@ -365,7 +398,7 @@ export async function parseFlowYamlFile(
   filepath: string,
   options: ParseOptions = {}
 ): Promise<ParsedFlow> {
-  const content = readFileSync(filepath, "utf-8");
+  const content = readFileSync(filepath, 'utf-8');
 
   // If caller already provided bindings (e.g. --env CLI flag), use those directly
   if (options.bindings && Object.keys(options.bindings.variables).length > 0) {
@@ -374,7 +407,7 @@ export async function parseFlowYamlFile(
 
   // First pass: extract meta to discover env: field (parse without bindings)
   const docs = parseAllDocuments(content);
-  if (docs.length === 0) throw new Error("Empty YAML");
+  if (docs.length === 0) throw new Error('Empty YAML');
   const raw = extractRaw(docs);
   let bindings = emptyBindings();
 
@@ -412,11 +445,13 @@ export function isSuiteYaml(content: string): boolean {
     if (docs.length === 0) return false;
     // Two-doc: check second doc. Single-doc: check the only doc.
     const doc = docs.length >= 2 ? docs[1].toJS() : docs[0].toJS();
-    if (doc && typeof doc === "object" && !Array.isArray(doc)) {
+    if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
       const obj = doc as Record<string, unknown>;
-      return Array.isArray(obj.flows) && obj.flows.every((f: unknown) => typeof f === "string");
+      return Array.isArray(obj.flows) && obj.flows.every((f: unknown) => typeof f === 'string');
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return false;
 }
 
@@ -447,13 +482,13 @@ export function isSuiteYaml(content: string): boolean {
  * Flow paths are resolved relative to the suite file's directory.
  */
 export function parseSuiteYamlFile(filepath: string): ParsedSuite {
-  const content = readFileSync(filepath, "utf-8");
+  const content = readFileSync(filepath, 'utf-8');
   const docs = parseAllDocuments(content);
-  if (docs.length === 0) throw new Error("Empty suite YAML");
+  if (docs.length === 0) throw new Error('Empty suite YAML');
 
   for (const doc of docs) {
     if (doc.errors.length > 0) {
-      throw new Error(doc.errors.map(e => e.message).join("; "));
+      throw new Error(doc.errors.map((e) => e.message).join('; '));
     }
   }
 
@@ -463,17 +498,17 @@ export function parseSuiteYamlFile(filepath: string): ParsedSuite {
   if (docs.length >= 2) {
     // Two-doc: first is meta, second has `flows:`
     const m = docs[0].toJS();
-    if (m && typeof m === "object" && !Array.isArray(m)) {
+    if (m && typeof m === 'object' && !Array.isArray(m)) {
       meta = m as FlowMeta;
     }
     const doc2 = docs[1].toJS();
-    if (doc2 && typeof doc2 === "object" && !Array.isArray(doc2)) {
+    if (doc2 && typeof doc2 === 'object' && !Array.isArray(doc2)) {
       rawFlows = (doc2 as Record<string, unknown>).flows as unknown[];
     }
   } else {
     // Single doc: meta fields + flows in same object
     const doc = docs[0].toJS();
-    if (doc && typeof doc === "object" && !Array.isArray(doc)) {
+    if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
       const obj = doc as Record<string, unknown>;
       for (const key of META_KEYS) {
         if (key in obj) (meta as Record<string, unknown>)[key] = obj[key];
@@ -483,14 +518,14 @@ export function parseSuiteYamlFile(filepath: string): ParsedSuite {
   }
 
   if (!Array.isArray(rawFlows) || rawFlows.length === 0) {
-    throw new Error("Suite YAML must have a non-empty `flows:` list of file paths");
+    throw new Error('Suite YAML must have a non-empty `flows:` list of file paths');
   }
-  if (!rawFlows.every(f => typeof f === "string")) {
-    throw new Error("Suite `flows:` entries must all be file path strings");
+  if (!rawFlows.every((f) => typeof f === 'string')) {
+    throw new Error('Suite `flows:` entries must all be file path strings');
   }
 
   const suiteDir = dirname(resolve(filepath));
-  const flows = (rawFlows as string[]).map(f => resolve(suiteDir, f));
+  const flows = (rawFlows as string[]).map((f) => resolve(suiteDir, f));
 
   return { meta, flows };
 }
@@ -501,12 +536,12 @@ export function parseSuiteYamlFile(filepath: string): ParsedSuite {
  */
 function findEnvFile(flowFilePath: string, envName: string): string | null {
   let dir = dirname(resolve(flowFilePath));
-  const root = resolve("/");
+  const root = resolve('/');
 
   while (dir !== root) {
-    const candidate = resolve(dir, ".appclaw", "env", `${envName}.yaml`);
+    const candidate = resolve(dir, '.appclaw', 'env', `${envName}.yaml`);
     if (existsSync(candidate)) return candidate;
-    const ymlCandidate = resolve(dir, ".appclaw", "env", `${envName}.yml`);
+    const ymlCandidate = resolve(dir, '.appclaw', 'env', `${envName}.yml`);
     if (existsSync(ymlCandidate)) return ymlCandidate;
     dir = dirname(dir);
   }

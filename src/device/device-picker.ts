@@ -10,17 +10,17 @@
  * - Searchable interactive picker for long lists
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import type { Platform, DeviceType } from "../index.js";
-import { extractText } from "../mcp/tools.js";
-import { interactivePicker } from "./interactive-picker.js";
-import type { PickerItem } from "./interactive-picker.js";
-import * as ui from "../ui/terminal.js";
+import type { MCPClient } from '../mcp/types.js';
+import type { Platform, DeviceType } from '../index.js';
+import { extractText } from '../mcp/tools.js';
+import { interactivePicker } from './interactive-picker.js';
+import type { PickerItem } from './interactive-picker.js';
+import * as ui from '../ui/terminal.js';
 
 export interface DeviceInfo {
   name: string;
   udid: string;
-  state?: string;  // "Booted", "Shutdown", etc.
+  state?: string; // "Booted", "Shutdown", etc.
   platform?: string; // iOS version for simulators
 }
 
@@ -42,28 +42,33 @@ export async function discoverAndSelectDevice(
   deviceType: DeviceType | undefined,
   udid: string | null,
   deviceName: string | null,
-  forceDevicePicker: boolean = false,
+  forceDevicePicker: boolean = false
 ): Promise<DeviceSelection> {
   // Step 1: Call select_platform to discover available devices
   ui.startSpinner(`Discovering ${platform} devices...`);
 
   const selectPlatformArgs: Record<string, unknown> = { platform };
-  if (platform === "ios" && deviceType) {
+  if (platform === 'ios' && deviceType) {
     selectPlatformArgs.iosDeviceType = deviceType;
   }
 
-  const platformResult = await mcp.callTool("select_platform", selectPlatformArgs);
+  const platformResult = await mcp.callTool('select_platform', selectPlatformArgs);
   const platformText = extractText(platformResult);
   ui.stopSpinner();
 
   // Check for errors
-  if (platformText.toLowerCase().includes("no devices") || platformText.toLowerCase().includes("no simulators") || platformText.toLowerCase().includes("no ios devices")) {
-    const hint = platform === "android"
-      ? "Connect a device/emulator: adb devices"
-      : deviceType === "simulator"
-        ? "Open Simulator.app or run: xcrun simctl list devices"
-        : "Connect an iOS device via USB and trust this computer";
-    ui.printSetupError(`No ${platform} ${deviceType ?? ""} devices found.`, hint);
+  if (
+    platformText.toLowerCase().includes('no devices') ||
+    platformText.toLowerCase().includes('no simulators') ||
+    platformText.toLowerCase().includes('no ios devices')
+  ) {
+    const hint =
+      platform === 'android'
+        ? 'Connect a device/emulator: adb devices'
+        : deviceType === 'simulator'
+          ? 'Open Simulator.app or run: xcrun simctl list devices'
+          : 'Connect an iOS device via USB and trust this computer';
+    ui.printSetupError(`No ${platform} ${deviceType ?? ''} devices found.`, hint);
     process.exit(1);
   }
 
@@ -79,7 +84,7 @@ export async function discoverAndSelectDevice(
     ui.printSetupOk(`${platform} device available`);
     await selectDeviceOnMcp(mcp, platform, deviceType, udid ?? undefined);
     return {
-      device: { name: "Unknown Device", udid: udid ?? "auto" },
+      device: { name: 'Unknown Device', udid: udid ?? 'auto' },
       platform,
       deviceType,
     };
@@ -90,27 +95,35 @@ export async function discoverAndSelectDevice(
 
   if (udid) {
     // Explicit UDID — find matching device
-    const match = devices.find(d => d.udid === udid);
+    const match = devices.find((d) => d.udid === udid);
     if (!match) {
-      ui.printError(`Device with UDID "${udid}" not found.`, `Available:\n${devices.map(d => `  ${d.name} (${d.udid})`).join("\n")}`);
+      ui.printError(
+        `Device with UDID "${udid}" not found.`,
+        `Available:\n${devices.map((d) => `  ${d.name} (${d.udid})`).join('\n')}`
+      );
       process.exit(1);
     }
     selectedDevice = match;
   } else if (deviceName) {
     // Explicit name — find matching device (case-insensitive partial match)
-    const match = devices.find(d => d.name.toLowerCase().includes(deviceName.toLowerCase()));
+    const match = devices.find((d) => d.name.toLowerCase().includes(deviceName.toLowerCase()));
     if (!match) {
-      ui.printError(`Device "${deviceName}" not found.`, `Available:\n${devices.map(d => `  ${d.name} (${d.udid})`).join("\n")}`);
+      ui.printError(
+        `Device "${deviceName}" not found.`,
+        `Available:\n${devices.map((d) => `  ${d.name} (${d.udid})`).join('\n')}`
+      );
       process.exit(1);
     }
     selectedDevice = match;
   } else if (devices.length === 1 && !forceDevicePicker) {
     // Only one device + explicit CLI selection — auto-select
     selectedDevice = devices[0];
-    ui.printSetupOk(`Selected ${selectedDevice.name}${selectedDevice.state ? ` (${selectedDevice.state})` : ""}`);
+    ui.printSetupOk(
+      `Selected ${selectedDevice.name}${selectedDevice.state ? ` (${selectedDevice.state})` : ''}`
+    );
   } else if (!forceDevicePicker) {
     // Multiple devices with explicit CLI — auto-select if exactly one is booted
-    const bootedDevices = devices.filter(d => d.state?.toLowerCase() === "booted");
+    const bootedDevices = devices.filter((d) => d.state?.toLowerCase() === 'booted');
     if (bootedDevices.length === 1) {
       selectedDevice = bootedDevices[0];
       ui.printSetupOk(`Auto-selected ${selectedDevice.name} (Booted)`);
@@ -126,7 +139,7 @@ export async function discoverAndSelectDevice(
     if (process.stdin.isTTY && process.stdout.isTTY) {
       selectedDevice = await promptDevicePicker(devices);
     } else {
-      const bootedDevices = devices.filter(d => d.state?.toLowerCase() === "booted");
+      const bootedDevices = devices.filter((d) => d.state?.toLowerCase() === 'booted');
       selectedDevice = bootedDevices[0] ?? devices[0];
       ui.printInfo(`Auto-selected ${selectedDevice.name} (use --udid to specify)`);
     }
@@ -143,16 +156,16 @@ async function selectDeviceOnMcp(
   mcp: MCPClient,
   platform: Platform,
   deviceType: DeviceType | undefined,
-  deviceUdid?: string,
+  deviceUdid?: string
 ): Promise<void> {
   const args: Record<string, unknown> = { platform };
-  if (platform === "ios" && deviceType) {
+  if (platform === 'ios' && deviceType) {
     args.iosDeviceType = deviceType;
   }
   if (deviceUdid) {
     args.deviceUdid = deviceUdid;
   }
-  await mcp.callTool("select_device", args);
+  await mcp.callTool('select_device', args);
 }
 
 /**
@@ -163,18 +176,18 @@ async function selectDeviceOnMcp(
  */
 function cleanAndSortDevices(devices: DeviceInfo[]): DeviceInfo[] {
   // Filter out junk
-  const filtered = devices.filter(d => {
+  const filtered = devices.filter((d) => {
     const name = d.name.toLowerCase();
     // Remove devices named "Unknown" or empty
-    if (name === "unknown" || !name || name === "my device name") return false;
+    if (name === 'unknown' || !name || name === 'my device name') return false;
     // Remove Apple TV devices (not useful for mobile testing)
-    if (name.includes("apple tv")) return false;
+    if (name.includes('apple tv')) return false;
     return true;
   });
 
   // Deduplicate by UDID
   const seen = new Set<string>();
-  const unique = filtered.filter(d => {
+  const unique = filtered.filter((d) => {
     if (seen.has(d.udid)) return false;
     seen.add(d.udid);
     return true;
@@ -182,8 +195,8 @@ function cleanAndSortDevices(devices: DeviceInfo[]): DeviceInfo[] {
 
   // Sort: booted first, then by name
   unique.sort((a, b) => {
-    const aBooted = a.state?.toLowerCase() === "booted" ? 0 : 1;
-    const bBooted = b.state?.toLowerCase() === "booted" ? 0 : 1;
+    const aBooted = a.state?.toLowerCase() === 'booted' ? 0 : 1;
+    const bBooted = b.state?.toLowerCase() === 'booted' ? 0 : 1;
     if (aBooted !== bBooted) return aBooted - bBooted;
     return a.name.localeCompare(b.name);
   });
@@ -205,7 +218,7 @@ export function parseDeviceList(text: string, _platform: Platform): DeviceInfo[]
       for (const d of data) {
         if (d.udid || d.UDID) {
           devices.push({
-            name: d.name || d.deviceName || d.model || "Unknown",
+            name: d.name || d.deviceName || d.model || 'Unknown',
             udid: d.udid || d.UDID,
             state: d.state,
             platform: d.platform || d.version,
@@ -221,7 +234,7 @@ export function parseDeviceList(text: string, _platform: Platform): DeviceInfo[]
   // Parse text format — look for patterns like:
   // "1. iPhone 16 Pro (E9F10A3E-58E6-4506-B273-B22AF836014E) - Shutdown"
   // "- iPhone 15 (iOS 17.5) | UDID: XXXXXXXX | State: Shutdown"
-  const lines = text.split("\n");
+  const lines = text.split('\n');
 
   for (const line of lines) {
     // Match UDID patterns — ordered from most specific to least specific:
@@ -231,23 +244,25 @@ export function parseDeviceList(text: string, _platform: Platform): DeviceInfo[]
     // 4. Bare UUID (iOS simulators)
     // 5. Real device UDID (40 hex chars)
     // 6. Short iOS device UDID
-    const udidMatch = line.match(/(emulator-\d+)/)           // Android emulator
-      || line.match(/(?:udid|UDID)[:\s=]+([A-F0-9-]{20,})/i)
-      || line.match(/\(([A-F0-9]{8}-(?:[A-F0-9]{4}-){3}[A-F0-9]{12})\)/i)
-      || line.match(/([A-F0-9]{8}-(?:[A-F0-9]{4}-){3}[A-F0-9]{12})/i)
-      || line.match(/([0-9A-F]{40})/i)                        // Real device UDIDs (40 hex chars)
-      || line.match(/([0-9A-F]{8}-[0-9A-F]{16})/i);           // Short iOS device UDIDs
+    const udidMatch =
+      line.match(/(emulator-\d+)/) || // Android emulator
+      line.match(/(?:udid|UDID)[:\s=]+([A-F0-9-]{20,})/i) ||
+      line.match(/\(([A-F0-9]{8}-(?:[A-F0-9]{4}-){3}[A-F0-9]{12})\)/i) ||
+      line.match(/([A-F0-9]{8}-(?:[A-F0-9]{4}-){3}[A-F0-9]{12})/i) ||
+      line.match(/([0-9A-F]{40})/i) || // Real device UDIDs (40 hex chars)
+      line.match(/([0-9A-F]{8}-[0-9A-F]{16})/i); // Short iOS device UDIDs
 
     if (!udidMatch) continue;
 
     const udid = udidMatch[1];
 
     // For Android emulators, the UDID is the display name too
-    let name = udid.startsWith("emulator-") ? udid : "Unknown";
+    let name = udid.startsWith('emulator-') ? udid : 'Unknown';
 
-    if (!udid.startsWith("emulator-")) {
-      const nameMatch = line.match(/(?:^[-\d.\s]*)([\w][\w\s']+?)(?:\s*\(|\s*[-|]?\s*(?:udid|UDID|state))/i)
-        || line.match(/(?:name|device)[:\s=]+([^\n|,]+)/i);
+    if (!udid.startsWith('emulator-')) {
+      const nameMatch =
+        line.match(/(?:^[-\d.\s]*)([\w][\w\s']+?)(?:\s*\(|\s*[-|]?\s*(?:udid|UDID|state))/i) ||
+        line.match(/(?:name|device)[:\s=]+([^\n|,]+)/i);
       if (nameMatch) {
         name = nameMatch[1].trim();
       }
@@ -255,8 +270,9 @@ export function parseDeviceList(text: string, _platform: Platform): DeviceInfo[]
 
     // Extract state
     let state: string | undefined;
-    const stateMatch = line.match(/(?:state|status)[:\s=]+(\w+)/i)
-      || line.match(/[-–]\s*(Booted|Shutdown|Shutting Down)/i);
+    const stateMatch =
+      line.match(/(?:state|status)[:\s=]+(\w+)/i) ||
+      line.match(/[-–]\s*(Booted|Shutdown|Shutting Down)/i);
     if (stateMatch) {
       state = stateMatch[1];
     }
@@ -276,11 +292,14 @@ export function parseDeviceList(text: string, _platform: Platform): DeviceInfo[]
 
 /** Interactive device picker using the shared searchable picker */
 async function promptDevicePicker(devices: DeviceInfo[]): Promise<DeviceInfo> {
-  const items: PickerItem<DeviceInfo>[] = devices.map(d => {
-    const tag = d.state?.toLowerCase() === "booted" ? "Booted" : undefined;
-    const hint = d.state?.toLowerCase() !== "booted" && d.platform
-      ? `iOS ${d.platform}`
-      : d.platform ? `iOS ${d.platform}` : undefined;
+  const items: PickerItem<DeviceInfo>[] = devices.map((d) => {
+    const tag = d.state?.toLowerCase() === 'booted' ? 'Booted' : undefined;
+    const hint =
+      d.state?.toLowerCase() !== 'booted' && d.platform
+        ? `iOS ${d.platform}`
+        : d.platform
+          ? `iOS ${d.platform}`
+          : undefined;
 
     return {
       label: d.name,
@@ -292,7 +311,7 @@ async function promptDevicePicker(devices: DeviceInfo[]): Promise<DeviceInfo> {
 
   // Start selection on first booted device (if any)
   return interactivePicker(items, {
-    prompt: "Select device:",
+    prompt: 'Select device:',
     viewportSize: 12,
     searchable: devices.length > 5,
   });

@@ -24,6 +24,7 @@ No formal test framework (Jest/Vitest) is configured. Tests are ad-hoc scripts i
 ### Entry Point & CLI Modes (`src/index.ts`)
 
 The CLI routes to 6 modes based on flags:
+
 - **Interactive** (default) — prompts for platform/device/goal, runs agent loop
 - **YAML Flow** (`--flow file.yaml`) — declarative automation, zero LLM cost
 - **Playground** (`--playground`) — interactive REPL for building flows
@@ -34,6 +35,7 @@ The CLI routes to 6 modes based on flags:
 ### Core Agent Loop (`src/agent/loop.ts`)
 
 The main Perception→Reasoning→Action loop:
+
 1. **Perceive** — get screen state (DOM XML or screenshot) via `src/perception/`
 2. **Reason** — send trimmed DOM + goal + history to LLM via `src/llm/`
 3. **Act** — execute action (tap, type, swipe) via appium-mcp through `src/mcp/`

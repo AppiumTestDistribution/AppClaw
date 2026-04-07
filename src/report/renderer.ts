@@ -5,18 +5,18 @@
  * No build step required — pure template strings.
  */
 
-import type { RunIndex, RunIndexEntry, RunManifest, StepArtifact, SuiteEntry } from "./types.js";
-import type { FlowPhase } from "../flow/types.js";
+import type { RunIndex, RunIndexEntry, RunManifest, StepArtifact, SuiteEntry } from './types.js';
+import type { FlowPhase } from '../flow/types.js';
 
 /* ─── Helpers ────────────────────────────────────────────── */
 
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function formatDuration(ms: number): string {
@@ -30,18 +30,23 @@ function formatDuration(ms: number): string {
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
 function formatDateShort(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function successRate(runs: RunIndexEntry[]): number {
@@ -49,32 +54,48 @@ function successRate(runs: RunIndexEntry[]): number {
   return (runs.filter((r) => r.success).length / runs.length) * 100;
 }
 
-
 function phaseLabel(phase: FlowPhase): string {
   switch (phase) {
-    case "setup": return "Setup";
-    case "test": return "Test";
-    case "assertion": return "Assertion";
+    case 'setup':
+      return 'Setup';
+    case 'test':
+      return 'Test';
+    case 'assertion':
+      return 'Assertion';
   }
 }
 
-
 function stepKindLabel(kind: string): string {
   switch (kind) {
-    case "tap": return "Tap";
-    case "type": return "Type";
-    case "assert": return "Assert";
-    case "scrollAssert": return "Scroll Assert";
-    case "swipe": return "Swipe";
-    case "wait": return "Wait";
-    case "waitUntil": return "Wait Until";
-    case "openApp": case "launchApp": return "Launch";
-    case "back": return "Back";
-    case "home": return "Home";
-    case "enter": return "Enter";
-    case "getInfo": return "Get Info";
-    case "done": return "Done";
-    default: return kind;
+    case 'tap':
+      return 'Tap';
+    case 'type':
+      return 'Type';
+    case 'assert':
+      return 'Assert';
+    case 'scrollAssert':
+      return 'Scroll Assert';
+    case 'swipe':
+      return 'Swipe';
+    case 'wait':
+      return 'Wait';
+    case 'waitUntil':
+      return 'Wait Until';
+    case 'openApp':
+    case 'launchApp':
+      return 'Launch';
+    case 'back':
+      return 'Back';
+    case 'home':
+      return 'Home';
+    case 'enter':
+      return 'Enter';
+    case 'getInfo':
+      return 'Get Info';
+    case 'done':
+      return 'Done';
+    default:
+      return kind;
   }
 }
 
@@ -358,32 +379,36 @@ function iconSteps(): string {
 
 function healthSummary(runs: RunIndexEntry[]): { headline: string; sub: string; cls: string } {
   if (runs.length === 0) {
-    return { headline: "No runs recorded yet", sub: "Run a YAML flow to see results here.", cls: "neutral" };
+    return {
+      headline: 'No runs recorded yet',
+      sub: 'Run a YAML flow to see results here.',
+      cls: 'neutral',
+    };
   }
-  const passed = runs.filter(r => r.success).length;
+  const passed = runs.filter((r) => r.success).length;
   const failed = runs.length - passed;
   const latest = runs[0];
-  const latestName = latest.flowName || latest.flowFile.split("/").pop() || latest.runId;
+  const latestName = latest.flowName || latest.flowFile.split('/').pop() || latest.runId;
   const latestDate = formatDateShort(latest.startedAt);
 
   if (failed === 0) {
     return {
-      headline: `All ${runs.length} run${runs.length !== 1 ? "s" : ""} passed`,
+      headline: `All ${runs.length} run${runs.length !== 1 ? 's' : ''} passed`,
       sub: `Latest: ${latestName} — ${latestDate}`,
-      cls: "all-passed",
+      cls: 'all-passed',
     };
   }
   if (passed === 0) {
     return {
-      headline: `All ${runs.length} run${runs.length !== 1 ? "s" : ""} failed`,
+      headline: `All ${runs.length} run${runs.length !== 1 ? 's' : ''} failed`,
       sub: `Latest failure: ${latestName} — ${latestDate}`,
-      cls: "all-failed",
+      cls: 'all-failed',
     };
   }
   return {
-    headline: `${failed} of ${runs.length} run${runs.length !== 1 ? "s" : ""} failed`,
+    headline: `${failed} of ${runs.length} run${runs.length !== 1 ? 's' : ''} failed`,
     sub: `${passed} passed · ${failed} need attention`,
-    cls: "partial",
+    cls: 'partial',
   };
 }
 
@@ -392,7 +417,7 @@ function healthSummary(runs: RunIndexEntry[]): { headline: string; sub: string; 
 export function renderIndexPage(index: RunIndex): string {
   const runs = index.runs;
   const rate = successRate(runs);
-  const failed = runs.filter(r => !r.success).length;
+  const failed = runs.filter((r) => !r.success).length;
 
   return `<!doctype html>
 <html lang="en">
@@ -791,11 +816,12 @@ export function renderIndexPage(index: RunIndex): string {
     <!-- Health Banner -->
     ${(() => {
       const h = healthSummary(runs);
-      const icon = h.cls === "all-passed"
-        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
-        : h.cls === "neutral"
-        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
-        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      const icon =
+        h.cls === 'all-passed'
+          ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+          : h.cls === 'neutral'
+            ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+            : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
       return `<div class="health-banner ${h.cls} animate-in animate-in-1">
         <div class="health-icon">${icon}</div>
         <div>
@@ -813,18 +839,18 @@ export function renderIndexPage(index: RunIndex): string {
       </div>
       <div class="stat-card">
         <div class="stat-label">Pass Rate</div>
-        <div class="stat-value ${rate >= 80 ? "success" : rate >= 50 ? "" : "failure"}">${rate.toFixed(0)}%</div>
+        <div class="stat-value ${rate >= 80 ? 'success' : rate >= 50 ? '' : 'failure'}">${rate.toFixed(0)}%</div>
         <div class="stat-bar">
-          <div class="stat-bar-fill ${rate >= 80 ? "" : rate >= 50 ? "mid" : "low"}" style="width:${rate.toFixed(0)}%"></div>
+          <div class="stat-bar-fill ${rate >= 80 ? '' : rate >= 50 ? 'mid' : 'low'}" style="width:${rate.toFixed(0)}%"></div>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Passed</div>
-        <div class="stat-value success">${runs.filter(r => r.success).length}</div>
+        <div class="stat-value success">${runs.filter((r) => r.success).length}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Failed</div>
-        <div class="stat-value ${failed > 0 ? "failure" : ""}">${failed}</div>
+        <div class="stat-value ${failed > 0 ? 'failure' : ''}">${failed}</div>
       </div>
     </section>
 
@@ -832,14 +858,15 @@ export function renderIndexPage(index: RunIndex): string {
     <section class="runs-panel animate-in animate-in-3">
       <div class="runs-header">
         <h2>Run History</h2>
-        <span class="runs-count">${runs.length} run${runs.length !== 1 ? "s" : ""}</span>
+        <span class="runs-count">${runs.length} run${runs.length !== 1 ? 's' : ''}</span>
       </div>
-      ${runs.length === 0
-        ? `<div class="empty-state">
+      ${
+        runs.length === 0
+          ? `<div class="empty-state">
             <p>No flow runs recorded yet.</p>
             <p>Run a YAML flow with <code>appclaw --flow</code> to get started.</p>
           </div>`
-        : `<div class="run-list-header">
+          : `<div class="run-list-header">
             <span></span>
             <span class="col-label">Flow</span>
             <span class="col-label">Platform</span>
@@ -847,7 +874,8 @@ export function renderIndexPage(index: RunIndex): string {
             <span class="col-label">Duration</span>
             <span class="col-label">Status</span>
           </div>
-          ${renderRunList(runs, index.suites ?? [])}`}
+          ${renderRunList(runs, index.suites ?? [])}`
+      }
     </section>
   </main>
   <script>
@@ -871,7 +899,7 @@ export function renderIndexPage(index: RunIndex): string {
 
 /** Build the ordered display list — suite groups first, then standalone runs, maintaining recency order. */
 function renderRunList(runs: RunIndexEntry[], suites: SuiteEntry[]): string {
-  const suiteMap = new Map<string, SuiteEntry>(suites.map(s => [s.suiteId, s]));
+  const suiteMap = new Map<string, SuiteEntry>(suites.map((s) => [s.suiteId, s]));
   const seenSuiteIds = new Set<string>();
   const html: string[] = [];
 
@@ -879,7 +907,7 @@ function renderRunList(runs: RunIndexEntry[], suites: SuiteEntry[]): string {
     if (run.suiteId) {
       if (!seenSuiteIds.has(run.suiteId)) {
         seenSuiteIds.add(run.suiteId);
-        const childRuns = runs.filter(r => r.suiteId === run.suiteId);
+        const childRuns = runs.filter((r) => r.suiteId === run.suiteId);
         const suite = suiteMap.get(run.suiteId);
         html.push(renderSuiteGroup(run.suiteId, run.suiteName, suite, childRuns));
       }
@@ -889,27 +917,29 @@ function renderRunList(runs: RunIndexEntry[], suites: SuiteEntry[]): string {
     }
   }
 
-  return html.join("");
+  return html.join('');
 }
 
 function renderSuiteGroup(
   suiteId: string,
   suiteName: string | undefined,
   suite: SuiteEntry | undefined,
-  childRuns: RunIndexEntry[],
+  childRuns: RunIndexEntry[]
 ): string {
-  const allPassed = childRuns.every(r => r.success);
-  const cls = allPassed ? "success" : "failure";
-  const platform = suite?.platform ?? childRuns[0]?.platform ?? "android";
-  const platformIcon = platform === "ios" ? iconApple() : iconAndroid();
-  const startedAt = suite?.startedAt ?? childRuns[0]?.startedAt ?? "";
+  const allPassed = childRuns.every((r) => r.success);
+  const cls = allPassed ? 'success' : 'failure';
+  const platform = suite?.platform ?? childRuns[0]?.platform ?? 'android';
+  const platformIcon = platform === 'ios' ? iconApple() : iconAndroid();
+  const startedAt = suite?.startedAt ?? childRuns[0]?.startedAt ?? '';
   const durationMs = suite?.durationMs ?? childRuns.reduce((s, r) => s + r.durationMs, 0);
-  const passedCount = suite?.passedCount ?? childRuns.filter(r => r.success).length;
+  const passedCount = suite?.passedCount ?? childRuns.filter((r) => r.success).length;
   const totalCount = childRuns.length;
-  const displayName = suiteName ?? "Suite";
+  const displayName = suiteName ?? 'Suite';
   const escapedSuiteId = escapeHtml(suiteId);
-  const statusLabel = allPassed ? `All ${passedCount} passed` : `${passedCount}/${totalCount} passed`;
-  const statusCls = allPassed ? "success" : "failure";
+  const statusLabel = allPassed
+    ? `All ${passedCount} passed`
+    : `${passedCount}/${totalCount} passed`;
+  const statusCls = allPassed ? 'success' : 'failure';
 
   return `
     <div class="suite-group">
@@ -917,10 +947,10 @@ function renderSuiteGroup(
         <div class="run-status-bar ${cls}"></div>
         <div>
           <div class="suite-name">${escapeHtml(displayName)} <span class="suite-badge">Suite</span></div>
-          <div class="suite-meta">${totalCount} flow${totalCount !== 1 ? "s" : ""}</div>
+          <div class="suite-meta">${totalCount} flow${totalCount !== 1 ? 's' : ''}</div>
         </div>
         <span class="run-platform">${platformIcon} ${escapeHtml(platform)}</span>
-        <span class="run-date">${startedAt ? escapeHtml(formatDateShort(startedAt)) : "—"}</span>
+        <span class="run-date">${startedAt ? escapeHtml(formatDateShort(startedAt)) : '—'}</span>
         <span class="run-duration">${escapeHtml(formatDuration(durationMs))}</span>
         <div style="display:flex;align-items:center;gap:8px;justify-content:flex-start">
           <span class="status-pill ${statusCls}"><span class="status-dot ${statusCls}"></span>${escapeHtml(statusLabel)}</span>
@@ -928,25 +958,26 @@ function renderSuiteGroup(
         </div>
       </div>
       <div class="suite-children" id="suite-children-${escapedSuiteId}">
-        ${childRuns.map(renderChildRunRow).join("")}
+        ${childRuns.map(renderChildRunRow).join('')}
       </div>
     </div>`;
 }
 
 function renderChildRunRow(run: RunIndexEntry): string {
-  const name = run.flowName || run.flowFile.split("/").pop() || run.runId;
-  const cls = run.success ? "success" : "failure";
-  const failedCls = !run.success ? " failed-row" : "";
-  const platformIcon = run.platform === "ios" ? iconApple() : iconAndroid();
-  const failureHint = !run.success && run.device
-    ? `<div class="run-failure-hint">Failed on ${escapeHtml(run.device)}</div>`
-    : "";
+  const name = run.flowName || run.flowFile.split('/').pop() || run.runId;
+  const cls = run.success ? 'success' : 'failure';
+  const failedCls = !run.success ? ' failed-row' : '';
+  const platformIcon = run.platform === 'ios' ? iconApple() : iconAndroid();
+  const failureHint =
+    !run.success && run.device
+      ? `<div class="run-failure-hint">Failed on ${escapeHtml(run.device)}</div>`
+      : '';
   return `
     <a class="suite-child-run${failedCls}" href="/runs/${escapeHtml(run.runId)}">
       <div class="run-status-bar ${cls}"></div>
       <div class="child-run-info">
         <div class="child-run-name">${escapeHtml(name)}</div>
-        <div class="child-run-device">${run.device ? escapeHtml(run.device) : escapeHtml(run.flowFile.split("/").pop() || run.flowFile)}</div>
+        <div class="child-run-device">${run.device ? escapeHtml(run.device) : escapeHtml(run.flowFile.split('/').pop() || run.flowFile)}</div>
         ${failureHint}
       </div>
       <span class="run-platform">${platformIcon} ${escapeHtml(run.platform)}</span>
@@ -957,13 +988,13 @@ function renderChildRunRow(run: RunIndexEntry): string {
 }
 
 function renderRunRow(run: RunIndexEntry): string {
-  const name = run.flowName || run.flowFile.split("/").pop() || run.runId;
-  const cls = run.success ? "success" : "failure";
-  const failedCls = !run.success ? " failed-row" : "";
-  const platformIcon = run.platform === "ios" ? iconApple() : iconAndroid();
+  const name = run.flowName || run.flowFile.split('/').pop() || run.runId;
+  const cls = run.success ? 'success' : 'failure';
+  const failedCls = !run.success ? ' failed-row' : '';
+  const platformIcon = run.platform === 'ios' ? iconApple() : iconAndroid();
   const failureHint = !run.success
-    ? `<div class="run-failure-hint">Failed at step ${run.stepsExecuted} of ${run.stepsTotal}${run.failedPhase ? ` (${run.failedPhase})` : ""}</div>`
-    : "";
+    ? `<div class="run-failure-hint">Failed at step ${run.stepsExecuted} of ${run.stepsTotal}${run.failedPhase ? ` (${run.failedPhase})` : ''}</div>`
+    : '';
   return `
     <a class="run-item${failedCls}" href="/runs/${escapeHtml(run.runId)}">
       <div class="run-status-bar ${cls}"></div>
@@ -980,17 +1011,17 @@ function renderRunRow(run: RunIndexEntry): string {
 }
 
 function renderStatusPill(success: boolean): string {
-  const cls = success ? "success" : "failure";
-  const label = success ? "Passed" : "Failed";
+  const cls = success ? 'success' : 'failure';
+  const label = success ? 'Passed' : 'Failed';
   return `<span class="status-pill ${cls}"><span class="status-dot ${cls}"></span>${label}</span>`;
 }
 
 /* ─── Run Detail Page ────────────────────────────────────── */
 
 export function renderRunPage(manifest: RunManifest): string {
-  const name = manifest.meta.name || manifest.flowFile.split("/").pop() || manifest.runId;
+  const name = manifest.meta.name || manifest.flowFile.split('/').pop() || manifest.runId;
   const hasPhases = manifest.phaseResults && manifest.phaseResults.length > 0;
-  const platformIcon = manifest.platform === "ios" ? iconApple() : iconAndroid();
+  const platformIcon = manifest.platform === 'ios' ? iconApple() : iconAndroid();
 
   return `<!doctype html>
 <html lang="en">
@@ -1532,14 +1563,16 @@ export function renderRunPage(manifest: RunManifest): string {
 
     <!-- Status Hero -->
     ${(() => {
-      const failedStep = manifest.steps.find(s => s.status === "failed");
-      const verdictText = manifest.success ? "Flow passed" : `Flow failed at step ${manifest.stepsExecuted} of ${manifest.stepsTotal}`;
-      const cls = manifest.success ? "passed" : "failed";
+      const failedStep = manifest.steps.find((s) => s.status === 'failed');
+      const verdictText = manifest.success
+        ? 'Flow passed'
+        : `Flow failed at step ${manifest.stepsExecuted} of ${manifest.stepsTotal}`;
+      const cls = manifest.success ? 'passed' : 'failed';
       const icon = manifest.success
         ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
         : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
-      let reasonHtml = "";
+      let reasonHtml = '';
       if (!manifest.success) {
         if (failedStep?.verbatim) {
           reasonHtml = `<div class="status-hero-reason"><strong>"${escapeHtml(failedStep.verbatim)}"</strong></div>`;
@@ -1560,13 +1593,13 @@ export function renderRunPage(manifest: RunManifest): string {
             <span>${platformIcon} <strong>${escapeHtml(manifest.platform)}</strong></span>
             <span>${iconClock()} <strong>${escapeHtml(formatDuration(manifest.durationMs))}</strong></span>
             <span>${iconSteps()} <strong>${manifest.stepsExecuted}/${manifest.stepsTotal}</strong> steps</span>
-            ${manifest.device ? `<span>${iconDevice()} <strong>${escapeHtml(manifest.device)}</strong></span>` : ""}
+            ${manifest.device ? `<span>${iconDevice()} <strong>${escapeHtml(manifest.device)}</strong></span>` : ''}
           </div>
         </div>
       </section>`;
     })()}
 
-    ${hasPhases ? renderPhaseTrack(manifest) : ""}
+    ${hasPhases ? renderPhaseTrack(manifest) : ''}
 
     <!-- Workspace -->
     <section class="workspace animate-in animate-in-2">
@@ -1589,20 +1622,26 @@ export function renderRunPage(manifest: RunManifest): string {
         </div>
         <div class="detail-body">
           <div class="screenshot-area" id="screenshot-area">
-            ${manifest.steps.length > 0 && manifest.steps[0].screenshotPath
-              ? `<div class="device-frame ${escapeHtml(manifest.platform)}" id="device-frame">
-                  ${manifest.platform === "ios"
-                    ? '<div class="device-notch"></div>'
-                    : '<div class="device-bezel-top"><div class="device-camera"></div><div class="device-speaker"></div></div>'}
-                  <div class="${manifest.platform === "android" ? "device-screen" : ""}"><div class="screenshot-frame" id="screenshot-frame"><img id="screenshot-img" src="/artifacts/${escapeHtml(manifest.runId)}/${escapeHtml(manifest.steps[0].screenshotPath)}" alt="Step screenshot"></div></div>
-                  ${manifest.platform === "ios"
-                    ? '<div class="device-home"></div>'
-                    : '<div class="device-bezel-bottom"><div class="nav-pill"></div></div>'}
+            ${
+              manifest.steps.length > 0 && manifest.steps[0].screenshotPath
+                ? `<div class="device-frame ${escapeHtml(manifest.platform)}" id="device-frame">
+                  ${
+                    manifest.platform === 'ios'
+                      ? '<div class="device-notch"></div>'
+                      : '<div class="device-bezel-top"><div class="device-camera"></div><div class="device-speaker"></div></div>'
+                  }
+                  <div class="${manifest.platform === 'android' ? 'device-screen' : ''}"><div class="screenshot-frame" id="screenshot-frame"><img id="screenshot-img" src="/artifacts/${escapeHtml(manifest.runId)}/${escapeHtml(manifest.steps[0].screenshotPath)}" alt="Step screenshot"></div></div>
+                  ${
+                    manifest.platform === 'ios'
+                      ? '<div class="device-home"></div>'
+                      : '<div class="device-bezel-bottom"><div class="nav-pill"></div></div>'
+                  }
                 </div>`
-              : `<div class="empty-screenshot" id="screenshot-frame">Select a step to view its screenshot</div>`}
+                : `<div class="empty-screenshot" id="screenshot-frame">Select a step to view its screenshot</div>`
+            }
           </div>
           <div class="step-info" id="step-info">
-            ${manifest.steps.length > 0 ? renderStepDetailInfo(manifest.steps[0]) : ""}
+            ${manifest.steps.length > 0 ? renderStepDetailInfo(manifest.steps[0]) : ''}
           </div>
         </div>
       </div>
@@ -1610,24 +1649,26 @@ export function renderRunPage(manifest: RunManifest): string {
   </main>
 
   <script>
-    var steps = ${JSON.stringify(manifest.steps.map(s => ({
-      index: s.index,
-      kind: s.kind,
-      verbatim: s.verbatim || null,
-      target: s.target || null,
-      phase: s.phase,
-      status: s.status,
-      durationMs: s.durationMs,
-      error: s.error || null,
-      message: s.message || null,
-      screenshotPath: s.screenshotPath || null,
-      beforeScreenshotPath: s.beforeScreenshotPath || null,
-      tapCoordinates: s.tapCoordinates || null,
-      deviceScreenSize: s.deviceScreenSize || null,
-      screenshotSize: s.screenshotSize || null,
-    }))).replace(/</g, "\\u003c")};
-    var runId = ${JSON.stringify(manifest.runId).replace(/</g, "\\u003c")};
-    var platform = ${JSON.stringify(manifest.platform).replace(/</g, "\\u003c")};
+    var steps = ${JSON.stringify(
+      manifest.steps.map((s) => ({
+        index: s.index,
+        kind: s.kind,
+        verbatim: s.verbatim || null,
+        target: s.target || null,
+        phase: s.phase,
+        status: s.status,
+        durationMs: s.durationMs,
+        error: s.error || null,
+        message: s.message || null,
+        screenshotPath: s.screenshotPath || null,
+        beforeScreenshotPath: s.beforeScreenshotPath || null,
+        tapCoordinates: s.tapCoordinates || null,
+        deviceScreenSize: s.deviceScreenSize || null,
+        screenshotSize: s.screenshotSize || null,
+      }))
+    ).replace(/</g, '\\u003c')};
+    var runId = ${JSON.stringify(manifest.runId).replace(/</g, '\\u003c')};
+    var platform = ${JSON.stringify(manifest.platform).replace(/</g, '\\u003c')};
     var currentStep = null;
     var currentView = 'before';
 
@@ -1789,23 +1830,25 @@ export function renderRunPage(manifest: RunManifest): string {
 }
 
 function renderPhaseTrack(manifest: RunManifest): string {
-  if (!manifest.phaseResults) return "";
+  if (!manifest.phaseResults) return '';
   return `
     <section class="phase-track animate-in animate-in-2">
-      ${manifest.phaseResults.map((pr) => {
-        const cls = pr.success ? "passed" : "failed";
-        return `
+      ${manifest.phaseResults
+        .map((pr) => {
+          const cls = pr.success ? 'passed' : 'failed';
+          return `
           <div class="phase-seg ${cls}">
             <span class="phase-name">${phaseLabel(pr.phase)}</span>
             <span class="phase-steps">${pr.stepsExecuted}/${pr.stepsTotal}</span>
           </div>`;
-      }).join("")}
+        })
+        .join('')}
     </section>`;
 }
 
 function renderStepTimeline(manifest: RunManifest): string {
   const hasPhases = manifest.phaseResults && manifest.phaseResults.length > 0;
-  let html = "";
+  let html = '';
   let currentPhase: FlowPhase | null = null;
 
   for (const step of manifest.steps) {
@@ -1826,10 +1869,10 @@ function renderStepTimeline(manifest: RunManifest): string {
 function renderStepItem(step: StepArtifact): string {
   const isFirst = step.index === 0;
   const label = step.verbatim || step.target || step.kind;
-  const failedCls = step.status === "failed" ? " failed-step" : "";
+  const failedCls = step.status === 'failed' ? ' failed-step' : '';
   return `
     <button
-      class="step-item${isFirst ? " selected" : ""}${failedCls}"
+      class="step-item${isFirst ? ' selected' : ''}${failedCls}"
       data-step="${step.index}"
       onclick="selectStep(${step.index})"
       type="button"
@@ -1844,12 +1887,12 @@ function renderStepItem(step: StepArtifact): string {
         </div>
         <span class="step-time">${escapeHtml(formatDuration(step.durationMs))}</span>
       </div>
-      ${step.status === "failed" && step.error ? `<div class="step-error-inline">${escapeHtml(step.error)}</div>` : ""}
+      ${step.status === 'failed' && step.error ? `<div class="step-error-inline">${escapeHtml(step.error)}</div>` : ''}
     </button>`;
 }
 
 function renderStepDetailInfo(step: StepArtifact): string {
-  let html = "";
+  let html = '';
   if (step.verbatim) {
     html += `<div class="info-section"><div class="info-label">Instruction</div><div class="info-value command">${escapeHtml(step.verbatim)}</div></div>`;
   } else if (step.target) {

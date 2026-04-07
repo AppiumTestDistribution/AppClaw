@@ -1,655 +1,798 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Usage Guide — AppClaw</title>
-  <meta name="description" content="Complete usage guide for AppClaw — CLI commands, YAML flow syntax, natural language instructions, variables, vision modes, and configuration.">
-  <meta name="theme-color" content="#ffffff">
-  <link rel="icon" type="image/svg+xml" href="logo.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    :root {
-      --bg: #ffffff;
-      --bg-alt: #f9fafb;
-      --text: #0f172a;
-      --text-secondary: #64748b;
-      --text-tertiary: #94a3b8;
-      --accent: #f97316;
-      --accent-hover: #ea580c;
-      --teal: #0ea5e9;
-      --purple: #7c3aed;
-      --green: #16a34a;
-      --border: rgba(15,23,42,0.08);
-      --terminal-bg: #0f172a;
-      --terminal-text: #e2e8f0;
-      --radius: 16px;
-      --radius-lg: 24px;
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.7;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 32px;
-    }
-
-    /* ===== ANIMATIONS ===== */
-    .reveal {
-      opacity: 0;
-      transform: translateY(40px);
-      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .reveal { opacity: 1; transform: none; transition: none; }
-    }
-
-    /* ===== NAVBAR ===== */
-    nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      background: rgba(255,255,255,0.8);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      border-bottom: 1px solid transparent;
-      transition: border-color 0.3s;
-    }
-    nav.scrolled {
-      border-bottom-color: var(--border);
-    }
-
-    .nav-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 64px;
-    }
-
-    .nav-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-    }
-    .nav-logo img { width: 32px; height: 32px; }
-    .nav-logo span {
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--text);
-      letter-spacing: -0.02em;
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 36px;
-      list-style: none;
-    }
-    .nav-links a {
-      text-decoration: none;
-      color: var(--text-secondary);
-      font-size: 14px;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-    .nav-links a:hover { color: var(--text); }
-    .nav-links a.active { color: var(--accent); font-weight: 600; }
-
-    .nav-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .nav-github {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      text-decoration: none;
-      color: var(--text-secondary);
-      font-size: 13px;
-      font-weight: 500;
-      padding: 6px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      transition: all 0.2s;
-    }
-    .nav-github:hover { border-color: rgba(15,23,42,0.2); color: var(--text); }
-    .nav-github svg { width: 18px; height: 18px; }
-
-    .nav-cta {
-      display: inline-flex;
-      align-items: center;
-      padding: 8px 20px;
-      background: var(--accent);
-      color: #fff;
-      font-size: 14px;
-      font-weight: 600;
-      border-radius: 8px;
-      text-decoration: none;
-      transition: background 0.2s;
-    }
-    .nav-cta:hover { background: var(--accent-hover); }
-
-    .mobile-menu-btn {
-      display: none;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 4px;
-    }
-    .mobile-menu-btn svg { width: 24px; height: 24px; color: var(--text); }
-
-    /* ===== PAGE HEADER ===== */
-    .page-header {
-      padding: 120px 0 60px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .page-header-orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(100px);
-      opacity: 0.1;
-      pointer-events: none;
-    }
-    .page-header-orb-1 {
-      width: 500px; height: 500px;
-      background: var(--accent);
-      top: -200px; left: -100px;
-    }
-    .page-header-orb-2 {
-      width: 400px; height: 400px;
-      background: var(--teal);
-      top: -100px; right: -150px;
-    }
-
-    .page-header h1 {
-      font-size: clamp(2rem, 4vw, 3rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      margin-bottom: 16px;
-    }
-
-    .page-header p {
-      font-size: 18px;
-      color: var(--text-secondary);
-      max-width: 640px;
-      margin: 0 auto;
-    }
-
-    /* ===== DOCS LAYOUT ===== */
-    .docs-layout {
-      display: grid;
-      grid-template-columns: 220px 1fr;
-      gap: 64px;
-      padding: 60px 0 120px;
-    }
-
-    /* Sidebar */
-    .docs-sidebar {
-      position: sticky;
-      top: 96px;
-      align-self: start;
-      max-height: calc(100vh - 120px);
-      overflow-y: auto;
-    }
-
-    .docs-sidebar ul {
-      list-style: none;
-    }
-
-    .docs-sidebar li {
-      margin-bottom: 4px;
-    }
-
-    .docs-sidebar a {
-      display: block;
-      padding: 6px 12px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      text-decoration: none;
-      border-radius: 6px;
-      transition: all 0.15s;
-    }
-    .docs-sidebar a:hover {
-      color: var(--text);
-      background: var(--bg-alt);
-    }
-    .docs-sidebar a.active {
-      color: var(--accent);
-      background: rgba(249,115,22,0.08);
-    }
-
-    .docs-sidebar .sidebar-heading {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-tertiary);
-      padding: 16px 12px 6px;
-    }
-    .docs-sidebar .sidebar-heading:first-child {
-      padding-top: 0;
-    }
-
-    /* Content */
-    .docs-content {
-      min-width: 0;
-    }
-
-    .docs-content section {
-      margin-bottom: 64px;
-    }
-
-    .docs-content h2 {
-      font-size: 1.75rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 2px solid var(--bg-alt);
-    }
-
-    .docs-content h3 {
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-top: 36px;
-      margin-bottom: 12px;
-      color: var(--text);
-    }
-
-    .docs-content p {
-      color: var(--text-secondary);
-      margin-bottom: 16px;
-      font-size: 15px;
-    }
-
-    .docs-content ul, .docs-content ol {
-      margin-bottom: 16px;
-      padding-left: 24px;
-    }
-
-    .docs-content li {
-      color: var(--text-secondary);
-      font-size: 15px;
-      margin-bottom: 6px;
-    }
-
-    .docs-content li code {
-      background: var(--bg-alt);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      color: var(--accent);
-    }
-
-    /* Code blocks */
-    .code-block {
-      background: var(--terminal-bg);
-      border-radius: var(--radius);
-      margin-bottom: 24px;
-      overflow: hidden;
-    }
-
-    .code-block-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 20px;
-      background: rgba(255,255,255,0.04);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .code-block-dots {
-      display: flex;
-      gap: 6px;
-    }
-    .code-block-dots span {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-    }
-    .code-block-dots span:nth-child(1) { background: #ef4444; }
-    .code-block-dots span:nth-child(2) { background: #eab308; }
-    .code-block-dots span:nth-child(3) { background: #22c55e; }
-
-    .code-block-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--text-tertiary);
-    }
-
-    .code-block pre {
-      padding: 20px;
-      overflow-x: auto;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      line-height: 1.7;
-      color: var(--terminal-text);
-    }
-
-    .code-block pre .c  { color: #64748b; } /* comment */
-    .code-block pre .k  { color: #f97316; } /* keyword / key */
-    .code-block pre .s  { color: #22d3ee; } /* string */
-    .code-block pre .v  { color: #a78bfa; } /* variable */
-    .code-block pre .n  { color: #facc15; } /* number */
-    .code-block pre .p  { color: #94a3b8; } /* punctuation */
-    .code-block pre .g  { color: #4ade80; } /* green / success */
-    .code-block pre .fl { color: #fb923c; } /* flag */
-
-    /* Inline code */
-    code {
-      background: var(--bg-alt);
-      padding: 2px 7px;
-      border-radius: 5px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      color: var(--accent);
-      border: 1px solid var(--border);
-    }
-
-    /* Command reference table */
-    .cmd-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 24px;
-      font-size: 14px;
-    }
-    .cmd-table th {
-      text-align: left;
-      padding: 12px 16px;
-      font-weight: 600;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-tertiary);
-      background: var(--bg-alt);
-      border-bottom: 2px solid var(--border);
-    }
-    .cmd-table td {
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border);
-      color: var(--text-secondary);
-      vertical-align: top;
-    }
-    .cmd-table td:first-child {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      color: var(--accent);
-      white-space: nowrap;
-    }
-    .cmd-table tr:last-child td { border-bottom: none; }
-    .cmd-table tr:hover td { background: rgba(249,115,22,0.03); }
-
-    /* Badge / pill */
-    .badge {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 20px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .badge-orange { background: rgba(249,115,22,0.1); color: var(--accent); }
-    .badge-teal   { background: rgba(14,165,233,0.1); color: var(--teal); }
-    .badge-purple { background: rgba(124,58,237,0.1); color: var(--purple); }
-    .badge-green  { background: rgba(22,163,74,0.1);  color: var(--green); }
-
-    /* Callout / tip box */
-    .callout {
-      padding: 16px 20px;
-      border-radius: 12px;
-      margin-bottom: 24px;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-    .callout-tip {
-      background: rgba(14,165,233,0.06);
-      border-left: 3px solid var(--teal);
-    }
-    .callout-tip .callout-title { color: var(--teal); }
-    .callout-warn {
-      background: rgba(249,115,22,0.06);
-      border-left: 3px solid var(--accent);
-    }
-    .callout-warn .callout-title { color: var(--accent); }
-    .callout-title {
-      font-weight: 700;
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-bottom: 4px;
-    }
-    .callout p { margin-bottom: 0; }
-
-    /* Footer */
-    footer {
-      background: var(--bg-alt);
-      padding: 80px 0 40px;
-      border-top: 1px solid var(--border);
-    }
-    .footer-grid {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr;
-      gap: 48px;
-    }
-    .footer-brand p {
-      color: var(--text-secondary);
-      font-size: 14px;
-      margin-top: 12px;
-      max-width: 280px;
-    }
-    .footer-brand .footer-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .footer-brand .footer-logo img { width: 28px; height: 28px; }
-    .footer-brand .footer-logo span {
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--text);
-    }
-    .footer-col h4 {
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-tertiary);
-      margin-bottom: 16px;
-    }
-    .footer-col ul { list-style: none; }
-    .footer-col li { margin-bottom: 12px; }
-    .footer-col a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-size: 14px;
-      transition: color 0.2s;
-    }
-    .footer-col a:hover { color: var(--text); }
-
-    .footer-bottom {
-      margin-top: 48px;
-      padding-top: 24px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13px;
-      color: var(--text-tertiary);
-    }
-    .footer-socials {
-      display: flex;
-      gap: 16px;
-    }
-    .footer-socials a {
-      color: var(--text-tertiary);
-      transition: color 0.2s;
-    }
-    .footer-socials a:hover { color: var(--text); }
-    .footer-socials svg { width: 20px; height: 20px; }
-
-    /* ===== RESPONSIVE ===== */
-    @media (max-width: 1024px) {
-      .docs-layout {
-        grid-template-columns: 1fr;
-        gap: 0;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Usage Guide — AppClaw</title>
+    <meta
+      name="description"
+      content="Complete usage guide for AppClaw — CLI commands, YAML flow syntax, natural language instructions, variables, vision modes, and configuration."
+    />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" type="image/svg+xml" href="logo.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-      .docs-sidebar {
-        position: relative;
+
+      :root {
+        --bg: #ffffff;
+        --bg-alt: #f9fafb;
+        --text: #0f172a;
+        --text-secondary: #64748b;
+        --text-tertiary: #94a3b8;
+        --accent: #f97316;
+        --accent-hover: #ea580c;
+        --teal: #0ea5e9;
+        --purple: #7c3aed;
+        --green: #16a34a;
+        --border: rgba(15, 23, 42, 0.08);
+        --terminal-bg: #0f172a;
+        --terminal-text: #e2e8f0;
+        --radius: 16px;
+        --radius-lg: 24px;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 32px;
+      }
+
+      /* ===== ANIMATIONS ===== */
+      .reveal {
+        opacity: 0;
+        transform: translateY(40px);
+        transition:
+          opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+          transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .reveal.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .reveal {
+          opacity: 1;
+          transform: none;
+          transition: none;
+        }
+      }
+
+      /* ===== NAVBAR ===== */
+      nav {
+        position: fixed;
         top: 0;
-        max-height: none;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.3s;
+      }
+      nav.scrolled {
+        border-bottom-color: var(--border);
+      }
+
+      .nav-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 32px;
         display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        padding-bottom: 32px;
-        border-bottom: 1px solid var(--border);
-        margin-bottom: 40px;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
       }
+
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+      }
+      .nav-logo img {
+        width: 32px;
+        height: 32px;
+      }
+      .nav-logo span {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text);
+        letter-spacing: -0.02em;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 36px;
+        list-style: none;
+      }
+      .nav-links a {
+        text-decoration: none;
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 500;
+        transition: color 0.2s;
+      }
+      .nav-links a:hover {
+        color: var(--text);
+      }
+      .nav-links a.active {
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .nav-github {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-weight: 500;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        transition: all 0.2s;
+      }
+      .nav-github:hover {
+        border-color: rgba(15, 23, 42, 0.2);
+        color: var(--text);
+      }
+      .nav-github svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .nav-cta {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 20px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 8px;
+        text-decoration: none;
+        transition: background 0.2s;
+      }
+      .nav-cta:hover {
+        background: var(--accent-hover);
+      }
+
+      .mobile-menu-btn {
+        display: none;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+      }
+      .mobile-menu-btn svg {
+        width: 24px;
+        height: 24px;
+        color: var(--text);
+      }
+
+      /* ===== PAGE HEADER ===== */
+      .page-header {
+        padding: 120px 0 60px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .page-header-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(100px);
+        opacity: 0.1;
+        pointer-events: none;
+      }
+      .page-header-orb-1 {
+        width: 500px;
+        height: 500px;
+        background: var(--accent);
+        top: -200px;
+        left: -100px;
+      }
+      .page-header-orb-2 {
+        width: 400px;
+        height: 400px;
+        background: var(--teal);
+        top: -100px;
+        right: -150px;
+      }
+
+      .page-header h1 {
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+        margin-bottom: 16px;
+      }
+
+      .page-header p {
+        font-size: 18px;
+        color: var(--text-secondary);
+        max-width: 640px;
+        margin: 0 auto;
+      }
+
+      /* ===== DOCS LAYOUT ===== */
+      .docs-layout {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 64px;
+        padding: 60px 0 120px;
+      }
+
+      /* Sidebar */
+      .docs-sidebar {
+        position: sticky;
+        top: 96px;
+        align-self: start;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+      }
+
+      .docs-sidebar ul {
+        list-style: none;
+      }
+
+      .docs-sidebar li {
+        margin-bottom: 4px;
+      }
+
+      .docs-sidebar a {
+        display: block;
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-decoration: none;
+        border-radius: 6px;
+        transition: all 0.15s;
+      }
+      .docs-sidebar a:hover {
+        color: var(--text);
+        background: var(--bg-alt);
+      }
+      .docs-sidebar a.active {
+        color: var(--accent);
+        background: rgba(249, 115, 22, 0.08);
+      }
+
       .docs-sidebar .sidebar-heading {
-        width: 100%;
-        padding: 12px 0 4px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-tertiary);
+        padding: 16px 12px 6px;
       }
-      .docs-sidebar li { margin-bottom: 0; }
-    }
+      .docs-sidebar .sidebar-heading:first-child {
+        padding-top: 0;
+      }
 
-    @media (max-width: 768px) {
-      .nav-links { display: none; }
-      .nav-right { display: none; }
-      .mobile-menu-btn { display: block; }
-      .footer-grid { grid-template-columns: 1fr; gap: 40px; }
-      .cmd-table { font-size: 13px; }
-      .cmd-table td, .cmd-table th { padding: 8px 12px; }
-    }
+      /* Content */
+      .docs-content {
+        min-width: 0;
+      }
 
-    @media (max-width: 480px) {
-      .page-header h1 { font-size: 1.75rem; }
-      .page-header p { font-size: 16px; }
-    }
-  </style>
-</head>
-<body>
+      .docs-content section {
+        margin-bottom: 64px;
+      }
 
-  <!-- NAVBAR -->
-  <nav id="navbar">
-    <div class="nav-inner">
-      <a class="nav-logo" href="index.html">
-        <img src="logo.svg" alt="AppClaw">
-        <span>AppClaw</span>
-      </a>
-      <ul class="nav-links">
-        <li><a href="index.html#features">Features</a></li>
-        <li><a href="index.html#how-it-works">How It Works</a></li>
-        <li><a href="usage.html" class="active">Usage Guide</a></li>
-        <li><a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank">GitHub</a></li>
-      </ul>
-      <div class="nav-right">
-        <a class="nav-github" href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener">
-          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          Star
+      .docs-content h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--bg-alt);
+      }
+
+      .docs-content h3 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-top: 36px;
+        margin-bottom: 12px;
+        color: var(--text);
+      }
+
+      .docs-content p {
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+        font-size: 15px;
+      }
+
+      .docs-content ul,
+      .docs-content ol {
+        margin-bottom: 16px;
+        padding-left: 24px;
+      }
+
+      .docs-content li {
+        color: var(--text-secondary);
+        font-size: 15px;
+        margin-bottom: 6px;
+      }
+
+      .docs-content li code {
+        background: var(--bg-alt);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: var(--accent);
+      }
+
+      /* Code blocks */
+      .code-block {
+        background: var(--terminal-bg);
+        border-radius: var(--radius);
+        margin-bottom: 24px;
+        overflow: hidden;
+      }
+
+      .code-block-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .code-block-dots {
+        display: flex;
+        gap: 6px;
+      }
+      .code-block-dots span {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      .code-block-dots span:nth-child(1) {
+        background: #ef4444;
+      }
+      .code-block-dots span:nth-child(2) {
+        background: #eab308;
+      }
+      .code-block-dots span:nth-child(3) {
+        background: #22c55e;
+      }
+
+      .code-block-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        color: var(--text-tertiary);
+      }
+
+      .code-block pre {
+        padding: 20px;
+        overflow-x: auto;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--terminal-text);
+      }
+
+      .code-block pre .c {
+        color: #64748b;
+      } /* comment */
+      .code-block pre .k {
+        color: #f97316;
+      } /* keyword / key */
+      .code-block pre .s {
+        color: #22d3ee;
+      } /* string */
+      .code-block pre .v {
+        color: #a78bfa;
+      } /* variable */
+      .code-block pre .n {
+        color: #facc15;
+      } /* number */
+      .code-block pre .p {
+        color: #94a3b8;
+      } /* punctuation */
+      .code-block pre .g {
+        color: #4ade80;
+      } /* green / success */
+      .code-block pre .fl {
+        color: #fb923c;
+      } /* flag */
+
+      /* Inline code */
+      code {
+        background: var(--bg-alt);
+        padding: 2px 7px;
+        border-radius: 5px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: var(--accent);
+        border: 1px solid var(--border);
+      }
+
+      /* Command reference table */
+      .cmd-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 24px;
+        font-size: 14px;
+      }
+      .cmd-table th {
+        text-align: left;
+        padding: 12px 16px;
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-tertiary);
+        background: var(--bg-alt);
+        border-bottom: 2px solid var(--border);
+      }
+      .cmd-table td {
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+        color: var(--text-secondary);
+        vertical-align: top;
+      }
+      .cmd-table td:first-child {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+      .cmd-table tr:last-child td {
+        border-bottom: none;
+      }
+      .cmd-table tr:hover td {
+        background: rgba(249, 115, 22, 0.03);
+      }
+
+      /* Badge / pill */
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .badge-orange {
+        background: rgba(249, 115, 22, 0.1);
+        color: var(--accent);
+      }
+      .badge-teal {
+        background: rgba(14, 165, 233, 0.1);
+        color: var(--teal);
+      }
+      .badge-purple {
+        background: rgba(124, 58, 237, 0.1);
+        color: var(--purple);
+      }
+      .badge-green {
+        background: rgba(22, 163, 74, 0.1);
+        color: var(--green);
+      }
+
+      /* Callout / tip box */
+      .callout {
+        padding: 16px 20px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .callout-tip {
+        background: rgba(14, 165, 233, 0.06);
+        border-left: 3px solid var(--teal);
+      }
+      .callout-tip .callout-title {
+        color: var(--teal);
+      }
+      .callout-warn {
+        background: rgba(249, 115, 22, 0.06);
+        border-left: 3px solid var(--accent);
+      }
+      .callout-warn .callout-title {
+        color: var(--accent);
+      }
+      .callout-title {
+        font-weight: 700;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+      }
+      .callout p {
+        margin-bottom: 0;
+      }
+
+      /* Footer */
+      footer {
+        background: var(--bg-alt);
+        padding: 80px 0 40px;
+        border-top: 1px solid var(--border);
+      }
+      .footer-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr;
+        gap: 48px;
+      }
+      .footer-brand p {
+        color: var(--text-secondary);
+        font-size: 14px;
+        margin-top: 12px;
+        max-width: 280px;
+      }
+      .footer-brand .footer-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .footer-brand .footer-logo img {
+        width: 28px;
+        height: 28px;
+      }
+      .footer-brand .footer-logo span {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .footer-col h4 {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-tertiary);
+        margin-bottom: 16px;
+      }
+      .footer-col ul {
+        list-style: none;
+      }
+      .footer-col li {
+        margin-bottom: 12px;
+      }
+      .footer-col a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 14px;
+        transition: color 0.2s;
+      }
+      .footer-col a:hover {
+        color: var(--text);
+      }
+
+      .footer-bottom {
+        margin-top: 48px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        color: var(--text-tertiary);
+      }
+      .footer-socials {
+        display: flex;
+        gap: 16px;
+      }
+      .footer-socials a {
+        color: var(--text-tertiary);
+        transition: color 0.2s;
+      }
+      .footer-socials a:hover {
+        color: var(--text);
+      }
+      .footer-socials svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      /* ===== RESPONSIVE ===== */
+      @media (max-width: 1024px) {
+        .docs-layout {
+          grid-template-columns: 1fr;
+          gap: 0;
+        }
+        .docs-sidebar {
+          position: relative;
+          top: 0;
+          max-height: none;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          padding-bottom: 32px;
+          border-bottom: 1px solid var(--border);
+          margin-bottom: 40px;
+        }
+        .docs-sidebar .sidebar-heading {
+          width: 100%;
+          padding: 12px 0 4px;
+        }
+        .docs-sidebar li {
+          margin-bottom: 0;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .nav-links {
+          display: none;
+        }
+        .nav-right {
+          display: none;
+        }
+        .mobile-menu-btn {
+          display: block;
+        }
+        .footer-grid {
+          grid-template-columns: 1fr;
+          gap: 40px;
+        }
+        .cmd-table {
+          font-size: 13px;
+        }
+        .cmd-table td,
+        .cmd-table th {
+          padding: 8px 12px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .page-header h1 {
+          font-size: 1.75rem;
+        }
+        .page-header p {
+          font-size: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- NAVBAR -->
+    <nav id="navbar">
+      <div class="nav-inner">
+        <a class="nav-logo" href="index.html">
+          <img src="logo.svg" alt="AppClaw" />
+          <span>AppClaw</span>
         </a>
-        <a class="nav-cta" href="https://github.com/AppiumTestDistribution/appclaw#quick-start">Get Started</a>
+        <ul class="nav-links">
+          <li><a href="index.html#features">Features</a></li>
+          <li><a href="index.html#how-it-works">How It Works</a></li>
+          <li><a href="usage.html" class="active">Usage Guide</a></li>
+          <li>
+            <a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank">GitHub</a>
+          </li>
+        </ul>
+        <div class="nav-right">
+          <a
+            class="nav-github"
+            href="https://github.com/AppiumTestDistribution/appclaw"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+              />
+            </svg>
+            Star
+          </a>
+          <a class="nav-cta" href="https://github.com/AppiumTestDistribution/appclaw#quick-start"
+            >Get Started</a
+          >
+        </div>
+        <button class="mobile-menu-btn" aria-label="Menu">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
       </div>
-      <button class="mobile-menu-btn" aria-label="Menu">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
-      </button>
-    </div>
-  </nav>
+    </nav>
 
-  <!-- PAGE HEADER -->
-  <section class="page-header">
-    <div class="page-header-orb page-header-orb-1"></div>
-    <div class="page-header-orb page-header-orb-2"></div>
+    <!-- PAGE HEADER -->
+    <section class="page-header">
+      <div class="page-header-orb page-header-orb-1"></div>
+      <div class="page-header-orb page-header-orb-2"></div>
+      <div class="container">
+        <h1 class="reveal">Usage Guide</h1>
+        <p class="reveal">
+          Everything you need to automate mobile apps with AppClaw &mdash; CLI commands, YAML flow
+          syntax, natural language instructions, and configuration.
+        </p>
+      </div>
+    </section>
+
+    <!-- DOCS -->
     <div class="container">
-      <h1 class="reveal">Usage Guide</h1>
-      <p class="reveal">Everything you need to automate mobile apps with AppClaw &mdash; CLI commands, YAML flow syntax, natural language instructions, and configuration.</p>
-    </div>
-  </section>
+      <div class="docs-layout">
+        <!-- SIDEBAR -->
+        <aside class="docs-sidebar">
+          <div class="sidebar-heading">Getting Started</div>
+          <ul>
+            <li><a href="#quick-start">Quick Start</a></li>
+            <li><a href="#cli-options">CLI Options</a></li>
+            <li><a href="#execution-modes">Execution Modes</a></li>
+          </ul>
+          <div class="sidebar-heading">YAML Flows</div>
+          <ul>
+            <li><a href="#yaml-overview">Overview</a></li>
+            <li><a href="#flat-format">Flat Format</a></li>
+            <li><a href="#phased-format">Phased Format</a></li>
+            <li><a href="#variables">Variables &amp; Secrets</a></li>
+          </ul>
+          <div class="sidebar-heading">Commands</div>
+          <ul>
+            <li><a href="#tap-click">Tap / Click</a></li>
+            <li><a href="#type-text">Type Text</a></li>
+            <li><a href="#wait">Wait / Pause</a></li>
+            <li><a href="#wait-until">Wait Until</a></li>
+            <li><a href="#scroll-swipe">Scroll / Swipe</a></li>
+            <li><a href="#assert">Assert / Verify</a></li>
+            <li><a href="#navigation">Navigation</a></li>
+            <li><a href="#all-commands">Full Reference</a></li>
+          </ul>
+          <div class="sidebar-heading">Configuration</div>
+          <ul>
+            <li><a href="#vision-modes">Vision Modes</a></li>
+            <li><a href="#env-vars">Environment Variables</a></li>
+          </ul>
+        </aside>
 
-  <!-- DOCS -->
-  <div class="container">
-    <div class="docs-layout">
+        <!-- CONTENT -->
+        <main class="docs-content">
+          <!-- ============================================ -->
+          <!-- GETTING STARTED                              -->
+          <!-- ============================================ -->
+          <section id="quick-start" class="reveal">
+            <h2>Quick Start</h2>
+            <p>Install AppClaw globally and start automating in seconds.</p>
 
-      <!-- SIDEBAR -->
-      <aside class="docs-sidebar">
-        <div class="sidebar-heading">Getting Started</div>
-        <ul>
-          <li><a href="#quick-start">Quick Start</a></li>
-          <li><a href="#cli-options">CLI Options</a></li>
-          <li><a href="#execution-modes">Execution Modes</a></li>
-        </ul>
-        <div class="sidebar-heading">YAML Flows</div>
-        <ul>
-          <li><a href="#yaml-overview">Overview</a></li>
-          <li><a href="#flat-format">Flat Format</a></li>
-          <li><a href="#phased-format">Phased Format</a></li>
-          <li><a href="#variables">Variables &amp; Secrets</a></li>
-        </ul>
-        <div class="sidebar-heading">Commands</div>
-        <ul>
-          <li><a href="#tap-click">Tap / Click</a></li>
-          <li><a href="#type-text">Type Text</a></li>
-          <li><a href="#wait">Wait / Pause</a></li>
-          <li><a href="#wait-until">Wait Until</a></li>
-          <li><a href="#scroll-swipe">Scroll / Swipe</a></li>
-          <li><a href="#assert">Assert / Verify</a></li>
-          <li><a href="#navigation">Navigation</a></li>
-          <li><a href="#all-commands">Full Reference</a></li>
-        </ul>
-        <div class="sidebar-heading">Configuration</div>
-        <ul>
-          <li><a href="#vision-modes">Vision Modes</a></li>
-          <li><a href="#env-vars">Environment Variables</a></li>
-        </ul>
-      </aside>
-
-      <!-- CONTENT -->
-      <main class="docs-content">
-
-        <!-- ============================================ -->
-        <!-- GETTING STARTED                              -->
-        <!-- ============================================ -->
-        <section id="quick-start" class="reveal">
-          <h2>Quick Start</h2>
-          <p>Install AppClaw globally and start automating in seconds.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Terminal</span>
-            </div>
-            <pre><span class="c"># Install</span>
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Terminal</span>
+              </div>
+              <pre><span class="c"># Install</span>
 <span class="k">npm</span> install -g appclaw
 
 <span class="c"># Run with a natural language goal</span>
@@ -660,111 +803,197 @@
 
 <span class="c"># Interactive playground</span>
 <span class="k">appclaw</span> <span class="fl">--playground</span></pre>
-          </div>
-
-        </section>
-
-        <section id="cli-options" class="reveal">
-          <h2>CLI Options</h2>
-          <p>All the flags you can pass to <code>appclaw</code>.</p>
-
-          <h3>Platform &amp; Device</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Flag</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>--platform &lt;os&gt;</td><td>Target platform: <code>android</code> or <code>ios</code></td></tr>
-              <tr><td>--device-type &lt;type&gt;</td><td>iOS only: <code>simulator</code> or <code>real</code></td></tr>
-              <tr><td>--device &lt;name&gt;</td><td>Device name (partial match, e.g. "iPhone 17 Pro")</td></tr>
-              <tr><td>--udid &lt;udid&gt;</td><td>Device UDID (skips the device picker)</td></tr>
-            </tbody>
-          </table>
-
-          <h3>Execution</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Flag</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>--flow &lt;file&gt;</td><td>Run a declarative YAML flow file</td></tr>
-              <tr><td>--env &lt;name&gt;</td><td>Environment for variable/secret resolution</td></tr>
-              <tr><td>--playground</td><td>Launch the interactive REPL for building flows</td></tr>
-              <tr><td>--record</td><td>Record a goal execution for later replay</td></tr>
-              <tr><td>--replay &lt;file&gt;</td><td>Replay a previously recorded session</td></tr>
-              <tr><td>--plan</td><td>Decompose a complex goal into sub-goals</td></tr>
-              <tr><td>--json</td><td>JSON output mode (for IDE extensions)</td></tr>
-            </tbody>
-          </table>
-
-          <h3>Explorer (Test Generation)</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Flag</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>--explore &lt;prd&gt;</td><td>Generate test flows from a PRD document</td></tr>
-              <tr><td>--num-flows &lt;N&gt;</td><td>Number of flows to generate (default: 5)</td></tr>
-              <tr><td>--no-crawl</td><td>Skip device crawling, use PRD only</td></tr>
-              <tr><td>--output-dir &lt;dir&gt;</td><td>Output directory (default: generated-flows)</td></tr>
-              <tr><td>--max-screens &lt;N&gt;</td><td>Max screens to crawl (default: 10)</td></tr>
-              <tr><td>--max-depth &lt;N&gt;</td><td>Max navigation depth (default: 3)</td></tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section id="execution-modes" class="reveal">
-          <h2>Execution Modes</h2>
-          <p>AppClaw has three distinct ways to automate mobile apps.</p>
-
-          <h3><span class="badge badge-orange">Agent Mode</span></h3>
-          <p>Give AppClaw a goal in plain English. The AI agent takes a screenshot, reasons about what it sees, and decides what to tap, type, or swipe &mdash; step by step until the goal is complete.</p>
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Agent Mode</span>
             </div>
-            <pre><span class="k">appclaw</span> <span class="s">"Search for 'Appium 3.0' on YouTube and find the TestMu AI video"</span></pre>
-          </div>
+          </section>
 
-          <h3><span class="badge badge-teal">YAML Flows</span></h3>
-          <p>Define repeatable, version-controlled test flows in YAML. Each step is a natural language instruction &mdash; no element selectors, no brittle locators.</p>
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">YAML Flow</span>
+          <section id="cli-options" class="reveal">
+            <h2>CLI Options</h2>
+            <p>All the flags you can pass to <code>appclaw</code>.</p>
+
+            <h3>Platform &amp; Device</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Flag</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>--platform &lt;os&gt;</td>
+                  <td>Target platform: <code>android</code> or <code>ios</code></td>
+                </tr>
+                <tr>
+                  <td>--device-type &lt;type&gt;</td>
+                  <td>iOS only: <code>simulator</code> or <code>real</code></td>
+                </tr>
+                <tr>
+                  <td>--device &lt;name&gt;</td>
+                  <td>Device name (partial match, e.g. "iPhone 17 Pro")</td>
+                </tr>
+                <tr>
+                  <td>--udid &lt;udid&gt;</td>
+                  <td>Device UDID (skips the device picker)</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Execution</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Flag</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>--flow &lt;file&gt;</td>
+                  <td>Run a declarative YAML flow file</td>
+                </tr>
+                <tr>
+                  <td>--env &lt;name&gt;</td>
+                  <td>Environment for variable/secret resolution</td>
+                </tr>
+                <tr>
+                  <td>--playground</td>
+                  <td>Launch the interactive REPL for building flows</td>
+                </tr>
+                <tr>
+                  <td>--record</td>
+                  <td>Record a goal execution for later replay</td>
+                </tr>
+                <tr>
+                  <td>--replay &lt;file&gt;</td>
+                  <td>Replay a previously recorded session</td>
+                </tr>
+                <tr>
+                  <td>--plan</td>
+                  <td>Decompose a complex goal into sub-goals</td>
+                </tr>
+                <tr>
+                  <td>--json</td>
+                  <td>JSON output mode (for IDE extensions)</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Explorer (Test Generation)</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Flag</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>--explore &lt;prd&gt;</td>
+                  <td>Generate test flows from a PRD document</td>
+                </tr>
+                <tr>
+                  <td>--num-flows &lt;N&gt;</td>
+                  <td>Number of flows to generate (default: 5)</td>
+                </tr>
+                <tr>
+                  <td>--no-crawl</td>
+                  <td>Skip device crawling, use PRD only</td>
+                </tr>
+                <tr>
+                  <td>--output-dir &lt;dir&gt;</td>
+                  <td>Output directory (default: generated-flows)</td>
+                </tr>
+                <tr>
+                  <td>--max-screens &lt;N&gt;</td>
+                  <td>Max screens to crawl (default: 10)</td>
+                </tr>
+                <tr>
+                  <td>--max-depth &lt;N&gt;</td>
+                  <td>Max navigation depth (default: 3)</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section id="execution-modes" class="reveal">
+            <h2>Execution Modes</h2>
+            <p>AppClaw has three distinct ways to automate mobile apps.</p>
+
+            <h3><span class="badge badge-orange">Agent Mode</span></h3>
+            <p>
+              Give AppClaw a goal in plain English. The AI agent takes a screenshot, reasons about
+              what it sees, and decides what to tap, type, or swipe &mdash; step by step until the
+              goal is complete.
+            </p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Agent Mode</span>
+              </div>
+              <pre><span class="k">appclaw</span> <span class="s">"Search for 'Appium 3.0' on YouTube and find the TestMu AI video"</span></pre>
             </div>
-            <pre><span class="k">appclaw</span> <span class="fl">--flow</span> tests/youtube-search.yaml <span class="fl">--env</span> dev</pre>
-          </div>
 
-          <h3><span class="badge badge-purple">Playground</span></h3>
-          <p>An interactive REPL where you type one instruction at a time and see it execute immediately. Great for exploring an app and building flows interactively.</p>
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Playground</span>
+            <h3><span class="badge badge-teal">YAML Flows</span></h3>
+            <p>
+              Define repeatable, version-controlled test flows in YAML. Each step is a natural
+              language instruction &mdash; no element selectors, no brittle locators.
+            </p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">YAML Flow</span>
+              </div>
+              <pre><span class="k">appclaw</span> <span class="fl">--flow</span> tests/youtube-search.yaml <span class="fl">--env</span> dev</pre>
             </div>
-            <pre><span class="k">appclaw</span> <span class="fl">--playground</span> <span class="fl">--platform</span> ios <span class="fl">--device-type</span> simulator</pre>
-          </div>
-        </section>
 
-        <!-- ============================================ -->
-        <!-- YAML FLOWS                                   -->
-        <!-- ============================================ -->
-        <section id="yaml-overview" class="reveal">
-          <h2>Designing YAML Flows</h2>
-          <p>YAML flows are the heart of AppClaw's repeatable automation. Write your test steps in plain English &mdash; AppClaw figures out how to execute them on the device. No XPath, no accessibility IDs, no brittle selectors.</p>
-
-          <div class="callout callout-tip">
-            <div class="callout-title">Key Idea</div>
-            <p>Each step is a natural language instruction like <code>tap Login</code> or <code>wait for the home screen to be visible</code>. AppClaw uses AI to find the right elements on screen.</p>
-          </div>
-        </section>
-
-        <section id="flat-format" class="reveal">
-          <h2>Flat Format</h2>
-          <p>The simplest YAML structure &mdash; a metadata header separated by <code>---</code> from a flat list of steps.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">settings-wifi.yaml</span>
+            <h3><span class="badge badge-purple">Playground</span></h3>
+            <p>
+              An interactive REPL where you type one instruction at a time and see it execute
+              immediately. Great for exploring an app and building flows interactively.
+            </p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Playground</span>
+              </div>
+              <pre><span class="k">appclaw</span> <span class="fl">--playground</span> <span class="fl">--platform</span> ios <span class="fl">--device-type</span> simulator</pre>
             </div>
-            <pre><span class="k">name</span><span class="p">:</span> <span class="s">Turn on Wi-Fi</span>
+          </section>
+
+          <!-- ============================================ -->
+          <!-- YAML FLOWS                                   -->
+          <!-- ============================================ -->
+          <section id="yaml-overview" class="reveal">
+            <h2>Designing YAML Flows</h2>
+            <p>
+              YAML flows are the heart of AppClaw's repeatable automation. Write your test steps in
+              plain English &mdash; AppClaw figures out how to execute them on the device. No XPath,
+              no accessibility IDs, no brittle selectors.
+            </p>
+
+            <div class="callout callout-tip">
+              <div class="callout-title">Key Idea</div>
+              <p>
+                Each step is a natural language instruction like <code>tap Login</code> or
+                <code>wait for the home screen to be visible</code>. AppClaw uses AI to find the
+                right elements on screen.
+              </p>
+            </div>
+          </section>
+
+          <section id="flat-format" class="reveal">
+            <h2>Flat Format</h2>
+            <p>
+              The simplest YAML structure &mdash; a metadata header separated by
+              <code>---</code> from a flat list of steps.
+            </p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">settings-wifi.yaml</span>
+              </div>
+              <pre><span class="k">name</span><span class="p">:</span> <span class="s">Turn on Wi-Fi</span>
 <span class="k">platform</span><span class="p">:</span> <span class="s">android</span>
 <span class="p">---</span>
 <span class="p">-</span> open Settings app
@@ -773,31 +1002,61 @@
 <span class="p">-</span> tap Wi-Fi
 <span class="p">-</span> verify Wi-Fi is visible
 <span class="p">-</span> done</pre>
-          </div>
-
-          <h3>Metadata Fields</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Field</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>name</td><td>Display name for the flow</td></tr>
-              <tr><td>description</td><td>Optional description of what the flow does</td></tr>
-              <tr><td>platform</td><td><code>android</code> or <code>ios</code> &mdash; fallback if no <code>--platform</code> CLI flag</td></tr>
-              <tr><td>appId</td><td>App bundle/package ID for <code>launchApp</code> steps</td></tr>
-              <tr><td>env</td><td>Environment name &mdash; resolves variables from <code>.appclaw/env/&lt;name&gt;.yaml</code></td></tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section id="phased-format" class="reveal">
-          <h2>Phased Format</h2>
-          <p>For structured tests, organize your steps into three phases: <strong>setup</strong>, <strong>steps</strong>, and <strong>assertions</strong>. This gives clearer reporting and separates initialization from the actual test logic.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">youtube-search.yaml</span>
             </div>
-            <pre><span class="k">name</span><span class="p">:</span> <span class="s">YouTube Search</span>
+
+            <h3>Metadata Fields</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>name</td>
+                  <td>Display name for the flow</td>
+                </tr>
+                <tr>
+                  <td>description</td>
+                  <td>Optional description of what the flow does</td>
+                </tr>
+                <tr>
+                  <td>platform</td>
+                  <td>
+                    <code>android</code> or <code>ios</code> &mdash; fallback if no
+                    <code>--platform</code> CLI flag
+                  </td>
+                </tr>
+                <tr>
+                  <td>appId</td>
+                  <td>App bundle/package ID for <code>launchApp</code> steps</td>
+                </tr>
+                <tr>
+                  <td>env</td>
+                  <td>
+                    Environment name &mdash; resolves variables from
+                    <code>.appclaw/env/&lt;name&gt;.yaml</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section id="phased-format" class="reveal">
+            <h2>Phased Format</h2>
+            <p>
+              For structured tests, organize your steps into three phases: <strong>setup</strong>,
+              <strong>steps</strong>, and <strong>assertions</strong>. This gives clearer reporting
+              and separates initialization from the actual test logic.
+            </p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">youtube-search.yaml</span>
+              </div>
+              <pre><span class="k">name</span><span class="p">:</span> <span class="s">YouTube Search</span>
 <span class="k">description</span><span class="p">:</span> <span class="s">Searches YouTube and verifies video results</span>
 <span class="k">platform</span><span class="p">:</span> <span class="s">android</span>
 <span class="k">env</span><span class="p">:</span> <span class="s">dev</span>
@@ -816,55 +1075,81 @@
 
 <span class="k">assertions</span><span class="p">:</span>
   <span class="p">-</span> verify <span class="v">${variables.expected_channel}</span> is visible</pre>
-          </div>
-
-          <h3>Phases Explained</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Phase</th><th>Purpose</th></tr></thead>
-            <tbody>
-              <tr><td>setup</td><td>Initialization &mdash; launch the app, navigate to starting screen, dismiss popups. Failures here skip the test.</td></tr>
-              <tr><td>steps</td><td>The main test actions &mdash; the interactions you're actually testing.</td></tr>
-              <tr><td>assertions</td><td>Verification checks &mdash; confirm the expected outcome. You can also mix in actions here if needed.</td></tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section id="variables" class="reveal">
-          <h2>Variables &amp; Secrets</h2>
-          <p>Keep your flows flexible and secure with variable interpolation.</p>
-
-          <h3>Variables <code>${variables.X}</code></h3>
-          <p>Loaded from environment files. Values appear in logs.</p>
-
-          <h3>Secrets <code>${secrets.X}</code></h3>
-          <p>Resolved from shell environment variables at runtime. Always shown as <code>***</code> in logs.</p>
-
-          <h3>Environment File</h3>
-          <p>Create <code>.appclaw/env/&lt;name&gt;.yaml</code> in your project root:</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">.appclaw/env/dev.yaml</span>
             </div>
-            <pre><span class="k">variables</span><span class="p">:</span>
+
+            <h3>Phases Explained</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Phase</th>
+                  <th>Purpose</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>setup</td>
+                  <td>
+                    Initialization &mdash; launch the app, navigate to starting screen, dismiss
+                    popups. Failures here skip the test.
+                  </td>
+                </tr>
+                <tr>
+                  <td>steps</td>
+                  <td>The main test actions &mdash; the interactions you're actually testing.</td>
+                </tr>
+                <tr>
+                  <td>assertions</td>
+                  <td>
+                    Verification checks &mdash; confirm the expected outcome. You can also mix in
+                    actions here if needed.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section id="variables" class="reveal">
+            <h2>Variables &amp; Secrets</h2>
+            <p>Keep your flows flexible and secure with variable interpolation.</p>
+
+            <h3>Variables <code>${variables.X}</code></h3>
+            <p>Loaded from environment files. Values appear in logs.</p>
+
+            <h3>Secrets <code>${secrets.X}</code></h3>
+            <p>
+              Resolved from shell environment variables at runtime. Always shown as
+              <code>***</code> in logs.
+            </p>
+
+            <h3>Environment File</h3>
+            <p>Create <code>.appclaw/env/&lt;name&gt;.yaml</code> in your project root:</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">.appclaw/env/dev.yaml</span>
+              </div>
+              <pre><span class="k">variables</span><span class="p">:</span>
   <span class="k">app_name</span><span class="p">:</span> <span class="s">youtube</span>
   <span class="k">expected_channel</span><span class="p">:</span> <span class="s">TestMu AI</span>
   <span class="k">timeout</span><span class="p">:</span> <span class="n">30</span>
   <span class="k">locale</span><span class="p">:</span> <span class="s">en-US</span></pre>
-          </div>
-
-          <p>Then reference it in your YAML header with <code>env: dev</code>, or pass <code>--env dev</code> on the CLI.</p>
-
-          <h3>Inline Variables</h3>
-          <p>For self-contained flows, embed variables directly in the YAML header:</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Inline env block</span>
             </div>
-            <pre><span class="k">name</span><span class="p">:</span> <span class="s">Self-contained flow</span>
+
+            <p>
+              Then reference it in your YAML header with <code>env: dev</code>, or pass
+              <code>--env dev</code> on the CLI.
+            </p>
+
+            <h3>Inline Variables</h3>
+            <p>For self-contained flows, embed variables directly in the YAML header:</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Inline env block</span>
+              </div>
+              <pre><span class="k">name</span><span class="p">:</span> <span class="s">Self-contained flow</span>
 <span class="k">env</span><span class="p">:</span>
   <span class="k">variables</span><span class="p">:</span>
     <span class="k">app_name</span><span class="p">:</span> <span class="s">youtube</span>
@@ -872,27 +1157,34 @@
 <span class="p">---</span>
 <span class="p">-</span> open <span class="v">${variables.app_name}</span> app
 <span class="p">-</span> type <span class="v">${variables.search_term}</span></pre>
-          </div>
-
-          <div class="callout callout-warn">
-            <div class="callout-title">Resolution Order</div>
-            <p><code>--env</code> CLI flag wins over the YAML <code>env:</code> field, which wins over inline <code>env:</code> blocks. Secrets always come from shell environment variables.</p>
-          </div>
-        </section>
-
-        <!-- ============================================ -->
-        <!-- COMMANDS                                     -->
-        <!-- ============================================ -->
-        <section id="tap-click" class="reveal">
-          <h2>Tap / Click</h2>
-          <p>Tap on an element by describing its label. AppClaw matches it against visible text and elements on screen.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Natural language</span>
             </div>
-            <pre><span class="p">-</span> tap Login
+
+            <div class="callout callout-warn">
+              <div class="callout-title">Resolution Order</div>
+              <p>
+                <code>--env</code> CLI flag wins over the YAML <code>env:</code> field, which wins
+                over inline <code>env:</code> blocks. Secrets always come from shell environment
+                variables.
+              </p>
+            </div>
+          </section>
+
+          <!-- ============================================ -->
+          <!-- COMMANDS                                     -->
+          <!-- ============================================ -->
+          <section id="tap-click" class="reveal">
+            <h2>Tap / Click</h2>
+            <p>
+              Tap on an element by describing its label. AppClaw matches it against visible text and
+              elements on screen.
+            </p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Natural language</span>
+              </div>
+              <pre><span class="p">-</span> tap Login
 <span class="p">-</span> click on the search icon
 <span class="p">-</span> press Submit
 <span class="p">-</span> select the first item
@@ -903,29 +1195,32 @@
 <span class="p">-</span> enable Notifications
 <span class="p">-</span> close the popup
 <span class="p">-</span> dismiss the dialog</pre>
-          </div>
-
-          <p>All of these are equivalent &mdash; they find the element and tap it. Use whichever reads most naturally.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Structured YAML</span>
             </div>
-            <pre><span class="p">-</span> <span class="k">tap</span><span class="p">:</span> <span class="s">"Login Button"</span></pre>
-          </div>
-        </section>
 
-        <section id="type-text" class="reveal">
-          <h2>Type Text</h2>
-          <p>Type text into the currently focused field, or specify a target field.</p>
+            <p>
+              All of these are equivalent &mdash; they find the element and tap it. Use whichever
+              reads most naturally.
+            </p>
 
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Natural language</span>
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Structured YAML</span>
+              </div>
+              <pre><span class="p">-</span> <span class="k">tap</span><span class="p">:</span> <span class="s">"Login Button"</span></pre>
             </div>
-            <pre><span class="c"># Type into focused field</span>
+          </section>
+
+          <section id="type-text" class="reveal">
+            <h2>Type Text</h2>
+            <p>Type text into the currently focused field, or specify a target field.</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Natural language</span>
+              </div>
+              <pre><span class="c"># Type into focused field</span>
 <span class="p">-</span> type <span class="s">"hello world"</span>
 <span class="p">-</span> enter text <span class="s">"user@example.com"</span>
 
@@ -936,85 +1231,89 @@
 <span class="c"># Search (types the text)</span>
 <span class="p">-</span> search for <span class="s">"Appium 3.0"</span>
 <span class="p">-</span> look for <span class="s">"restaurants nearby"</span></pre>
-          </div>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Structured YAML</span>
             </div>
-            <pre><span class="p">-</span> <span class="k">type</span><span class="p">:</span> <span class="s">"hello world"</span></pre>
-          </div>
-        </section>
 
-        <section id="wait" class="reveal">
-          <h2>Wait / Pause</h2>
-          <p>Pause execution for a fixed duration.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Natural language</span>
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Structured YAML</span>
+              </div>
+              <pre><span class="p">-</span> <span class="k">type</span><span class="p">:</span> <span class="s">"hello world"</span></pre>
             </div>
-            <pre><span class="p">-</span> wait 3s
+          </section>
+
+          <section id="wait" class="reveal">
+            <h2>Wait / Pause</h2>
+            <p>Pause execution for a fixed duration.</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Natural language</span>
+              </div>
+              <pre><span class="p">-</span> wait 3s
 <span class="p">-</span> wait 1.5 seconds
 <span class="p">-</span> sleep 500ms
 <span class="p">-</span> pause 2 sec
 <span class="p">-</span> wait               <span class="c"># defaults to 2 seconds</span>
 <span class="p">-</span> wait a moment      <span class="c"># defaults to 2 seconds</span></pre>
-          </div>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Structured YAML</span>
             </div>
-            <pre><span class="p">-</span> <span class="k">wait</span><span class="p">:</span> <span class="n">3</span>          <span class="c"># seconds</span></pre>
-          </div>
-        </section>
 
-        <section id="wait-until" class="reveal">
-          <h2>Wait Until</h2>
-          <p>Wait dynamically until a condition is met. Polls the screen every 500ms up to a timeout (default 10s). Uses AI vision to understand the screen &mdash; you can describe what you expect to see in plain English.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Wait for something to appear</span>
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Structured YAML</span>
+              </div>
+              <pre><span class="p">-</span> <span class="k">wait</span><span class="p">:</span> <span class="n">3</span>          <span class="c"># seconds</span></pre>
             </div>
-            <pre><span class="p">-</span> wait until search icon is visible
+          </section>
+
+          <section id="wait-until" class="reveal">
+            <h2>Wait Until</h2>
+            <p>
+              Wait dynamically until a condition is met. Polls the screen every 500ms up to a
+              timeout (default 10s). Uses AI vision to understand the screen &mdash; you can
+              describe what you expect to see in plain English.
+            </p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Wait for something to appear</span>
+              </div>
+              <pre><span class="p">-</span> wait until search icon is visible
 <span class="p">-</span> wait for the search results to be visible
 <span class="p">-</span> wait for the home screen to be loaded
 <span class="p">-</span> wait until <span class="s">"Welcome back"</span> appears
 <span class="p">-</span> wait 15s until login button is visible  <span class="c"># custom timeout</span></pre>
-          </div>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Wait for something to disappear</span>
             </div>
-            <pre><span class="p">-</span> wait until loading spinner is gone
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Wait for something to disappear</span>
+              </div>
+              <pre><span class="p">-</span> wait until loading spinner is gone
 <span class="p">-</span> wait for the popup to be hidden
 <span class="p">-</span> wait until progress bar disappeared</pre>
-          </div>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Wait for screen to stabilize</span>
             </div>
-            <pre><span class="p">-</span> wait until screen is loaded
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Wait for screen to stabilize</span>
+              </div>
+              <pre><span class="p">-</span> wait until screen is loaded
 <span class="p">-</span> wait until screen is stable
 <span class="p">-</span> wait 5s until screen is ready</pre>
-          </div>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Structured YAML</span>
             </div>
-            <pre><span class="c"># With custom timeout</span>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Structured YAML</span>
+              </div>
+              <pre><span class="c"># With custom timeout</span>
 <span class="p">-</span> <span class="k">waitUntil</span><span class="p">:</span> <span class="s">"Login button"</span>
   <span class="k">timeout</span><span class="p">:</span> <span class="n">15</span>
 
@@ -1024,87 +1323,99 @@
 
 <span class="c"># Screen loaded (DOM stability check)</span>
 <span class="p">-</span> <span class="k">waitUntil</span><span class="p">:</span> <span class="s">"screen loaded"</span></pre>
-          </div>
-
-          <div class="callout callout-tip">
-            <div class="callout-title">Smart Vision</div>
-            <p>When you write something descriptive like <code>wait for the search results to be visible</code>, AppClaw uses AI vision to understand the screen holistically &mdash; it checks whether results are actually shown, not just whether the literal words "search results" appear. You can describe what you expect to see naturally.</p>
-          </div>
-        </section>
-
-        <section id="scroll-swipe" class="reveal">
-          <h2>Scroll / Swipe</h2>
-          <p>Scroll or swipe in any direction, optionally repeating multiple times or scrolling until an element is found.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Basic scroll / swipe</span>
             </div>
-            <pre><span class="p">-</span> scroll down
+
+            <div class="callout callout-tip">
+              <div class="callout-title">Smart Vision</div>
+              <p>
+                When you write something descriptive like
+                <code>wait for the search results to be visible</code>, AppClaw uses AI vision to
+                understand the screen holistically &mdash; it checks whether results are actually
+                shown, not just whether the literal words "search results" appear. You can describe
+                what you expect to see naturally.
+              </p>
+            </div>
+          </section>
+
+          <section id="scroll-swipe" class="reveal">
+            <h2>Scroll / Swipe</h2>
+            <p>
+              Scroll or swipe in any direction, optionally repeating multiple times or scrolling
+              until an element is found.
+            </p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Basic scroll / swipe</span>
+              </div>
+              <pre><span class="p">-</span> scroll down
 <span class="p">-</span> scroll up 3 times
 <span class="p">-</span> swipe left
 <span class="p">-</span> swipe right 2 times</pre>
-          </div>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Scroll until found</span>
             </div>
-            <pre><span class="c"># Scroll until an element appears</span>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Scroll until found</span>
+              </div>
+              <pre><span class="c"># Scroll until an element appears</span>
 <span class="p">-</span> scroll down until <span class="s">"Terms &amp; Conditions"</span> is visible
 <span class="p">-</span> scroll down 5 times to find <span class="s">"Accept"</span>
 <span class="p">-</span> scroll down to see <span class="s">"Load More"</span></pre>
-          </div>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Structured YAML</span>
             </div>
-            <pre><span class="p">-</span> <span class="k">scrollAssert</span><span class="p">:</span> <span class="s">"Terms &amp; Conditions"</span>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Structured YAML</span>
+              </div>
+              <pre><span class="p">-</span> <span class="k">scrollAssert</span><span class="p">:</span> <span class="s">"Terms &amp; Conditions"</span>
   <span class="k">direction</span><span class="p">:</span> <span class="s">down</span>
   <span class="k">maxScrolls</span><span class="p">:</span> <span class="n">5</span></pre>
-          </div>
-        </section>
-
-        <section id="assert" class="reveal">
-          <h2>Assert / Verify</h2>
-          <p>Verify that something is visible on screen. Works with both literal text and visual/semantic descriptions via AI vision.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Natural language</span>
             </div>
-            <pre><span class="p">-</span> verify <span class="s">"Welcome back"</span> is visible
+          </section>
+
+          <section id="assert" class="reveal">
+            <h2>Assert / Verify</h2>
+            <p>
+              Verify that something is visible on screen. Works with both literal text and
+              visual/semantic descriptions via AI vision.
+            </p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Natural language</span>
+              </div>
+              <pre><span class="p">-</span> verify <span class="s">"Welcome back"</span> is visible
 <span class="p">-</span> assert Dashboard is visible
 <span class="p">-</span> check that the login button is on the screen
 <span class="p">-</span> verify TestMu AI is visible</pre>
-          </div>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Structured YAML</span>
             </div>
-            <pre><span class="p">-</span> <span class="k">assert</span><span class="p">:</span> <span class="s">"Welcome back"</span>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Structured YAML</span>
+              </div>
+              <pre><span class="p">-</span> <span class="k">assert</span><span class="p">:</span> <span class="s">"Welcome back"</span>
 <span class="p">-</span> <span class="k">verify</span><span class="p">:</span> <span class="s">"Dashboard"</span>    <span class="c"># alias for assert</span>
 <span class="p">-</span> <span class="k">check</span><span class="p">:</span>  <span class="s">"Login button"</span>  <span class="c"># alias for assert</span></pre>
-          </div>
-        </section>
-
-        <section id="navigation" class="reveal">
-          <h2>Navigation &amp; Control</h2>
-          <p>App launch, back, home, enter, and flow completion.</p>
-
-          <div class="code-block">
-            <div class="code-block-header">
-              <div class="code-block-dots"><span></span><span></span><span></span></div>
-              <span class="code-block-label">Natural language</span>
             </div>
-            <pre><span class="c"># Launch / open</span>
+          </section>
+
+          <section id="navigation" class="reveal">
+            <h2>Navigation &amp; Control</h2>
+            <p>App launch, back, home, enter, and flow completion.</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Natural language</span>
+              </div>
+              <pre><span class="c"># Launch / open</span>
 <span class="p">-</span> open YouTube app
 <span class="p">-</span> launch Settings
 <span class="p">-</span> start Chrome
@@ -1123,214 +1434,442 @@
 <span class="c"># Flow completion</span>
 <span class="p">-</span> done
 <span class="p">-</span> done: <span class="s">"Login was successful"</span></pre>
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section id="all-commands" class="reveal">
-          <h2>Full Command Reference</h2>
-          <p>Every supported step kind at a glance.</p>
+          <section id="all-commands" class="reveal">
+            <h2>Full Command Reference</h2>
+            <p>Every supported step kind at a glance.</p>
 
-          <table class="cmd-table">
-            <thead><tr><th>Kind</th><th>Parameters</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>openApp</td><td>query</td><td>Open an app by name</td></tr>
-              <tr><td>launchApp</td><td>&mdash;</td><td>Launch app defined in <code>appId</code> metadata</td></tr>
-              <tr><td>tap</td><td>label</td><td>Tap element by visible text/label</td></tr>
-              <tr><td>type</td><td>text, target?</td><td>Type text, optionally into a named field</td></tr>
-              <tr><td>enter</td><td>&mdash;</td><td>Press Enter / Return key</td></tr>
-              <tr><td>back</td><td>&mdash;</td><td>Press the Back button</td></tr>
-              <tr><td>home</td><td>&mdash;</td><td>Press the Home button</td></tr>
-              <tr><td>wait</td><td>seconds</td><td>Pause for a fixed duration</td></tr>
-              <tr><td>waitUntil</td><td>condition, text?, timeout</td><td>Poll until visible/gone/screenLoaded</td></tr>
-              <tr><td>swipe</td><td>direction, repeat?</td><td>Swipe up/down/left/right</td></tr>
-              <tr><td>assert</td><td>text</td><td>Verify text or description is visible</td></tr>
-              <tr><td>scrollAssert</td><td>text, direction, maxScrolls</td><td>Scroll until text found</td></tr>
-              <tr><td>getInfo</td><td>query</td><td>Ask the AI a question about the screen</td></tr>
-              <tr><td>done</td><td>message?</td><td>Signal flow completion</td></tr>
-            </tbody>
-          </table>
-        </section>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Kind</th>
+                  <th>Parameters</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>openApp</td>
+                  <td>query</td>
+                  <td>Open an app by name</td>
+                </tr>
+                <tr>
+                  <td>launchApp</td>
+                  <td>&mdash;</td>
+                  <td>Launch app defined in <code>appId</code> metadata</td>
+                </tr>
+                <tr>
+                  <td>tap</td>
+                  <td>label</td>
+                  <td>Tap element by visible text/label</td>
+                </tr>
+                <tr>
+                  <td>type</td>
+                  <td>text, target?</td>
+                  <td>Type text, optionally into a named field</td>
+                </tr>
+                <tr>
+                  <td>enter</td>
+                  <td>&mdash;</td>
+                  <td>Press Enter / Return key</td>
+                </tr>
+                <tr>
+                  <td>back</td>
+                  <td>&mdash;</td>
+                  <td>Press the Back button</td>
+                </tr>
+                <tr>
+                  <td>home</td>
+                  <td>&mdash;</td>
+                  <td>Press the Home button</td>
+                </tr>
+                <tr>
+                  <td>wait</td>
+                  <td>seconds</td>
+                  <td>Pause for a fixed duration</td>
+                </tr>
+                <tr>
+                  <td>waitUntil</td>
+                  <td>condition, text?, timeout</td>
+                  <td>Poll until visible/gone/screenLoaded</td>
+                </tr>
+                <tr>
+                  <td>swipe</td>
+                  <td>direction, repeat?</td>
+                  <td>Swipe up/down/left/right</td>
+                </tr>
+                <tr>
+                  <td>assert</td>
+                  <td>text</td>
+                  <td>Verify text or description is visible</td>
+                </tr>
+                <tr>
+                  <td>scrollAssert</td>
+                  <td>text, direction, maxScrolls</td>
+                  <td>Scroll until text found</td>
+                </tr>
+                <tr>
+                  <td>getInfo</td>
+                  <td>query</td>
+                  <td>Ask the AI a question about the screen</td>
+                </tr>
+                <tr>
+                  <td>done</td>
+                  <td>message?</td>
+                  <td>Signal flow completion</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
 
-        <!-- ============================================ -->
-        <!-- CONFIGURATION                                -->
-        <!-- ============================================ -->
-        <section id="vision-modes" class="reveal">
-          <h2>Vision Modes</h2>
-          <p>Control how AppClaw locates elements on screen.</p>
+          <!-- ============================================ -->
+          <!-- CONFIGURATION                                -->
+          <!-- ============================================ -->
+          <section id="vision-modes" class="reveal">
+            <h2>Vision Modes</h2>
+            <p>Control how AppClaw locates elements on screen.</p>
 
-          <h3>Agent Mode <code>AGENT_MODE</code></h3>
-          <table class="cmd-table">
-            <thead><tr><th>Value</th><th>Behavior</th></tr></thead>
-            <tbody>
-              <tr><td>dom</td><td>Default. Uses the app's DOM/accessibility tree to find elements.</td></tr>
-              <tr><td>vision</td><td>Uses AI vision (screenshots + LLM) as the primary strategy for all interactions.</td></tr>
-            </tbody>
-          </table>
+            <h3>Agent Mode <code>AGENT_MODE</code></h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Value</th>
+                  <th>Behavior</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>dom</td>
+                  <td>Default. Uses the app's DOM/accessibility tree to find elements.</td>
+                </tr>
+                <tr>
+                  <td>vision</td>
+                  <td>
+                    Uses AI vision (screenshots + LLM) as the primary strategy for all interactions.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-          <h3>Vision Mode <code>VISION_MODE</code></h3>
-          <table class="cmd-table">
-            <thead><tr><th>Value</th><th>Behavior</th></tr></thead>
-            <tbody>
-              <tr><td>fallback</td><td>Default. Try DOM first, fall back to vision if no match found.</td></tr>
-              <tr><td>always</td><td>Skip DOM entirely, use vision for every interaction.</td></tr>
-              <tr><td>never</td><td>DOM only. No vision fallback.</td></tr>
-            </tbody>
-          </table>
+            <h3>Vision Mode <code>VISION_MODE</code></h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Value</th>
+                  <th>Behavior</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>fallback</td>
+                  <td>Default. Try DOM first, fall back to vision if no match found.</td>
+                </tr>
+                <tr>
+                  <td>always</td>
+                  <td>Skip DOM entirely, use vision for every interaction.</td>
+                </tr>
+                <tr>
+                  <td>never</td>
+                  <td>DOM only. No vision fallback.</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
 
-        </section>
+          <section id="env-vars" class="reveal">
+            <h2>Environment Variables</h2>
+            <p>
+              All environment variables recognized by AppClaw. These are especially useful for CI/CD
+              pipelines.
+            </p>
 
-        <section id="env-vars" class="reveal">
-          <h2>Environment Variables</h2>
-          <p>All environment variables recognized by AppClaw. These are especially useful for CI/CD pipelines.</p>
+            <h3>LLM Configuration</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>LLM_PROVIDER</td>
+                  <td>
+                    LLM provider: <code>anthropic</code>, <code>openai</code>, <code>gemini</code>,
+                    <code>groq</code>, <code>ollama</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td>LLM_API_KEY</td>
+                  <td>API key for the chosen provider</td>
+                </tr>
+                <tr>
+                  <td>LLM_MODEL</td>
+                  <td>Specific model name to use</td>
+                </tr>
+                <tr>
+                  <td>LLM_THINKING</td>
+                  <td>Extended thinking: <code>on</code> or <code>off</code> (default: on)</td>
+                </tr>
+                <tr>
+                  <td>LLM_THINKING_BUDGET</td>
+                  <td>Max thinking tokens: 1&ndash;10000 (default: 128)</td>
+                </tr>
+                <tr>
+                  <td>LLM_SCREENSHOT_MAX_EDGE_PX</td>
+                  <td>Downscale screenshots to this max edge (0 = disabled)</td>
+                </tr>
+              </tbody>
+            </table>
 
-          <h3>LLM Configuration</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Variable</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>LLM_PROVIDER</td><td>LLM provider: <code>anthropic</code>, <code>openai</code>, <code>gemini</code>, <code>groq</code>, <code>ollama</code></td></tr>
-              <tr><td>LLM_API_KEY</td><td>API key for the chosen provider</td></tr>
-              <tr><td>LLM_MODEL</td><td>Specific model name to use</td></tr>
-              <tr><td>LLM_THINKING</td><td>Extended thinking: <code>on</code> or <code>off</code> (default: on)</td></tr>
-              <tr><td>LLM_THINKING_BUDGET</td><td>Max thinking tokens: 1&ndash;10000 (default: 128)</td></tr>
-              <tr><td>LLM_SCREENSHOT_MAX_EDGE_PX</td><td>Downscale screenshots to this max edge (0 = disabled)</td></tr>
-            </tbody>
-          </table>
+            <h3>Device &amp; Platform</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>PLATFORM</td>
+                  <td>Same as <code>--platform</code> flag</td>
+                </tr>
+                <tr>
+                  <td>DEVICE_TYPE</td>
+                  <td>Same as <code>--device-type</code> flag</td>
+                </tr>
+                <tr>
+                  <td>DEVICE_UDID</td>
+                  <td>Same as <code>--udid</code> flag</td>
+                </tr>
+                <tr>
+                  <td>DEVICE_NAME</td>
+                  <td>Same as <code>--device</code> flag</td>
+                </tr>
+              </tbody>
+            </table>
 
-          <h3>Device &amp; Platform</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Variable</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>PLATFORM</td><td>Same as <code>--platform</code> flag</td></tr>
-              <tr><td>DEVICE_TYPE</td><td>Same as <code>--device-type</code> flag</td></tr>
-              <tr><td>DEVICE_UDID</td><td>Same as <code>--udid</code> flag</td></tr>
-              <tr><td>DEVICE_NAME</td><td>Same as <code>--device</code> flag</td></tr>
-            </tbody>
-          </table>
+            <h3>Vision</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>VISION_MODE</td>
+                  <td><code>always</code>, <code>fallback</code>, or <code>never</code></td>
+                </tr>
+                <tr>
+                  <td>AGENT_MODE</td>
+                  <td><code>dom</code> or <code>vision</code></td>
+                </tr>
+                <tr>
+                  <td>GEMINI_API_KEY</td>
+                  <td>
+                    Gemini API key for Stark vision — only needed when <code>LLM_PROVIDER</code> is
+                    not <code>gemini</code> and <code>AGENT_MODE=vision</code>. If provider is
+                    already Gemini, <code>LLM_API_KEY</code> is reused automatically.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-          <h3>Vision</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Variable</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>VISION_MODE</td><td><code>always</code>, <code>fallback</code>, or <code>never</code></td></tr>
-              <tr><td>AGENT_MODE</td><td><code>dom</code> or <code>vision</code></td></tr>
-              <tr><td>GEMINI_API_KEY</td><td>Gemini API key for Stark vision — only needed when <code>LLM_PROVIDER</code> is not <code>gemini</code> and <code>AGENT_MODE=vision</code>. If provider is already Gemini, <code>LLM_API_KEY</code> is reused automatically.</td></tr>
-            </tbody>
-          </table>
+            <h3>Execution Tuning</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>MAX_STEPS</td>
+                  <td>Max steps per goal (default: 30)</td>
+                </tr>
+                <tr>
+                  <td>STEP_DELAY</td>
+                  <td>Delay between steps in ms (default: 500)</td>
+                </tr>
+                <tr>
+                  <td>MAX_ELEMENTS</td>
+                  <td>Max DOM elements to parse (default: 40)</td>
+                </tr>
+                <tr>
+                  <td>MAX_HISTORY_STEPS</td>
+                  <td>Max action history retained (default: 10)</td>
+                </tr>
+              </tbody>
+            </table>
 
-          <h3>Execution Tuning</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Variable</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>MAX_STEPS</td><td>Max steps per goal (default: 30)</td></tr>
-              <tr><td>STEP_DELAY</td><td>Delay between steps in ms (default: 500)</td></tr>
-              <tr><td>MAX_ELEMENTS</td><td>Max DOM elements to parse (default: 40)</td></tr>
-              <tr><td>MAX_HISTORY_STEPS</td><td>Max action history retained (default: 10)</td></tr>
-            </tbody>
-          </table>
-
-          <h3>MCP Connection</h3>
-          <table class="cmd-table">
-            <thead><tr><th>Variable</th><th>Description</th></tr></thead>
-            <tbody>
-              <tr><td>MCP_TRANSPORT</td><td><code>stdio</code> or <code>sse</code> (default: stdio)</td></tr>
-              <tr><td>MCP_HOST</td><td>MCP server host (default: localhost)</td></tr>
-              <tr><td>MCP_PORT</td><td>MCP server port (default: 8080)</td></tr>
-            </tbody>
-          </table>
-        </section>
-
-      </main>
+            <h3>MCP Connection</h3>
+            <table class="cmd-table">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>MCP_TRANSPORT</td>
+                  <td><code>stdio</code> or <code>sse</code> (default: stdio)</td>
+                </tr>
+                <tr>
+                  <td>MCP_HOST</td>
+                  <td>MCP server host (default: localhost)</td>
+                </tr>
+                <tr>
+                  <td>MCP_PORT</td>
+                  <td>MCP server port (default: 8080)</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </main>
+      </div>
     </div>
-  </div>
 
-  <!-- FOOTER -->
-  <footer>
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <div class="footer-logo">
-            <img src="logo.svg" alt="AppClaw">
-            <span>AppClaw</span>
+    <!-- FOOTER -->
+    <footer>
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <div class="footer-logo">
+              <img src="logo.svg" alt="AppClaw" />
+              <span>AppClaw</span>
+            </div>
+            <p>
+              AI-powered mobile automation agent. Tell it what to do in plain English — it figures
+              out the rest.
+            </p>
           </div>
-          <p>AI-powered mobile automation agent. Tell it what to do in plain English — it figures out the rest.</p>
+          <div class="footer-col">
+            <h4>Product</h4>
+            <ul>
+              <li><a href="index.html#features">Agent Mode</a></li>
+              <li><a href="index.html#features">YAML Flows</a></li>
+              <li><a href="index.html#features">Playground</a></li>
+              <li><a href="index.html#architecture">Architecture</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h4>Developers</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appclaw#quick-start"
+                  target="_blank"
+                  >Quick Start</a
+                >
+              </li>
+              <li><a href="usage.html">Usage Guide</a></li>
+              <li><a href="https://github.com/appium/appium-mcp" target="_blank">appium-mcp</a></li>
+              <li>
+                <a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank"
+                  >GitHub</a
+                >
+              </li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h4>Community</h4>
+            <ul>
+              <li>
+                <a href="https://github.com/AppiumTestDistribution/appclaw/issues" target="_blank"
+                  >Issues</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appclaw/discussions"
+                  target="_blank"
+                  >Discussions</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/AppiumTestDistribution/appclaw/blob/main/LICENSE"
+                  target="_blank"
+                  >License</a
+                >
+              </li>
+            </ul>
+          </div>
         </div>
-        <div class="footer-col">
-          <h4>Product</h4>
-          <ul>
-            <li><a href="index.html#features">Agent Mode</a></li>
-            <li><a href="index.html#features">YAML Flows</a></li>
-            <li><a href="index.html#features">Playground</a></li>
-            <li><a href="index.html#architecture">Architecture</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Developers</h4>
-          <ul>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw#quick-start" target="_blank">Quick Start</a></li>
-            <li><a href="usage.html">Usage Guide</a></li>
-            <li><a href="https://github.com/appium/appium-mcp" target="_blank">appium-mcp</a></li>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank">GitHub</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Community</h4>
-          <ul>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw/issues" target="_blank">Issues</a></li>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw/discussions" target="_blank">Discussions</a></li>
-            <li><a href="https://github.com/AppiumTestDistribution/appclaw/blob/main/LICENSE" target="_blank">License</a></li>
-          </ul>
+        <div class="footer-bottom">
+          <span>&copy; 2025 AppClaw. Open source under Apache 2.0.</span>
+          <div class="footer-socials">
+            <a
+              href="https://github.com/AppiumTestDistribution/appclaw"
+              target="_blank"
+              rel="noopener"
+              aria-label="GitHub"
+            >
+              <svg viewBox="0 0 16 16" fill="currentColor">
+                <path
+                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                />
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
-      <div class="footer-bottom">
-        <span>&copy; 2025 AppClaw. Open source under Apache 2.0.</span>
-        <div class="footer-socials">
-          <a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank" rel="noopener" aria-label="GitHub">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          </a>
-        </div>
-      </div>
-    </div>
-  </footer>
+    </footer>
 
-  <script>
-    // Navbar scroll effect
-    const navbar = document.getElementById('navbar');
-    window.addEventListener('scroll', () => {
-      navbar.classList.toggle('scrolled', window.scrollY > 20);
-    });
-
-    // Intersection Observer for reveal animations
-    const revealObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-        }
+    <script>
+      // Navbar scroll effect
+      const navbar = document.getElementById('navbar');
+      window.addEventListener('scroll', () => {
+        navbar.classList.toggle('scrolled', window.scrollY > 20);
       });
-    }, {
-      threshold: 0.1,
-      rootMargin: '0px 0px -60px 0px'
-    });
 
-    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
-
-    // Sidebar active link tracking
-    const sections = document.querySelectorAll('.docs-content section[id]');
-    const sidebarLinks = document.querySelectorAll('.docs-sidebar a');
-
-    const sectionObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          sidebarLinks.forEach(link => link.classList.remove('active'));
-          const activeLink = document.querySelector(`.docs-sidebar a[href="#${entry.target.id}"]`);
-          if (activeLink) activeLink.classList.add('active');
+      // Intersection Observer for reveal animations
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+            }
+          });
+        },
+        {
+          threshold: 0.1,
+          rootMargin: '0px 0px -60px 0px',
         }
-      });
-    }, {
-      threshold: 0.2,
-      rootMargin: '-80px 0px -60% 0px'
-    });
+      );
 
-    sections.forEach(section => sectionObserver.observe(section));
-  </script>
-</body>
+      document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
+
+      // Sidebar active link tracking
+      const sections = document.querySelectorAll('.docs-content section[id]');
+      const sidebarLinks = document.querySelectorAll('.docs-sidebar a');
+
+      const sectionObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              sidebarLinks.forEach((link) => link.classList.remove('active'));
+              const activeLink = document.querySelector(
+                `.docs-sidebar a[href="#${entry.target.id}"]`
+              );
+              if (activeLink) activeLink.classList.add('active');
+            }
+          });
+        },
+        {
+          threshold: 0.2,
+          rootMargin: '-80px 0px -60% 0px',
+        }
+      );
+
+      sections.forEach((section) => sectionObserver.observe(section));
+    </script>
+  </body>
 </html>

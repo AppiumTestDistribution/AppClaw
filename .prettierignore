@@ -1,0 +1,10 @@
+dist/
+node_modules/
+vscode-extension/node_modules/
+vscode-extension/dist/
+landing/node_modules/
+landing/.next/
+*.lock
+
+# Intentionally invalid YAML for parser tests (Prettier cannot parse)
+tests/flows/fixtures/invalid-syntax.yaml

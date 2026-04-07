@@ -1,409 +1,664 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-<meta charset="utf-8">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    width: 720px;
-    height: 600px;
-    background: #1e1e1e;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    overflow: hidden;
-  }
-  .vscode-window {
-    width: 720px; height: 600px;
-    background: #1e1e1e; display: flex; flex-direction: column;
-  }
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        width: 720px;
+        height: 600px;
+        background: #1e1e1e;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        overflow: hidden;
+      }
+      .vscode-window {
+        width: 720px;
+        height: 600px;
+        background: #1e1e1e;
+        display: flex;
+        flex-direction: column;
+      }
 
-  /* ── Title bar ── */
-  .titlebar {
-    height: 32px; background: #3c3c3c;
-    display: flex; align-items: center; padding: 0 12px; gap: 8px; flex-shrink: 0;
-  }
-  .traffic-lights { display: flex; gap: 6px; align-items: center; }
-  .tl { width: 12px; height: 12px; border-radius: 50%; }
-  .tl-r { background: #ff5f57; } .tl-y { background: #febc2e; } .tl-g { background: #28c840; }
-  .title-text {
-    height: 32px; padding: 0 14px; background: #1e1e1e; color: #ccc;
-    font-size: 12px; display: flex; align-items: center; gap: 6px; margin-left: 8px;
-    font-family: 'Segoe UI', sans-serif;
-  }
-  .title-icon { color: #e9b44c; font-size: 11px; }
+      /* ── Title bar ── */
+      .titlebar {
+        height: 32px;
+        background: #3c3c3c;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .traffic-lights {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .tl {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .tl-r {
+        background: #ff5f57;
+      }
+      .tl-y {
+        background: #febc2e;
+      }
+      .tl-g {
+        background: #28c840;
+      }
+      .title-text {
+        height: 32px;
+        padding: 0 14px;
+        background: #1e1e1e;
+        color: #ccc;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: 8px;
+        font-family: 'Segoe UI', sans-serif;
+      }
+      .title-icon {
+        color: #e9b44c;
+        font-size: 11px;
+      }
 
-  /* ── Panel header bar ── */
-  .panel-header {
-    height: 34px; background: #252526; border-bottom: 1px solid #404040;
-    display: flex; align-items: center; gap: 8px; padding: 0 12px; flex-shrink: 0;
-  }
-  .header-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .header-dot.blue { background: #4fc3f7; }
-  .header-title {
-    color: #d4d4d4; font-size: 12px; font-weight: 600;
-    font-family: 'Segoe UI', sans-serif; flex: 1;
-  }
-  .header-badge {
-    font-size: 10px; padding: 2px 7px; border-radius: 3px;
-    background: #3c3c3c; color: #858585; font-family: 'Segoe UI', sans-serif;
-  }
-  .header-badge.running { color: #4fc3f7; background: rgba(79,195,247,0.12); }
-  .header-badge.done    { color: #4ec9b0; background: rgba(78,201,176,0.12); }
+      /* ── Panel header bar ── */
+      .panel-header {
+        height: 34px;
+        background: #252526;
+        border-bottom: 1px solid #404040;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        flex-shrink: 0;
+      }
+      .header-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .header-dot.blue {
+        background: #4fc3f7;
+      }
+      .header-title {
+        color: #d4d4d4;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: 'Segoe UI', sans-serif;
+        flex: 1;
+      }
+      .header-badge {
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: 3px;
+        background: #3c3c3c;
+        color: #858585;
+        font-family: 'Segoe UI', sans-serif;
+      }
+      .header-badge.running {
+        color: #4fc3f7;
+        background: rgba(79, 195, 247, 0.12);
+      }
+      .header-badge.done {
+        color: #4ec9b0;
+        background: rgba(78, 201, 176, 0.12);
+      }
 
-  /* ── Device grid ── */
-  .device-grid {
-    flex: 1; display: grid; grid-template-columns: 1fr 1fr;
-    gap: 8px; padding: 8px; background: #16162a; overflow: hidden; align-content: start;
-  }
+      /* ── Device grid ── */
+      .device-grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 8px;
+        background: #16162a;
+        overflow: hidden;
+        align-content: start;
+      }
 
-  /* ── Device card ── */
-  .device-card {
-    display: flex; flex-direction: column;
-    background: #1e1e1e; border: 1.5px solid #404040; border-radius: 4px; overflow: hidden;
-  }
-  .device-card.running { border-color: #4fc3f7; }
-  .device-card.pass    { border-color: #4ec9b0; }
-  .device-card.fail    { border-color: #f44747; }
+      /* ── Device card ── */
+      .device-card {
+        display: flex;
+        flex-direction: column;
+        background: #1e1e1e;
+        border: 1.5px solid #404040;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .device-card.running {
+        border-color: #4fc3f7;
+      }
+      .device-card.pass {
+        border-color: #4ec9b0;
+      }
+      .device-card.fail {
+        border-color: #f44747;
+      }
 
-  .card-header {
-    height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 8px;
-    background: #252526; border-bottom: 1px solid #404040; flex-shrink: 0;
-  }
-  .card-dot {
-    width: 6px; height: 6px; border-radius: 50%; background: #858585; flex-shrink: 0;
-  }
-  .device-card.running .card-dot { background: #4fc3f7; animation: pulse 0.9s infinite; }
-  .device-card.pass    .card-dot { background: #4ec9b0; animation: none; }
-  .device-card.fail    .card-dot { background: #f44747; animation: none; }
-  .card-name {
-    font-size: 11px; font-weight: 600; color: #d4d4d4;
-    font-family: 'Segoe UI', sans-serif; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .platform-badge {
-    font-size: 9px; padding: 1px 5px; border-radius: 3px;
-    background: #3c3c3c; color: #d4d4d4; font-family: 'Segoe UI', sans-serif; flex-shrink: 0;
-  }
+      .card-header {
+        height: 28px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px;
+        background: #252526;
+        border-bottom: 1px solid #404040;
+        flex-shrink: 0;
+      }
+      .card-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #858585;
+        flex-shrink: 0;
+      }
+      .device-card.running .card-dot {
+        background: #4fc3f7;
+        animation: pulse 0.9s infinite;
+      }
+      .device-card.pass .card-dot {
+        background: #4ec9b0;
+        animation: none;
+      }
+      .device-card.fail .card-dot {
+        background: #f44747;
+        animation: none;
+      }
+      .card-name {
+        font-size: 11px;
+        font-weight: 600;
+        color: #d4d4d4;
+        font-family: 'Segoe UI', sans-serif;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .platform-badge {
+        font-size: 9px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        background: #3c3c3c;
+        color: #d4d4d4;
+        font-family: 'Segoe UI', sans-serif;
+        flex-shrink: 0;
+      }
 
-  /* ── Screen area ── */
-  .card-screen {
-    height: 152px; background: #000; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; overflow: hidden;
-    position: relative;
-  }
-  .card-screen img {
-    height: 100%; width: auto; object-fit: contain; display: block;
-  }
-  /* Connecting overlay */
-  .connecting-overlay {
-    position: absolute; inset: 0; background: #0a0a1a;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 8px; transition: opacity 0.5s ease;
-  }
-  .connecting-overlay.hidden { opacity: 0; pointer-events: none; }
-  .conn-spinner {
-    width: 20px; height: 20px; border: 2px solid #333;
-    border-top-color: #4fc3f7; border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  .conn-text { font-size: 10px; color: #4fc3f7; font-family: 'Segoe UI', sans-serif; }
+      /* ── Screen area ── */
+      .card-screen {
+        height: 152px;
+        background: #000;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+      }
+      .card-screen img {
+        height: 100%;
+        width: auto;
+        object-fit: contain;
+        display: block;
+      }
+      /* Connecting overlay */
+      .connecting-overlay {
+        position: absolute;
+        inset: 0;
+        background: #0a0a1a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: opacity 0.5s ease;
+      }
+      .connecting-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .conn-spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #333;
+        border-top-color: #4fc3f7;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .conn-text {
+        font-size: 10px;
+        color: #4fc3f7;
+        font-family: 'Segoe UI', sans-serif;
+      }
 
-  /* Pass / Fail overlay */
-  .result-overlay {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 6px; opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
-  }
-  .result-overlay.pass-ov { background: rgba(0,0,0,0.72); }
-  .result-overlay.fail-ov { background: rgba(0,0,0,0.72); }
-  .result-overlay.visible { opacity: 1; }
-  .overlay-icon { font-size: 28px; line-height: 1; }
-  .overlay-label {
-    font-size: 11px; font-weight: 700; font-family: 'Segoe UI', sans-serif;
-    letter-spacing: 0.04em;
-  }
-  .result-overlay.pass-ov .overlay-label { color: #4ec9b0; }
-  .result-overlay.fail-ov .overlay-label { color: #f44747; }
+      /* Pass / Fail overlay */
+      .result-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        pointer-events: none;
+      }
+      .result-overlay.pass-ov {
+        background: rgba(0, 0, 0, 0.72);
+      }
+      .result-overlay.fail-ov {
+        background: rgba(0, 0, 0, 0.72);
+      }
+      .result-overlay.visible {
+        opacity: 1;
+      }
+      .overlay-icon {
+        font-size: 28px;
+        line-height: 1;
+      }
+      .overlay-label {
+        font-size: 11px;
+        font-weight: 700;
+        font-family: 'Segoe UI', sans-serif;
+        letter-spacing: 0.04em;
+      }
+      .result-overlay.pass-ov .overlay-label {
+        color: #4ec9b0;
+      }
+      .result-overlay.fail-ov .overlay-label {
+        color: #f44747;
+      }
 
-  /* ── Progress bar ── */
-  .card-progress { height: 3px; background: #404040; flex-shrink: 0; }
-  .progress-fill {
-    height: 100%; width: 0%; background: #4fc3f7; transition: width 0.4s ease;
-  }
-  .device-card.pass .progress-fill { background: #4ec9b0; }
-  .device-card.fail .progress-fill { background: #f44747; }
+      /* ── Progress bar ── */
+      .card-progress {
+        height: 3px;
+        background: #404040;
+        flex-shrink: 0;
+      }
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: #4fc3f7;
+        transition: width 0.4s ease;
+      }
+      .device-card.pass .progress-fill {
+        background: #4ec9b0;
+      }
+      .device-card.fail .progress-fill {
+        background: #f44747;
+      }
 
-  /* ── Step dots ── */
-  .card-dots {
-    height: 36px; display: flex; align-items: center; justify-content: center;
-    gap: 7px; background: #1a1a1a; flex-shrink: 0;
-    border-top: 1px solid #2a2a2a; border-bottom: 1px solid #2a2a2a;
-  }
-  .step-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #2e2e2e; transition: background 0.3s ease, transform 0.2s ease;
-    flex-shrink: 0;
-  }
-  .step-dot.running { background: #4fc3f7; animation: pulse 0.9s infinite; transform: scale(1.25); }
-  .step-dot.passed  { background: #4ec9b0; transform: scale(1); }
-  .step-dot.failed  { background: #f44747; transform: scale(1); }
+      /* ── Step dots ── */
+      .card-dots {
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        background: #1a1a1a;
+        flex-shrink: 0;
+        border-top: 1px solid #2a2a2a;
+        border-bottom: 1px solid #2a2a2a;
+      }
+      .step-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #2e2e2e;
+        transition:
+          background 0.3s ease,
+          transform 0.2s ease;
+        flex-shrink: 0;
+      }
+      .step-dot.running {
+        background: #4fc3f7;
+        animation: pulse 0.9s infinite;
+        transform: scale(1.25);
+      }
+      .step-dot.passed {
+        background: #4ec9b0;
+        transform: scale(1);
+      }
+      .step-dot.failed {
+        background: #f44747;
+        transform: scale(1);
+      }
 
-  /* ── Footer ── */
-  .card-footer {
-    height: 24px; padding: 0 8px; font-size: 10px; color: #858585;
-    display: flex; align-items: center; justify-content: space-between;
-    background: #252526; border-top: 1px solid #404040; flex-shrink: 0;
-    font-family: 'Segoe UI', sans-serif;
-  }
-  .result-label { font-size: 10px; }
-  .device-card.running .result-label { color: #4fc3f7; }
-  .device-card.pass .result-label { color: #4ec9b0; font-weight: 600; }
-  .device-card.fail .result-label { color: #f44747; font-weight: 600; }
+      /* ── Footer ── */
+      .card-footer {
+        height: 24px;
+        padding: 0 8px;
+        font-size: 10px;
+        color: #858585;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #252526;
+        border-top: 1px solid #404040;
+        flex-shrink: 0;
+        font-family: 'Segoe UI', sans-serif;
+      }
+      .result-label {
+        font-size: 10px;
+      }
+      .device-card.running .result-label {
+        color: #4fc3f7;
+      }
+      .device-card.pass .result-label {
+        color: #4ec9b0;
+        font-weight: 600;
+      }
+      .device-card.fail .result-label {
+        color: #f44747;
+        font-weight: 600;
+      }
 
-  @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
-  @keyframes fadeIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
-</head>
-<body>
-<div class="vscode-window">
-
-  <!-- Title bar -->
-  <div class="titlebar">
-    <div class="traffic-lights">
-      <div class="tl tl-r"></div><div class="tl tl-y"></div><div class="tl tl-g"></div>
-    </div>
-    <div class="title-text">
-      <span class="title-icon">▶</span>
-      youtube-suite.yaml — AppClaw
-    </div>
-  </div>
-
-  <!-- Panel header -->
-  <div class="panel-header">
-    <div class="header-dot blue"></div>
-    <span class="header-title" id="hTitle">Parallel Run</span>
-    <span class="header-badge running" id="hBadge">4 devices</span>
-  </div>
-
-  <!-- Device grid (2×2) -->
-  <div class="device-grid">
-
-    <!-- Card 1 — Pixel 8 Pro -->
-    <div class="device-card running" id="card1">
-      <div class="card-header">
-        <div class="card-dot"></div>
-        <span class="card-name">Pixel 8 Pro</span>
-        <span class="platform-badge">android</span>
-      </div>
-      <div class="card-screen">
-        <img src="device-0.gif" alt="">
-        <div class="connecting-overlay" id="conn1">
-          <div class="conn-spinner"></div>
-          <div class="conn-text">Connecting…</div>
-        </div>
-        <div class="result-overlay pass-ov" id="rov1p"><div class="overlay-icon">✓</div><div class="overlay-label">PASSED</div></div>
-        <div class="result-overlay fail-ov" id="rov1f"><div class="overlay-icon">✕</div><div class="overlay-label">FAILED</div></div>
-      </div>
-      <div class="card-progress"><div class="progress-fill" id="fill1"></div></div>
-      <div class="card-dots" id="dots1">
-        <span class="step-dot" id="d1-1"></span><span class="step-dot" id="d1-2"></span>
-        <span class="step-dot" id="d1-3"></span><span class="step-dot" id="d1-4"></span>
-        <span class="step-dot" id="d1-5"></span><span class="step-dot" id="d1-6"></span>
-        <span class="step-dot" id="d1-7"></span><span class="step-dot" id="d1-8"></span>
-        <span class="step-dot" id="d1-9"></span>
-      </div>
-      <div class="card-footer">
-        <span id="step1">Connecting…</span>
-        <span class="result-label" id="result1"></span>
-      </div>
-    </div>
-
-    <!-- Card 2 — Samsung S24 -->
-    <div class="device-card running" id="card2">
-      <div class="card-header">
-        <div class="card-dot"></div>
-        <span class="card-name">Samsung S24</span>
-        <span class="platform-badge">android</span>
-      </div>
-      <div class="card-screen">
-        <img src="device-1.gif" alt="">
-        <div class="connecting-overlay" id="conn2">
-          <div class="conn-spinner"></div>
-          <div class="conn-text">Connecting…</div>
-        </div>
-        <div class="result-overlay pass-ov" id="rov2p"><div class="overlay-icon">✓</div><div class="overlay-label">PASSED</div></div>
-        <div class="result-overlay fail-ov" id="rov2f"><div class="overlay-icon">✕</div><div class="overlay-label">FAILED</div></div>
-      </div>
-      <div class="card-progress"><div class="progress-fill" id="fill2"></div></div>
-      <div class="card-dots" id="dots2">
-        <span class="step-dot" id="d2-1"></span><span class="step-dot" id="d2-2"></span>
-        <span class="step-dot" id="d2-3"></span><span class="step-dot" id="d2-4"></span>
-        <span class="step-dot" id="d2-5"></span><span class="step-dot" id="d2-6"></span>
-        <span class="step-dot" id="d2-7"></span><span class="step-dot" id="d2-8"></span>
-        <span class="step-dot" id="d2-9"></span>
-      </div>
-      <div class="card-footer">
-        <span id="step2">Connecting…</span>
-        <span class="result-label" id="result2"></span>
-      </div>
-    </div>
-
-    <!-- Card 3 — OnePlus 12 -->
-    <div class="device-card running" id="card3">
-      <div class="card-header">
-        <div class="card-dot"></div>
-        <span class="card-name">OnePlus 12</span>
-        <span class="platform-badge">android</span>
-      </div>
-      <div class="card-screen">
-        <img src="device-2.gif" alt="">
-        <div class="connecting-overlay" id="conn3">
-          <div class="conn-spinner"></div>
-          <div class="conn-text">Connecting…</div>
-        </div>
-        <div class="result-overlay pass-ov" id="rov3p"><div class="overlay-icon">✓</div><div class="overlay-label">PASSED</div></div>
-        <div class="result-overlay fail-ov" id="rov3f"><div class="overlay-icon">✕</div><div class="overlay-label">FAILED</div></div>
-      </div>
-      <div class="card-progress"><div class="progress-fill" id="fill3"></div></div>
-      <div class="card-dots" id="dots3">
-        <span class="step-dot" id="d3-1"></span><span class="step-dot" id="d3-2"></span>
-        <span class="step-dot" id="d3-3"></span><span class="step-dot" id="d3-4"></span>
-        <span class="step-dot" id="d3-5"></span><span class="step-dot" id="d3-6"></span>
-        <span class="step-dot" id="d3-7"></span><span class="step-dot" id="d3-8"></span>
-        <span class="step-dot" id="d3-9"></span>
-      </div>
-      <div class="card-footer">
-        <span id="step3">Connecting…</span>
-        <span class="result-label" id="result3"></span>
-      </div>
-    </div>
-
-    <!-- Card 4 — Pixel 7 -->
-    <div class="device-card running" id="card4">
-      <div class="card-header">
-        <div class="card-dot"></div>
-        <span class="card-name">Pixel 7</span>
-        <span class="platform-badge">android</span>
-      </div>
-      <div class="card-screen">
-        <img src="device-3.gif" alt="">
-        <div class="connecting-overlay" id="conn4">
-          <div class="conn-spinner"></div>
-          <div class="conn-text">Connecting…</div>
-        </div>
-        <div class="result-overlay pass-ov" id="rov4p"><div class="overlay-icon">✓</div><div class="overlay-label">PASSED</div></div>
-        <div class="result-overlay fail-ov" id="rov4f"><div class="overlay-icon">✕</div><div class="overlay-label">FAILED</div></div>
-      </div>
-      <div class="card-progress"><div class="progress-fill" id="fill4"></div></div>
-      <div class="card-dots" id="dots4">
-        <span class="step-dot" id="d4-1"></span><span class="step-dot" id="d4-2"></span>
-        <span class="step-dot" id="d4-3"></span><span class="step-dot" id="d4-4"></span>
-        <span class="step-dot" id="d4-5"></span><span class="step-dot" id="d4-6"></span>
-        <span class="step-dot" id="d4-7"></span><span class="step-dot" id="d4-8"></span>
-        <span class="step-dot" id="d4-9"></span>
-      </div>
-      <div class="card-footer">
-        <span id="step4">Connecting…</span>
-        <span class="result-label" id="result4"></span>
-      </div>
-    </div>
-
-  </div><!-- /device-grid -->
-</div><!-- /vscode-window -->
-
-<script>
-const STEPS = [
-  'Open YouTube app',
-  'Wait for search icon',
-  'Tap search icon',
-  'Type "appium 3.0"',
-  'Tap first result',
-  'Wait 3s',
-  'Scroll down',
-  'Verify TestMu AI video',
-  'Done',
-];
-const TOTAL = STEPS.length;
-
-// Device 4 fails on assert (step 8); rest pass
-const FAIL_AT = { 4: 8 };
-
-function setDot(n, step, state) {
-  // Resolve previous running dot
-  const prev = document.querySelector('#dots' + n + ' .step-dot.running');
-  if (prev) {
-    prev.classList.remove('running');
-    prev.classList.add(state === 'failed' ? 'failed' : 'passed');
-  }
-  if (state === 'running') {
-    const dot = document.getElementById('d' + n + '-' + step);
-    if (dot) dot.classList.add('running');
-  }
-}
-
-function setProgress(n, step) {
-  document.getElementById('fill' + n).style.width = ((step / TOTAL) * 100) + '%';
-  document.getElementById('step' + n).textContent = 'Step ' + step + '/' + TOTAL;
-}
-
-function finishDevice(n, outcome) {
-  const card = document.getElementById('card' + n);
-  card.classList.remove('running');
-  card.classList.add(outcome);
-  document.getElementById('result' + n).textContent = outcome === 'pass' ? '✓ Passed' : '✕ Failed';
-  document.getElementById('fill' + n).style.width = '100%';
-  document.getElementById('step' + n).textContent = 'Step ' + TOTAL + '/' + TOTAL;
-  // Resolve any remaining running dot
-  const runDot = document.querySelector('#dots' + n + ' .step-dot.running');
-  if (runDot) { runDot.classList.remove('running'); runDot.classList.add(outcome === 'pass' ? 'passed' : 'failed'); }
-  const ov = document.getElementById('rov' + n + (outcome === 'pass' ? 'p' : 'f'));
-  if (ov) setTimeout(() => ov.classList.add('visible'), 200);
-  checkDone();
-}
-
-let doneCnt = 0;
-function checkDone() {
-  if (++doneCnt === 4) {
-    setTimeout(() => {
-      document.getElementById('hTitle').textContent = 'Run Complete';
-      document.getElementById('hBadge').textContent = '3/4 passed • 1 failed';
-      document.getElementById('hBadge').className = 'header-badge done';
-    }, 400);
-  }
-}
-
-function scheduleDevice(n, offsetMs, stepMs) {
-  const failAt = FAIL_AT[n];
-
-  // Reveal screen after connect delay
-  setTimeout(() => {
-    document.getElementById('conn' + n).classList.add('hidden');
-  }, offsetMs);
-
-  let lastStep = failAt ? failAt : TOTAL;
-  for (let s = 1; s <= lastStep; s++) {
-    const t = offsetMs + (s - 1) * stepMs;
-    const isFail = failAt && s === failAt;
-    const isFinal = s === lastStep;
-
-    ;((step, fail, final) => {
-      setTimeout(() => {
-        setDot(n, step, 'running');
-        setProgress(n, step);
-        if (final) {
-          setTimeout(() => {
-            finishDevice(n, fail ? 'fail' : 'pass');
-          }, stepMs * 0.75);
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.4;
         }
-      }, t);
-    })(s, isFail, isFinal);
-  }
-}
+        50% {
+          opacity: 1;
+        }
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(3px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="vscode-window">
+      <!-- Title bar -->
+      <div class="titlebar">
+        <div class="traffic-lights">
+          <div class="tl tl-r"></div>
+          <div class="tl tl-y"></div>
+          <div class="tl tl-g"></div>
+        </div>
+        <div class="title-text">
+          <span class="title-icon">▶</span>
+          youtube-suite.yaml — AppClaw
+        </div>
+      </div>
 
-// Staggered starts & slightly different paces for realism
-scheduleDevice(1, 1100, 1650);  // Pixel 8 Pro
-scheduleDevice(2, 1350, 1800);  // Samsung S24 — slightly slower
-scheduleDevice(3,  900, 1500);  // OnePlus 12  — fastest
-scheduleDevice(4, 1550, 1700);  // Pixel 7     — latest start, fails at step 8
-</script>
-</body>
+      <!-- Panel header -->
+      <div class="panel-header">
+        <div class="header-dot blue"></div>
+        <span class="header-title" id="hTitle">Parallel Run</span>
+        <span class="header-badge running" id="hBadge">4 devices</span>
+      </div>
+
+      <!-- Device grid (2×2) -->
+      <div class="device-grid">
+        <!-- Card 1 — Pixel 8 Pro -->
+        <div class="device-card running" id="card1">
+          <div class="card-header">
+            <div class="card-dot"></div>
+            <span class="card-name">Pixel 8 Pro</span>
+            <span class="platform-badge">android</span>
+          </div>
+          <div class="card-screen">
+            <img src="device-0.gif" alt="" />
+            <div class="connecting-overlay" id="conn1">
+              <div class="conn-spinner"></div>
+              <div class="conn-text">Connecting…</div>
+            </div>
+            <div class="result-overlay pass-ov" id="rov1p">
+              <div class="overlay-icon">✓</div>
+              <div class="overlay-label">PASSED</div>
+            </div>
+            <div class="result-overlay fail-ov" id="rov1f">
+              <div class="overlay-icon">✕</div>
+              <div class="overlay-label">FAILED</div>
+            </div>
+          </div>
+          <div class="card-progress"><div class="progress-fill" id="fill1"></div></div>
+          <div class="card-dots" id="dots1">
+            <span class="step-dot" id="d1-1"></span><span class="step-dot" id="d1-2"></span>
+            <span class="step-dot" id="d1-3"></span><span class="step-dot" id="d1-4"></span>
+            <span class="step-dot" id="d1-5"></span><span class="step-dot" id="d1-6"></span>
+            <span class="step-dot" id="d1-7"></span><span class="step-dot" id="d1-8"></span>
+            <span class="step-dot" id="d1-9"></span>
+          </div>
+          <div class="card-footer">
+            <span id="step1">Connecting…</span>
+            <span class="result-label" id="result1"></span>
+          </div>
+        </div>
+
+        <!-- Card 2 — Samsung S24 -->
+        <div class="device-card running" id="card2">
+          <div class="card-header">
+            <div class="card-dot"></div>
+            <span class="card-name">Samsung S24</span>
+            <span class="platform-badge">android</span>
+          </div>
+          <div class="card-screen">
+            <img src="device-1.gif" alt="" />
+            <div class="connecting-overlay" id="conn2">
+              <div class="conn-spinner"></div>
+              <div class="conn-text">Connecting…</div>
+            </div>
+            <div class="result-overlay pass-ov" id="rov2p">
+              <div class="overlay-icon">✓</div>
+              <div class="overlay-label">PASSED</div>
+            </div>
+            <div class="result-overlay fail-ov" id="rov2f">
+              <div class="overlay-icon">✕</div>
+              <div class="overlay-label">FAILED</div>
+            </div>
+          </div>
+          <div class="card-progress"><div class="progress-fill" id="fill2"></div></div>
+          <div class="card-dots" id="dots2">
+            <span class="step-dot" id="d2-1"></span><span class="step-dot" id="d2-2"></span>
+            <span class="step-dot" id="d2-3"></span><span class="step-dot" id="d2-4"></span>
+            <span class="step-dot" id="d2-5"></span><span class="step-dot" id="d2-6"></span>
+            <span class="step-dot" id="d2-7"></span><span class="step-dot" id="d2-8"></span>
+            <span class="step-dot" id="d2-9"></span>
+          </div>
+          <div class="card-footer">
+            <span id="step2">Connecting…</span>
+            <span class="result-label" id="result2"></span>
+          </div>
+        </div>
+
+        <!-- Card 3 — OnePlus 12 -->
+        <div class="device-card running" id="card3">
+          <div class="card-header">
+            <div class="card-dot"></div>
+            <span class="card-name">OnePlus 12</span>
+            <span class="platform-badge">android</span>
+          </div>
+          <div class="card-screen">
+            <img src="device-2.gif" alt="" />
+            <div class="connecting-overlay" id="conn3">
+              <div class="conn-spinner"></div>
+              <div class="conn-text">Connecting…</div>
+            </div>
+            <div class="result-overlay pass-ov" id="rov3p">
+              <div class="overlay-icon">✓</div>
+              <div class="overlay-label">PASSED</div>
+            </div>
+            <div class="result-overlay fail-ov" id="rov3f">
+              <div class="overlay-icon">✕</div>
+              <div class="overlay-label">FAILED</div>
+            </div>
+          </div>
+          <div class="card-progress"><div class="progress-fill" id="fill3"></div></div>
+          <div class="card-dots" id="dots3">
+            <span class="step-dot" id="d3-1"></span><span class="step-dot" id="d3-2"></span>
+            <span class="step-dot" id="d3-3"></span><span class="step-dot" id="d3-4"></span>
+            <span class="step-dot" id="d3-5"></span><span class="step-dot" id="d3-6"></span>
+            <span class="step-dot" id="d3-7"></span><span class="step-dot" id="d3-8"></span>
+            <span class="step-dot" id="d3-9"></span>
+          </div>
+          <div class="card-footer">
+            <span id="step3">Connecting…</span>
+            <span class="result-label" id="result3"></span>
+          </div>
+        </div>
+
+        <!-- Card 4 — Pixel 7 -->
+        <div class="device-card running" id="card4">
+          <div class="card-header">
+            <div class="card-dot"></div>
+            <span class="card-name">Pixel 7</span>
+            <span class="platform-badge">android</span>
+          </div>
+          <div class="card-screen">
+            <img src="device-3.gif" alt="" />
+            <div class="connecting-overlay" id="conn4">
+              <div class="conn-spinner"></div>
+              <div class="conn-text">Connecting…</div>
+            </div>
+            <div class="result-overlay pass-ov" id="rov4p">
+              <div class="overlay-icon">✓</div>
+              <div class="overlay-label">PASSED</div>
+            </div>
+            <div class="result-overlay fail-ov" id="rov4f">
+              <div class="overlay-icon">✕</div>
+              <div class="overlay-label">FAILED</div>
+            </div>
+          </div>
+          <div class="card-progress"><div class="progress-fill" id="fill4"></div></div>
+          <div class="card-dots" id="dots4">
+            <span class="step-dot" id="d4-1"></span><span class="step-dot" id="d4-2"></span>
+            <span class="step-dot" id="d4-3"></span><span class="step-dot" id="d4-4"></span>
+            <span class="step-dot" id="d4-5"></span><span class="step-dot" id="d4-6"></span>
+            <span class="step-dot" id="d4-7"></span><span class="step-dot" id="d4-8"></span>
+            <span class="step-dot" id="d4-9"></span>
+          </div>
+          <div class="card-footer">
+            <span id="step4">Connecting…</span>
+            <span class="result-label" id="result4"></span>
+          </div>
+        </div>
+      </div>
+      <!-- /device-grid -->
+    </div>
+    <!-- /vscode-window -->
+
+    <script>
+      const STEPS = [
+        'Open YouTube app',
+        'Wait for search icon',
+        'Tap search icon',
+        'Type "appium 3.0"',
+        'Tap first result',
+        'Wait 3s',
+        'Scroll down',
+        'Verify TestMu AI video',
+        'Done',
+      ];
+      const TOTAL = STEPS.length;
+
+      // Device 4 fails on assert (step 8); rest pass
+      const FAIL_AT = { 4: 8 };
+
+      function setDot(n, step, state) {
+        // Resolve previous running dot
+        const prev = document.querySelector('#dots' + n + ' .step-dot.running');
+        if (prev) {
+          prev.classList.remove('running');
+          prev.classList.add(state === 'failed' ? 'failed' : 'passed');
+        }
+        if (state === 'running') {
+          const dot = document.getElementById('d' + n + '-' + step);
+          if (dot) dot.classList.add('running');
+        }
+      }
+
+      function setProgress(n, step) {
+        document.getElementById('fill' + n).style.width = (step / TOTAL) * 100 + '%';
+        document.getElementById('step' + n).textContent = 'Step ' + step + '/' + TOTAL;
+      }
+
+      function finishDevice(n, outcome) {
+        const card = document.getElementById('card' + n);
+        card.classList.remove('running');
+        card.classList.add(outcome);
+        document.getElementById('result' + n).textContent =
+          outcome === 'pass' ? '✓ Passed' : '✕ Failed';
+        document.getElementById('fill' + n).style.width = '100%';
+        document.getElementById('step' + n).textContent = 'Step ' + TOTAL + '/' + TOTAL;
+        // Resolve any remaining running dot
+        const runDot = document.querySelector('#dots' + n + ' .step-dot.running');
+        if (runDot) {
+          runDot.classList.remove('running');
+          runDot.classList.add(outcome === 'pass' ? 'passed' : 'failed');
+        }
+        const ov = document.getElementById('rov' + n + (outcome === 'pass' ? 'p' : 'f'));
+        if (ov) setTimeout(() => ov.classList.add('visible'), 200);
+        checkDone();
+      }
+
+      let doneCnt = 0;
+      function checkDone() {
+        if (++doneCnt === 4) {
+          setTimeout(() => {
+            document.getElementById('hTitle').textContent = 'Run Complete';
+            document.getElementById('hBadge').textContent = '3/4 passed • 1 failed';
+            document.getElementById('hBadge').className = 'header-badge done';
+          }, 400);
+        }
+      }
+
+      function scheduleDevice(n, offsetMs, stepMs) {
+        const failAt = FAIL_AT[n];
+
+        // Reveal screen after connect delay
+        setTimeout(() => {
+          document.getElementById('conn' + n).classList.add('hidden');
+        }, offsetMs);
+
+        let lastStep = failAt ? failAt : TOTAL;
+        for (let s = 1; s <= lastStep; s++) {
+          const t = offsetMs + (s - 1) * stepMs;
+          const isFail = failAt && s === failAt;
+          const isFinal = s === lastStep;
+
+          ((step, fail, final) => {
+            setTimeout(() => {
+              setDot(n, step, 'running');
+              setProgress(n, step);
+              if (final) {
+                setTimeout(() => {
+                  finishDevice(n, fail ? 'fail' : 'pass');
+                }, stepMs * 0.75);
+              }
+            }, t);
+          })(s, isFail, isFinal);
+        }
+      }
+
+      // Staggered starts & slightly different paces for realism
+      scheduleDevice(1, 1100, 1650); // Pixel 8 Pro
+      scheduleDevice(2, 1350, 1800); // Samsung S24 — slightly slower
+      scheduleDevice(3, 900, 1500); // OnePlus 12  — fastest
+      scheduleDevice(4, 1550, 1700); // Pixel 7     — latest start, fails at step 8
+    </script>
+  </body>
 </html>

@@ -3,7 +3,7 @@ export interface FlowMeta {
   appId?: string;
   name?: string;
   description?: string;
-  platform?: "android" | "ios";
+  platform?: 'android' | 'ios';
   /** Environment name — resolved from `.appclaw/env/<name>.yaml` or `--env` CLI flag */
   env?: string;
   /** Inline env block for self-contained flows */
@@ -39,20 +39,30 @@ export interface ParsedSuite {
 type Verbatim = { verbatim?: string };
 
 export type FlowStep =
-  | ({ kind: "launchApp" } & Verbatim)
-  | ({ kind: "openApp"; query: string } & Verbatim)
-  | ({ kind: "wait"; seconds: number } & Verbatim)
-  | ({ kind: "waitUntil"; condition: "visible" | "gone" | "screenLoaded"; text?: string; timeoutSeconds: number } & Verbatim)
-  | ({ kind: "tap"; label: string } & Verbatim)
-  | ({ kind: "type"; text: string; target?: string } & Verbatim)
-  | ({ kind: "enter" } & Verbatim)
-  | ({ kind: "back" } & Verbatim)
-  | ({ kind: "home" } & Verbatim)
-  | ({ kind: "swipe"; direction: "up" | "down" | "left" | "right"; repeat?: number } & Verbatim)
-  | ({ kind: "assert"; text: string } & Verbatim)
-  | ({ kind: "scrollAssert"; text: string; direction: "up" | "down" | "left" | "right"; maxScrolls: number } & Verbatim)
-  | ({ kind: "getInfo"; query: string } & Verbatim)
-  | ({ kind: "done"; message?: string } & Verbatim);
+  | ({ kind: 'launchApp' } & Verbatim)
+  | ({ kind: 'openApp'; query: string } & Verbatim)
+  | ({ kind: 'wait'; seconds: number } & Verbatim)
+  | ({
+      kind: 'waitUntil';
+      condition: 'visible' | 'gone' | 'screenLoaded';
+      text?: string;
+      timeoutSeconds: number;
+    } & Verbatim)
+  | ({ kind: 'tap'; label: string } & Verbatim)
+  | ({ kind: 'type'; text: string; target?: string } & Verbatim)
+  | ({ kind: 'enter' } & Verbatim)
+  | ({ kind: 'back' } & Verbatim)
+  | ({ kind: 'home' } & Verbatim)
+  | ({ kind: 'swipe'; direction: 'up' | 'down' | 'left' | 'right'; repeat?: number } & Verbatim)
+  | ({ kind: 'assert'; text: string } & Verbatim)
+  | ({
+      kind: 'scrollAssert';
+      text: string;
+      direction: 'up' | 'down' | 'left' | 'right';
+      maxScrolls: number;
+    } & Verbatim)
+  | ({ kind: 'getInfo'; query: string } & Verbatim)
+  | ({ kind: 'done'; message?: string } & Verbatim);
 
 /**
  * Execution phase of a flow step.
@@ -60,7 +70,7 @@ export type FlowStep =
  * - test: main test steps (the actions under test)
  * - assertion: verification checks (expected outcomes)
  */
-export type FlowPhase = "setup" | "test" | "assertion";
+export type FlowPhase = 'setup' | 'test' | 'assertion';
 
 /** A step tagged with its execution phase. */
 export interface PhasedStep {

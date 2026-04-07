@@ -11,10 +11,10 @@
  *         step-001.png
  */
 
-import * as fs from "node:fs";
-import * as fsp from "node:fs/promises";
-import * as path from "node:path";
-import * as crypto from "node:crypto";
+import * as fs from 'node:fs';
+import * as fsp from 'node:fs/promises';
+import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import type {
   RunManifest,
   RunIndex,
@@ -22,25 +22,25 @@ import type {
   SuiteEntry,
   StepArtifact,
   StepStatus,
-} from "./types.js";
-import type { FlowMeta, FlowPhase } from "../flow/types.js";
-import type { RunYamlFlowResult } from "../flow/run-yaml-flow.js";
+} from './types.js';
+import type { FlowMeta, FlowPhase } from '../flow/types.js';
+import type { RunYamlFlowResult } from '../flow/run-yaml-flow.js';
 
 /* ─── Helpers ────────────────────────────────────────────── */
 
 function generateRunId(): string {
   const now = new Date();
-  const ts = now.toISOString().replace(/[-:]/g, "").replace("T", "T").split(".")[0];
-  const suffix = crypto.randomBytes(3).toString("hex");
+  const ts = now.toISOString().replace(/[-:]/g, '').replace('T', 'T').split('.')[0];
+  const suffix = crypto.randomBytes(3).toString('hex');
   return `${ts}-${suffix}`;
 }
 
 function runsDir(projectRoot: string): string {
-  return path.join(projectRoot, ".appclaw", "runs");
+  return path.join(projectRoot, '.appclaw', 'runs');
 }
 
 function indexPath(projectRoot: string): string {
-  return path.join(runsDir(projectRoot), "runs.json");
+  return path.join(runsDir(projectRoot), 'runs.json');
 }
 
 /* ─── Read / write index ─────────────────────────────────── */
@@ -48,7 +48,7 @@ function indexPath(projectRoot: string): string {
 async function readIndex(projectRoot: string): Promise<RunIndex> {
   const p = indexPath(projectRoot);
   try {
-    const raw = await fsp.readFile(p, "utf-8");
+    const raw = await fsp.readFile(p, 'utf-8');
     return JSON.parse(raw) as RunIndex;
   } catch {
     return { schemaVersion: 1, generatedAt: new Date().toISOString(), runs: [] };
@@ -59,7 +59,7 @@ async function writeIndex(projectRoot: string, index: RunIndex): Promise<void> {
   const p = indexPath(projectRoot);
   await fsp.mkdir(path.dirname(p), { recursive: true });
   index.generatedAt = new Date().toISOString();
-  await fsp.writeFile(p, JSON.stringify(index, null, 2), "utf-8");
+  await fsp.writeFile(p, JSON.stringify(index, null, 2), 'utf-8');
 }
 
 /* ─── Step collector (used during execution) ─────────────── */
@@ -99,10 +99,10 @@ export class RunArtifactCollector {
   constructor(
     readonly flowFile: string,
     readonly meta: FlowMeta,
-    readonly platform: "android" | "ios",
+    readonly platform: 'android' | 'ios',
     readonly device?: string,
     readonly suiteId?: string,
-    readonly suiteName?: string,
+    readonly suiteName?: string
   ) {
     this.runId = generateRunId();
     this.startedAt = new Date().toISOString();
@@ -114,7 +114,7 @@ export class RunArtifactCollector {
   }
 
   /** Record a completed step. */
-  addStep(entry: Omit<StepCollectorEntry, "durationMs"> & { durationMs?: number }): void {
+  addStep(entry: Omit<StepCollectorEntry, 'durationMs'> & { durationMs?: number }): void {
     const startTime = this.stepTimers.get(entry.index);
     const durationMs = entry.durationMs ?? (startTime ? Date.now() - startTime : 0);
     this.steps.push({ ...entry, durationMs });
@@ -122,7 +122,11 @@ export class RunArtifactCollector {
   }
 
   /** Attach a base64 screenshot (after action) to an already-recorded step. */
-  attachScreenshot(stepIndex: number, base64: string, dimensions?: { width: number; height: number }): void {
+  attachScreenshot(
+    stepIndex: number,
+    base64: string,
+    dimensions?: { width: number; height: number }
+  ): void {
     const step = this.steps.find((s) => s.index === stepIndex);
     if (step) {
       step.screenshotBase64 = base64;
@@ -131,7 +135,11 @@ export class RunArtifactCollector {
   }
 
   /** Attach a "before" screenshot (taken before the action) to a step. */
-  attachBeforeScreenshot(stepIndex: number, base64: string, dimensions?: { width: number; height: number }): void {
+  attachBeforeScreenshot(
+    stepIndex: number,
+    base64: string,
+    dimensions?: { width: number; height: number }
+  ): void {
     const step = this.steps.find((s) => s.index === stepIndex);
     if (step) {
       step.beforeScreenshotBase64 = base64;
@@ -140,16 +148,13 @@ export class RunArtifactCollector {
   }
 
   /** Write everything to disk and update the global index. */
-  async finalize(
-    projectRoot: string,
-    result: RunYamlFlowResult,
-  ): Promise<string> {
+  async finalize(projectRoot: string, result: RunYamlFlowResult): Promise<string> {
     const finishedAt = new Date().toISOString();
     const durationMs = new Date(finishedAt).getTime() - new Date(this.startedAt).getTime();
 
     // Create run directory
     const runDir = path.join(runsDir(projectRoot), this.runId);
-    const stepsDir = path.join(runDir, "steps");
+    const stepsDir = path.join(runDir, 'steps');
     await fsp.mkdir(stepsDir, { recursive: true });
 
     // Save screenshots and build step artifacts
@@ -158,16 +163,16 @@ export class RunArtifactCollector {
       let screenshotPath: string | undefined;
       let beforeScreenshotPath: string | undefined;
       if (step.screenshotBase64) {
-        const filename = `step-${String(step.index).padStart(3, "0")}.png`;
+        const filename = `step-${String(step.index).padStart(3, '0')}.png`;
         screenshotPath = `steps/${filename}`;
         const fullPath = path.join(runDir, screenshotPath);
-        await fsp.writeFile(fullPath, Buffer.from(step.screenshotBase64, "base64"));
+        await fsp.writeFile(fullPath, Buffer.from(step.screenshotBase64, 'base64'));
       }
       if (step.beforeScreenshotBase64) {
-        const filename = `step-${String(step.index).padStart(3, "0")}-before.png`;
+        const filename = `step-${String(step.index).padStart(3, '0')}-before.png`;
         beforeScreenshotPath = `steps/${filename}`;
         const fullPath = path.join(runDir, beforeScreenshotPath);
-        await fsp.writeFile(fullPath, Buffer.from(step.beforeScreenshotBase64, "base64"));
+        await fsp.writeFile(fullPath, Buffer.from(step.beforeScreenshotBase64, 'base64'));
       }
       stepArtifacts.push({
         index: step.index,
@@ -209,9 +214,9 @@ export class RunArtifactCollector {
 
     // Write manifest
     await fsp.writeFile(
-      path.join(runDir, "manifest.json"),
+      path.join(runDir, 'manifest.json'),
       JSON.stringify(manifest, null, 2),
-      "utf-8",
+      'utf-8'
     );
 
     // Update global index
@@ -247,34 +252,27 @@ export async function loadRunIndex(projectRoot: string): Promise<RunIndex> {
 
 export async function loadRunManifest(
   projectRoot: string,
-  runId: string,
+  runId: string
 ): Promise<RunManifest | null> {
-  const manifestPath = path.join(runsDir(projectRoot), runId, "manifest.json");
+  const manifestPath = path.join(runsDir(projectRoot), runId, 'manifest.json');
   try {
-    const raw = await fsp.readFile(manifestPath, "utf-8");
+    const raw = await fsp.readFile(manifestPath, 'utf-8');
     return JSON.parse(raw) as RunManifest;
   } catch {
     return null;
   }
 }
 
-export function getArtifactPath(
-  projectRoot: string,
-  runId: string,
-  ...segments: string[]
-): string {
+export function getArtifactPath(projectRoot: string, runId: string, ...segments: string[]): string {
   return path.join(runsDir(projectRoot), runId, ...segments);
 }
 
 /** Write (or overwrite) a suite-level aggregate entry in the global index. */
-export async function writeSuiteEntry(
-  projectRoot: string,
-  entry: SuiteEntry,
-): Promise<void> {
+export async function writeSuiteEntry(projectRoot: string, entry: SuiteEntry): Promise<void> {
   const index = await readIndex(projectRoot);
   if (!index.suites) index.suites = [];
   // Replace existing entry for this suiteId if it exists, otherwise prepend
-  const existing = index.suites.findIndex(s => s.suiteId === entry.suiteId);
+  const existing = index.suites.findIndex((s) => s.suiteId === entry.suiteId);
   if (existing >= 0) {
     index.suites[existing] = entry;
   } else {

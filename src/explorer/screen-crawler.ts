@@ -10,16 +10,16 @@
  * The resulting ScreenGraph provides real UI data for flow generation.
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import { extractText } from "../mcp/tools.js";
-import { getScreenState } from "../perception/screen.js";
-import type { CrawledScreen, ScreenGraph, ScreenTransition, TappableElement } from "./types.js";
-import * as ui from "../ui/terminal.js";
+import type { MCPClient } from '../mcp/types.js';
+import { extractText } from '../mcp/tools.js';
+import { getScreenState } from '../perception/screen.js';
+import type { CrawledScreen, ScreenGraph, ScreenTransition, TappableElement } from './types.js';
+import * as ui from '../ui/terminal.js';
 
 /** Hash a DOM string to create a screen identifier */
 function hashScreen(dom: string): string {
   // Simple hash — strip whitespace and use first 64 chars + length
-  const normalized = dom.replace(/\s+/g, " ").trim();
+  const normalized = dom.replace(/\s+/g, ' ').trim();
   const prefix = normalized.slice(0, 100);
   return `screen_${prefix.length}_${normalized.length}`;
 }
@@ -28,7 +28,7 @@ function hashScreen(dom: string): string {
 function extractTappableElements(dom: string): TappableElement[] {
   const elements: TappableElement[] = [];
   // Match elements with clickable="true" or class containing Button/Tab
-  const lines = dom.split("\n");
+  const lines = dom.split('\n');
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -44,12 +44,12 @@ function extractTappableElements(dom: string): TappableElement[] {
     if (!label || !clickableMatch) continue;
 
     // Determine type from class
-    let type: TappableElement["type"] = "other";
-    const cls = classMatch?.[1]?.toLowerCase() ?? "";
-    if (cls.includes("button")) type = "button";
-    else if (cls.includes("edittext") || cls.includes("input")) type = "input";
-    else if (cls.includes("tab")) type = "tab";
-    else if (cls.includes("image")) type = "icon";
+    let type: TappableElement['type'] = 'other';
+    const cls = classMatch?.[1]?.toLowerCase() ?? '';
+    if (cls.includes('button')) type = 'button';
+    else if (cls.includes('edittext') || cls.includes('input')) type = 'input';
+    else if (cls.includes('tab')) type = 'tab';
+    else if (cls.includes('image')) type = 'icon';
 
     elements.push({
       label,
@@ -77,8 +77,8 @@ function extractVisibleTexts(dom: string): string[] {
 /** Check if two DOMs represent the same screen */
 function isSameScreen(dom1: string, dom2: string): boolean {
   // Compare normalized DOMs — if >80% similar, consider same screen
-  const n1 = dom1.replace(/\s+/g, " ").trim();
-  const n2 = dom2.replace(/\s+/g, " ").trim();
+  const n1 = dom1.replace(/\s+/g, ' ').trim();
+  const n2 = dom2.replace(/\s+/g, ' ').trim();
   if (n1 === n2) return true;
 
   // Quick length check
@@ -118,7 +118,7 @@ export interface CrawlerOptions {
 export async function crawlApp(
   mcp: MCPClient,
   appId: string | undefined,
-  options: CrawlerOptions,
+  options: CrawlerOptions
 ): Promise<ScreenGraph> {
   const screens: CrawledScreen[] = [];
   const transitions: ScreenTransition[] = [];
@@ -127,12 +127,12 @@ export async function crawlApp(
   // BFS queue: [screenId, depth]
   const queue: Array<{ screenId: string; depth: number }> = [];
 
-  ui.printExplorerPhase("Explore", "Crawling app screens...");
+  ui.printExplorerPhase('Explore', 'Crawling app screens...');
 
   // Launch app if appId provided
   if (appId) {
     try {
-      await mcp.callTool("appium_activate_app", { appId });
+      await mcp.callTool('appium_activate_app', { appId });
       await sleep(1500);
     } catch {
       ui.printWarning(`Could not launch app ${appId}, using current screen`);
@@ -145,19 +145,23 @@ export async function crawlApp(
   screens.push(initialScreen);
   queue.push({ screenId: initialScreen.id, depth: 0 });
 
-  ui.printExplorerScreen(initialScreen.id, initialScreen.tappableElements.length, initialScreen.visibleTexts.length);
+  ui.printExplorerScreen(
+    initialScreen.id,
+    initialScreen.tappableElements.length,
+    initialScreen.visibleTexts.length
+  );
 
   while (queue.length > 0 && screens.length < options.maxScreens) {
     const { screenId, depth } = queue.shift()!;
     if (visited.has(screenId) || depth >= options.maxDepth) continue;
     visited.add(screenId);
 
-    const screen = screens.find(s => s.id === screenId);
+    const screen = screens.find((s) => s.id === screenId);
     if (!screen) continue;
 
     // Try tapping each tappable element (limit to avoid explosion)
     const elementsToTry = screen.tappableElements
-      .filter(e => e.type !== "input") // Skip input fields
+      .filter((e) => e.type !== 'input') // Skip input fields
       .slice(0, 5); // Max 5 elements per screen
 
     for (const element of elementsToTry) {
@@ -166,8 +170,8 @@ export async function crawlApp(
       try {
         // Tap the element
         ui.printExplorerAction(`tap "${element.label}"`);
-        await mcp.callTool("appium_find_and_click", {
-          strategy: "accessibility id",
+        await mcp.callTool('appium_find_and_click', {
+          strategy: 'accessibility id',
           selector: element.label,
         });
         await sleep(options.stepDelayMs);
@@ -181,7 +185,7 @@ export async function crawlApp(
           transitions.push({
             fromScreen: screenId,
             toScreen: existingId,
-            action: "tap",
+            action: 'tap',
             element: element.label,
           });
         } else {
@@ -194,16 +198,20 @@ export async function crawlApp(
           transitions.push({
             fromScreen: screenId,
             toScreen: newScreen.id,
-            action: "tap",
+            action: 'tap',
             element: element.label,
           });
           queue.push({ screenId: newScreen.id, depth: depth + 1 });
 
-          ui.printExplorerScreen(newScreen.id, newScreen.tappableElements.length, newScreen.visibleTexts.length);
+          ui.printExplorerScreen(
+            newScreen.id,
+            newScreen.tappableElements.length,
+            newScreen.visibleTexts.length
+          );
         }
 
         // Navigate back to the original screen
-        await mcp.callTool("appium_press_back", {});
+        await mcp.callTool('appium_press_back', {});
         await sleep(options.stepDelayMs);
 
         // Verify we're back on the expected screen
@@ -211,7 +219,7 @@ export async function crawlApp(
         const backId = findMatchingScreen(backState.dom, screens);
         if (backId !== screenId) {
           // Not back on the expected screen — try one more back
-          await mcp.callTool("appium_press_back", {});
+          await mcp.callTool('appium_press_back', {});
           await sleep(options.stepDelayMs);
         }
       } catch {
@@ -229,7 +237,7 @@ export async function crawlApp(
 function createScreenEntry(
   dom: string,
   existingScreens: CrawledScreen[],
-  reachedVia?: { fromScreen: string; action: string },
+  reachedVia?: { fromScreen: string; action: string }
 ): CrawledScreen {
   const id = `screen_${existingScreens.length + 1}`;
   return {
@@ -242,5 +250,5 @@ function createScreenEntry(
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

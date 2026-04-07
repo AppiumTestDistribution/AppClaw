@@ -5,22 +5,22 @@
  * using multiple locator strategies before giving up.
  */
 
-import type { MCPClient } from "../mcp/types.js";
-import { findElement, findElementByVision } from "../mcp/tools.js";
-import type { CompactUIElement } from "../perception/types.js";
+import type { MCPClient } from '../mcp/types.js';
+import { findElement, findElementByVision } from '../mcp/tools.js';
+import type { CompactUIElement } from '../perception/types.js';
 
 // ─── AI Vision element helpers ─────────────────────────────
 
 /** Check if a UUID is a vision-generated synthetic element */
 export function isAIElement(uuid: string): boolean {
-  return uuid.startsWith("ai-element:");
+  return uuid.startsWith('ai-element:');
 }
 
 /** Parse coordinates from a vision-generated ai-element UUID */
 export function parseAIElementCoords(uuid: string): { x: number; y: number } | null {
   if (!isAIElement(uuid)) return null;
-  const coordsPart = uuid.replace("ai-element:", "").split(":")[0];
-  const [xStr, yStr] = coordsPart.split(",");
+  const coordsPart = uuid.replace('ai-element:', '').split(':')[0];
+  const [xStr, yStr] = coordsPart.split(',');
   const x = Number(xStr);
   const y = Number(yStr);
   if (isNaN(x) || isNaN(y)) return null;
@@ -38,28 +38,36 @@ export async function findByIdStrategies(
 ): Promise<string | null> {
   // 1. Try accessibility id (content-desc) — but skip empty or generic IDs like "title"
   //    that are shared by many elements (e.g. every row in Android Settings).
-  const genericIds = new Set(["", "title", "summary", "icon", "widget", "switch_widget", "checkbox"]);
+  const genericIds = new Set([
+    '',
+    'title',
+    'summary',
+    'icon',
+    'widget',
+    'switch_widget',
+    'checkbox',
+  ]);
   if (!genericIds.has(id.toLowerCase())) {
-    let uuid = await findElement(mcp, "accessibility id", id).catch(() => null);
+    let uuid = await findElement(mcp, 'accessibility id', id).catch(() => null);
     if (uuid) return uuid;
 
     // 2. Try resource id (Android: com.package:id/name, iOS: name)
-    uuid = await findElement(mcp, "id", id).catch(() => null);
+    uuid = await findElement(mcp, 'id', id).catch(() => null);
     if (uuid) return uuid;
   }
 
   // 3. Try finding by visible text (xpath) — useful when id/accessibilityId are generic
   if (text) {
     const escapedText = text.replace(/'/g, "\\'");
-    const uuid = await findElement(mcp, "xpath", `//*[@text='${escapedText}']`).catch(() => null);
+    const uuid = await findElement(mcp, 'xpath', `//*[@text='${escapedText}']`).catch(() => null);
     if (uuid) return uuid;
   }
 
   // 4. Fallback: try generic id anyway if we skipped it
   if (genericIds.has(id.toLowerCase())) {
-    let uuid = await findElement(mcp, "accessibility id", id).catch(() => null);
+    let uuid = await findElement(mcp, 'accessibility id', id).catch(() => null);
     if (uuid) return uuid;
-    uuid = await findElement(mcp, "id", id).catch(() => null);
+    uuid = await findElement(mcp, 'id', id).catch(() => null);
     if (uuid) return uuid;
   }
 
@@ -95,10 +103,7 @@ export function findNearestElement(
  * Try to find an element using AI vision (ai_instruction strategy).
  * Returns the synthetic ai-element UUID or null.
  */
-export async function findByVision(
-  mcp: MCPClient,
-  description: string
-): Promise<string | null> {
+export async function findByVision(mcp: MCPClient, description: string): Promise<string | null> {
   try {
     const uuid = await findElementByVision(mcp, description);
     return uuid;
@@ -149,46 +154,50 @@ export async function findElementWithFallback(
  * Tap directly at screen coordinates using Appium mobile gestures.
  * Works without finding an element — taps at the exact x,y position.
  */
-export async function tapAtCoordinates(
-  mcp: MCPClient,
-  x: number,
-  y: number
-): Promise<boolean> {
+export async function tapAtCoordinates(mcp: MCPClient, x: number, y: number): Promise<boolean> {
   // Preferred: appium-mcp's built-in tap by coordinates tool
   try {
-    const result = await mcp.callTool("appium_tap_by_coordinates", { x, y });
-    const text = result.content?.map((c: any) => c.type === "text" ? c.text : "").join("") ?? "";
-    if (!text.toLowerCase().includes("error") && !text.toLowerCase().includes("failed")) {
+    const result = await mcp.callTool('appium_tap_by_coordinates', { x, y });
+    const text = result.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
+    if (!text.toLowerCase().includes('error') && !text.toLowerCase().includes('failed')) {
       return true;
     }
-  } catch { /* not supported or failed */ }
+  } catch {
+    /* not supported or failed */
+  }
 
   // Android: mobile: clickGesture
   try {
-    await mcp.callTool("appium_execute_script", {
-      script: "mobile: clickGesture",
+    await mcp.callTool('appium_execute_script', {
+      script: 'mobile: clickGesture',
       args: [{ x, y }],
     });
     return true;
-  } catch { /* not supported or failed */ }
+  } catch {
+    /* not supported or failed */
+  }
 
   // W3C Actions pointer tap
   try {
-    await mcp.callTool("appium_perform_actions", {
-      actions: [{
-        type: "pointer",
-        id: "finger1",
-        parameters: { pointerType: "touch" },
-        actions: [
-          { type: "pointerMove", duration: 0, x, y },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 100 },
-          { type: "pointerUp", button: 0 },
-        ],
-      }],
+    await mcp.callTool('appium_perform_actions', {
+      actions: [
+        {
+          type: 'pointer',
+          id: 'finger1',
+          parameters: { pointerType: 'touch' },
+          actions: [
+            { type: 'pointerMove', duration: 0, x, y },
+            { type: 'pointerDown', button: 0 },
+            { type: 'pause', duration: 100 },
+            { type: 'pointerUp', button: 0 },
+          ],
+        },
+      ],
     });
     return true;
-  } catch { /* not supported or failed */ }
+  } catch {
+    /* not supported or failed */
+  }
 
   return false;
 }

@@ -7,10 +7,10 @@
  * `df-vision` ships a single webpack CJS bundle (`dist/bundle.js`). Default import is `module.exports`
  * so we destructure named exports here (avoids ESM named-import issues with CJS).
  */
-import starkVision from "df-vision";
-import sharp from "sharp";
+import starkVision from 'df-vision';
+import sharp from 'sharp';
 
-import type { MCPClient, MCPToolResult } from "../mcp/types.js";
+import type { MCPClient, MCPToolResult } from '../mcp/types.js';
 
 const {
   StarkVisionClient,
@@ -20,8 +20,8 @@ const {
   findSubstringWithBrackets,
   sanitizeOutput,
 } = starkVision;
-import { getStarkVisionApiKey, getStarkVisionModel } from "./locate-enabled.js";
-import { getScreenSizeForStark } from "./window-size.js";
+import { getStarkVisionApiKey, getStarkVisionModel } from './locate-enabled.js';
+import { getScreenSizeForStark } from './window-size.js';
 
 /** Max edge for screenshots sent to Stark/Gemini — coordinates are normalized so resolution doesn't matter. */
 const VISION_MAX_EDGE_PX = 512;
@@ -29,16 +29,21 @@ const VISION_MAX_EDGE_PX = 512;
 /** Downscale screenshot before sending to vision model. Mirrors the same step in vision-execute.ts. */
 async function downscaleForVision(base64: string): Promise<string> {
   try {
-    const input = Buffer.from(base64, "base64");
+    const input = Buffer.from(base64, 'base64');
     const meta = await sharp(input).metadata();
     if ((meta.width ?? 0) <= VISION_MAX_EDGE_PX && (meta.height ?? 0) <= VISION_MAX_EDGE_PX) {
       return base64;
     }
     const resized = await sharp(input)
-      .resize({ width: VISION_MAX_EDGE_PX, height: VISION_MAX_EDGE_PX, fit: "inside", withoutEnlargement: true })
+      .resize({
+        width: VISION_MAX_EDGE_PX,
+        height: VISION_MAX_EDGE_PX,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
       .jpeg({ quality: 80 })
       .toBuffer();
-    return resized.toString("base64");
+    return resized.toString('base64');
   } catch {
     return base64;
   }
@@ -46,27 +51,27 @@ async function downscaleForVision(base64: string): Promise<string> {
 
 function textFromMcpResult(result: MCPToolResult): string {
   for (const content of result.content) {
-    if (content.type === "text") return content.text;
+    if (content.type === 'text') return content.text;
   }
-  return "";
+  return '';
 }
 
 /** Same behavior as mcp/tools.screenshot — kept local to avoid circular imports. */
 async function captureScreenshotBase64(mcp: MCPClient): Promise<string | null> {
-  const result = await mcp.callTool("appium_screenshot", {});
+  const result = await mcp.callTool('appium_screenshot', {});
   for (const content of result.content) {
-    if (content.type === "image") return content.data;
+    if (content.type === 'image') return content.data;
   }
   const text = textFromMcpResult(result);
-  if (text.startsWith("iVBOR") || text.startsWith("/9j/")) {
+  if (text.startsWith('iVBOR') || text.startsWith('/9j/')) {
     return text;
   }
-  if (text.includes("screenshot") && text.includes("/")) {
+  if (text.includes('screenshot') && text.includes('/')) {
     try {
       const pathMatch = text.match(/:\s*(.+\.png)/);
       if (pathMatch) {
-        const { readFileSync } = await import("fs");
-        return readFileSync(pathMatch[1]).toString("base64");
+        const { readFileSync } = await import('fs');
+        return readFileSync(pathMatch[1]).toString('base64');
       }
     } catch {
       /* ignore */
@@ -99,7 +104,7 @@ export async function starkLocateTapTarget(
 ): Promise<StarkLocateResult & { syntheticUuid: string }> {
   const apiKey = getStarkVisionApiKey();
   if (!apiKey) {
-    throw new Error("Stark vision requires LLM_API_KEY (Gemini)");
+    throw new Error('Stark vision requires LLM_API_KEY (Gemini)');
   }
 
   const trimmed = instruction.trim();
@@ -110,9 +115,9 @@ export async function starkLocateTapTarget(
     );
   }
 
-  const rawScreenshot = existingScreenshot || await captureScreenshotBase64(mcp);
+  const rawScreenshot = existingScreenshot || (await captureScreenshotBase64(mcp));
   if (!rawScreenshot) {
-    throw new Error("Stark vision: could not capture screenshot via MCP");
+    throw new Error('Stark vision: could not capture screenshot via MCP');
   }
 
   // Use raw screenshot for coordinate scaling (needs true device pixels), compressed for Gemini
@@ -127,7 +132,7 @@ export async function starkLocateTapTarget(
 
   const locateT0 = performance.now();
   const actions = await parseInstruction(client, trimmed, imageBase64);
-  if (process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true") {
+  if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
     const elapsed = Math.round(performance.now() - locateT0);
     console.log(`        [stark] parseInstruction ${elapsed}ms`);
   }
@@ -135,17 +140,13 @@ export async function starkLocateTapTarget(
   for (const action of actions) {
     for (const locator of action.locators ?? []) {
       const coords = locator.coordinates;
-      if (
-        coords &&
-        coords.length >= 2 &&
-        !(coords[0] === 0 && coords[1] === 0)
-      ) {
+      if (coords && coords.length >= 2 && !(coords[0] === 0 && coords[1] === 0)) {
         const bbox = scaleCoordinates(coords as [number, number], screenSize);
         const { x, y } = bbox.center;
         return {
           x,
           y,
-          elementLabel: locator.element || "",
+          elementLabel: locator.element || '',
           syntheticUuid: buildSyntheticUuid(x, y),
         };
       }
@@ -153,7 +154,7 @@ export async function starkLocateTapTarget(
       if (locator.element) {
         const bboxT0 = performance.now();
         const bboxResponse = await client.getBoundingBox(locator.element, imageBase64);
-        if (process.env.MCP_DEBUG === "1" || process.env.MCP_DEBUG === "true") {
+        if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
           console.log(`        [stark] getBoundingBox ${Math.round(performance.now() - bboxT0)}ms`);
         }
         const arrayStr = findSubstringWithBrackets(bboxResponse);

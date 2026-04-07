@@ -10,11 +10,11 @@
  *   have verified is reachable from the Appium process (adb reverse, correct path, etc.).
  */
 
-import type { AppClawConfig } from "../config.js";
+import type { AppClawConfig } from '../config.js';
 
 /** Arguments for MCP tool `create_session` on Android. */
 export function androidCreateSessionArgs(config: AppClawConfig): {
-  platform: "android";
+  platform: 'android';
   capabilities?: Record<string, unknown>;
 } {
   const caps: Record<string, unknown> = {};
@@ -22,10 +22,10 @@ export function androidCreateSessionArgs(config: AppClawConfig): {
   const port = config.APPIUM_MJPEG_SERVER_PORT;
 
   if (port > 0) {
-    caps["appium:mjpegServerPort"] = port;
+    caps['appium:mjpegServerPort'] = port;
   }
   if (explicitUrl) {
-    caps["appium:mjpegScreenshotUrl"] = explicitUrl;
+    caps['appium:mjpegScreenshotUrl'] = explicitUrl;
   }
 
   // NOTE: mjpegScalingFactor is applied AFTER session creation via the settings API
@@ -33,7 +33,7 @@ export function androidCreateSessionArgs(config: AppClawConfig): {
   // appium:settings[...] flat-key format that appium-mcp uses, causing it to be ignored.
 
   if (Object.keys(caps).length === 0) {
-    return { platform: "android" };
+    return { platform: 'android' };
   }
-  return { platform: "android", capabilities: caps };
+  return { platform: 'android', capabilities: caps };
 }

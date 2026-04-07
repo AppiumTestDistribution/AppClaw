@@ -5,7 +5,7 @@
  * Mode-specific sections are injected via buildSystemPrompt().
  */
 
-import type { AgentContext } from "./provider.js";
+import type { AgentContext } from './provider.js';
 /** Unified mobile agent system prompt — works for both DOM and Vision modes */
 const BASE_AGENT_PROMPT = `You are a Mobile Device Agent controlling a device via Appium. Your job is to achieve the user's goal by navigating the mobile UI.
 
@@ -110,15 +110,15 @@ PROBLEM-SOLVING
 - Stuck → study the screenshot carefully, try elements you haven't tried yet`;
 
 export function buildSystemPrompt(
-  platform: "android" | "ios",
+  platform: 'android' | 'ios',
   aiVisionEnabled?: boolean,
-  agentMode?: "dom" | "vision",
+  agentMode?: 'dom' | 'vision',
   /** Meta-tools + MCP tools actually registered for this run (matches generateText `tools`) */
   callableToolCount = 0
 ): string {
-  const platformName = platform === "android" ? "Android" : "iOS";
-  const appIdLabel = platform === "android" ? "package name" : "bundle ID";
-  const isVision = agentMode === "vision";
+  const platformName = platform === 'android' ? 'Android' : 'iOS';
+  const appIdLabel = platform === 'android' ? 'package name' : 'bundle ID';
+  const isVision = agentMode === 'vision';
 
   // Do NOT paste MCP tool descriptions here — generateText() already sends full JSON schemas
   // for every tool (large). Duplicating them in the system prompt wasted ~multi-k tokens per step.
@@ -138,18 +138,24 @@ export function buildSystemPrompt(
 - find_and_type: Find element + click + type text in one step (strategy + selector + text).`;
 
   // Vision fallback section for DOM mode
-  const visionFallback = (!isVision && aiVisionEnabled) ? `
+  const visionFallback =
+    !isVision && aiVisionEnabled
+      ? `
 
 **AI Vision fallback:** When accessibility id and id both fail, you can use strategy="ai_instruction"
 with a visual description as the selector. This uses AI vision to find the element on screen.
-Example: find_and_click(strategy="ai_instruction", selector="blue Send button at bottom right")` : "";
+Example: find_and_click(strategy="ai_instruction", selector="blue Send button at bottom right")`
+      : '';
 
   // iOS-specific navigation hints
-  const iosNavigationHints = platform === "ios" ? `
+  const iosNavigationHints =
+    platform === 'ios'
+      ? `
 - iOS has NO hardware back button. To go back: tap the "< Back" / "Back" button in the navigation bar, or swipe from the left edge.
 - go_back sends a swipe-from-left-edge gesture on iOS.
 - Dismiss keyboards by tapping outside the input field or tapping "Done"/"Return".
-- Home screen: swipe up from the bottom edge.` : "";
+- Home screen: swipe up from the bottom edge.`
+      : '';
 
   return `${BASE_AGENT_PROMPT}
 ${interactionSection}
@@ -218,7 +224,9 @@ export function buildUserMessage(context: AgentContext): string {
   }
 
   if (context.installedApps) {
-    parts.push(`\nINSTALLED_APPS (use exact package names for "launch_app"):\n${context.installedApps}`);
+    parts.push(
+      `\nINSTALLED_APPS (use exact package names for "launch_app"):\n${context.installedApps}`
+    );
   }
 
   // Include DOM only if available (skipped in vision mode)
@@ -230,7 +238,7 @@ export function buildUserMessage(context: AgentContext): string {
     `\n⚡ Is the goal "${context.goal}" ALREADY achieved based on what you see? If yes, call "done".`
   );
 
-  return parts.join("\n");
+  return parts.join('\n');
 }
 
 /**
@@ -260,5 +268,5 @@ function buildContextualHints(context: AgentContext): string {
     );
   }
 
-  return hints.join("\n");
+  return hints.join('\n');
 }

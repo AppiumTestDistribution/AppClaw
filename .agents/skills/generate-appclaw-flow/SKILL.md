@@ -23,6 +23,7 @@ You are an expert mobile QA automation engineer with deep Appium experience acro
 ### Step 1 — Understand the Goal
 
 Read the user's request. If they reference an app, understand:
+
 - Target platform (Android, iOS, or both)
 - App package/bundle ID (needed for `appId` in header)
 - The user journey to automate
@@ -31,6 +32,7 @@ Read the user's request. If they reference an app, understand:
 ### Step 2 — Check Existing Flows and Environment
 
 Before writing anything:
+
 1. Check `examples/flows/` and any user flow directories for existing flows that overlap.
 2. Inspect `.appclaw/env/` for existing variable/secret bindings you can reuse.
 3. If the flow needs credentials, check which `${secrets.*}` and `${variables.*}` are already declared.
@@ -38,6 +40,7 @@ Before writing anything:
 ### Step 3 — Propose a Plan
 
 Present the user with:
+
 - Flow file path and name
 - Which format (flat vs phased) and why
 - Steps you intend to include (summarized)
@@ -151,15 +154,15 @@ You can freely mix natural language and structured steps in the same flow.
 
 ## Metadata Header Fields
 
-| Field | Type | Purpose |
-|---|---|---|
-| `appId` | string | App package (Android) or bundle ID (iOS). Required for `launchApp` step |
-| `name` | string | Flow name, shown in reports and logs |
-| `description` | string | Human-readable description |
-| `platform` | `android` or `ios` | Target platform (optional — can be set at runtime) |
-| `env` | string | Environment name — resolves `.appclaw/env/<name>.yaml` for variable/secret bindings |
-| `parallel` | number | Run on N devices concurrently (single flow) or with N workers (suite). Omit for single-device |
-| `flows` | list of paths | Suite mode — list of flow files to distribute across workers |
+| Field         | Type               | Purpose                                                                                       |
+| ------------- | ------------------ | --------------------------------------------------------------------------------------------- |
+| `appId`       | string             | App package (Android) or bundle ID (iOS). Required for `launchApp` step                       |
+| `name`        | string             | Flow name, shown in reports and logs                                                          |
+| `description` | string             | Human-readable description                                                                    |
+| `platform`    | `android` or `ios` | Target platform (optional — can be set at runtime)                                            |
+| `env`         | string             | Environment name — resolves `.appclaw/env/<name>.yaml` for variable/secret bindings           |
+| `parallel`    | number             | Run on N devices concurrently (single flow) or with N workers (suite). Omit for single-device |
+| `flows`       | list of paths      | Suite mode — list of flow files to distribute across workers                                  |
 
 ---
 
@@ -167,24 +170,24 @@ You can freely mix natural language and structured steps in the same flow.
 
 Use these when you need precise control over parameters.
 
-| Step | Syntax | Notes |
-|---|---|---|
-| `launchApp` | `- launchApp` | Launches app by `appId` from header |
-| `tap` | `- tap: "Login Button"` | Tap element matching label (DOM text, accessibility ID, hint) |
-| `type` | `- type: "hello"` | Type into the currently focused field |
-| `wait` | `- wait: 3` | Sleep N seconds |
-| `waitUntil` | `- waitUntil: "Login Button"` | Wait for text to appear (default 10s timeout) |
-| `waitUntil` | `- { waitUntil: "text", timeout: 15 }` | Wait with custom timeout |
-| `waitUntilGone` | `- waitUntilGone: "Loading"` | Wait for text to disappear |
-| `swipe` | `- swipe: "up"` | Swipe direction: up, down, left, right |
-| `swipe` | `- { swipe: "down", repeat: 3 }` | Swipe with repeat count |
-| `assert` | `- assert: "Login Successful"` | Verify text is visible on screen |
-| `scrollAssert` | `- { scrollAssert: "Item 5", direction: down, maxScrolls: 5 }` | Scroll until text found |
-| `enter` | `- enter` | Press Enter/Return key |
-| `back` | `- back` or `- goBack` | Press Back button |
-| `home` | `- home` or `- goHome` | Press Home button |
-| `getInfo` | `- getInfo: "What is the balance?"` | Ask a question about the screen (vision, returns answer) |
-| `done` | `- done` or `- done: "Success message"` | End flow. With message: verifies text before succeeding |
+| Step            | Syntax                                                         | Notes                                                         |
+| --------------- | -------------------------------------------------------------- | ------------------------------------------------------------- |
+| `launchApp`     | `- launchApp`                                                  | Launches app by `appId` from header                           |
+| `tap`           | `- tap: "Login Button"`                                        | Tap element matching label (DOM text, accessibility ID, hint) |
+| `type`          | `- type: "hello"`                                              | Type into the currently focused field                         |
+| `wait`          | `- wait: 3`                                                    | Sleep N seconds                                               |
+| `waitUntil`     | `- waitUntil: "Login Button"`                                  | Wait for text to appear (default 10s timeout)                 |
+| `waitUntil`     | `- { waitUntil: "text", timeout: 15 }`                         | Wait with custom timeout                                      |
+| `waitUntilGone` | `- waitUntilGone: "Loading"`                                   | Wait for text to disappear                                    |
+| `swipe`         | `- swipe: "up"`                                                | Swipe direction: up, down, left, right                        |
+| `swipe`         | `- { swipe: "down", repeat: 3 }`                               | Swipe with repeat count                                       |
+| `assert`        | `- assert: "Login Successful"`                                 | Verify text is visible on screen                              |
+| `scrollAssert`  | `- { scrollAssert: "Item 5", direction: down, maxScrolls: 5 }` | Scroll until text found                                       |
+| `enter`         | `- enter`                                                      | Press Enter/Return key                                        |
+| `back`          | `- back` or `- goBack`                                         | Press Back button                                             |
+| `home`          | `- home` or `- goHome`                                         | Press Home button                                             |
+| `getInfo`       | `- getInfo: "What is the balance?"`                            | Ask a question about the screen (vision, returns answer)      |
+| `done`          | `- done` or `- done: "Success message"`                        | End flow. With message: verifies text before succeeding       |
 
 ---
 
@@ -193,26 +196,31 @@ Use these when you need precise control over parameters.
 The parser recognizes these patterns (case-insensitive). Use them for readability.
 
 ### App Launch
+
 - `open YouTube app`, `launch Safari`, `start Settings`
 
 ### Tap / Click
+
 - `tap Login button`, `click on Settings`, `press Submit`
 - `toggle WiFi`, `enable Bluetooth`, `turn off Airplane Mode`
 - `close dialog`, `dismiss popup`, `cancel alert`
 - `navigate to Settings screen`
 
 ### Text Input
+
 - `type "hello" in search field`, `type 'password123' in password field`
 - `enter "hello world"`, `enter text "hello"`
 - `search for "pizza"`, `search "restaurants"`
 
 ### Scrolling & Swiping
+
 - `swipe up`, `swipe down 3 times`
 - `scroll down`, `scroll up 2 times`
 - `scroll down until "Submit" is visible`
 - `scroll down 3 times until "Item" is visible`
 
 ### Waiting
+
 - `wait 5 seconds`, `wait 2s`, `pause 500ms`
 - `wait a moment`, `sleep 3 sec`
 - `wait until screen is loaded` (DOM stability check)
@@ -221,16 +229,19 @@ The parser recognizes these patterns (case-insensitive). Use them for readabilit
 - `wait until "Loading" is gone`
 
 ### Navigation
+
 - `go back`, `press back`, `navigate back`
 - `go home`, `press home`
 - `press enter`, `hit enter`, `submit`, `perform search`
 
 ### Assertions
+
 - `verify Dashboard is visible`
 - `assert "Welcome!" is visible`
 - `check that Login button is on the screen`
 
 ### Questions (Vision mode only)
+
 - `what's on the screen?` — returns a description
 - `how many items are there?` — answered via vision
 
@@ -256,11 +267,12 @@ variables:
   timeout: 30
 
 secrets:
-  email: "${TEST_USER_EMAIL}"
-  password: "${TEST_USER_PASSWORD}"
+  email: '${TEST_USER_EMAIL}'
+  password: '${TEST_USER_PASSWORD}'
 ```
 
 **Rules:**
+
 - `variables` — non-sensitive, literal values (string, number, boolean). Shown in logs.
 - `secrets` — sensitive values. Use `"${SHELL_ENV_VAR}"` placeholders. Resolved from shell environment at runtime. Redacted in logs as `***`.
 - Never hardcode actual secret values in YAML files.
@@ -300,12 +312,12 @@ The parser walks up from the flow file directory looking for `.appclaw/env/<name
 
 If the test changes app state, the setup phase must handle prior state:
 
-| Test validates... | Setup must... |
-|---|---|
-| Adding an item | Delete the item first if it exists |
-| Enabling a toggle | Disable it first if already on |
-| Login flow | Log out first if already logged in |
-| Form submission | Clear any pre-filled data |
+| Test validates... | Setup must...                      |
+| ----------------- | ---------------------------------- |
+| Adding an item    | Delete the item first if it exists |
+| Enabling a toggle | Disable it first if already on     |
+| Login flow        | Log out first if already logged in |
+| Form submission   | Clear any pre-filled data          |
 
 ### Platform-Specific Flows
 
@@ -316,12 +328,13 @@ If the test changes app state, the setup phase must handle prior state:
 ```yaml
 # Samsung: Connections → Wi-Fi
 # Pixel/AOSP: Network & internet → Internet → Wi-Fi
-- tap: "Connections"
+- tap: 'Connections'
 ```
 
 ### Vision Fallback
 
 When the DOM can't match an element (custom views, canvas-rendered UI), the executor falls back to vision if configured (`AGENT_MODE=vision` or `VISION_MODE=fallback`). For flows targeting such apps:
+
 - Use descriptive labels: `tap "red heart icon"` instead of `tap "icon"`
 - Vision works best with unique, visually distinct descriptions
 

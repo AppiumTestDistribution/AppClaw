@@ -5,9 +5,9 @@
  * as a compact prompt section (< 200 tokens) for LLM injection.
  */
 
-import type { TrajectoryStore, TrajectoryQuery, TrajectoryMatch } from "./types.js";
-import { getEffectiveConfidence } from "./store.js";
-import { computeSemanticFingerprint } from "./fingerprint.js";
+import type { TrajectoryStore, TrajectoryQuery, TrajectoryMatch } from './types.js';
+import { getEffectiveConfidence } from './store.js';
+import { computeSemanticFingerprint } from './fingerprint.js';
 
 /** Minimum combined score to include a match */
 const MIN_SCORE = 0.25;
@@ -84,20 +84,20 @@ export function retrieveTrajectories(
  * Keeps output under ~200 tokens. Adapts format based on agent mode.
  */
 export function formatExperienceForPrompt(matches: TrajectoryMatch[]): string {
-  if (matches.length === 0) return "";
+  if (matches.length === 0) return '';
 
-  const lines: string[] = ["RELEVANT PAST EXPERIENCE (from previous successful runs):"];
+  const lines: string[] = ['RELEVANT PAST EXPERIENCE (from previous successful runs):'];
 
   for (const { entry, score } of matches) {
     const ago = formatTimeAgo(entry.timestamp);
-    const uses = entry.successCount > 1 ? ` (succeeded ${entry.successCount}x)` : "";
+    const uses = entry.successCount > 1 ? ` (succeeded ${entry.successCount}x)` : '';
 
-    if (entry.agentMode === "vision") {
+    if (entry.agentMode === 'vision') {
       // Vision mode: emphasize the description that worked
-      if (entry.action.toolName === "find_and_type") {
+      if (entry.action.toolName === 'find_and_type') {
         lines.push(
           `- ${entry.action.toolName}: describe target as "${entry.action.selector}", ` +
-          `text="${entry.action.text}"${uses} [${ago}]`
+            `text="${entry.action.text}"${uses} [${ago}]`
         );
       } else {
         lines.push(
@@ -106,11 +106,11 @@ export function formatExperienceForPrompt(matches: TrajectoryMatch[]): string {
       }
     } else {
       // DOM mode: emphasize strategy + selector
-      const strategy = entry.action.strategy ?? "unknown";
-      if (entry.action.toolName === "find_and_type") {
+      const strategy = entry.action.strategy ?? 'unknown';
+      if (entry.action.toolName === 'find_and_type') {
         lines.push(
           `- ${entry.action.toolName}(${strategy}="${entry.action.selector}", ` +
-          `text="${entry.action.text}")${uses} [${ago}]`
+            `text="${entry.action.text}")${uses} [${ago}]`
         );
       } else {
         lines.push(
@@ -120,14 +120,14 @@ export function formatExperienceForPrompt(matches: TrajectoryMatch[]): string {
     }
   }
 
-  lines.push("(These are hints — verify they still apply to the current screen before using.)");
-  return lines.join("\n");
+  lines.push('(These are hints — verify they still apply to the current screen before using.)');
+  return lines.join('\n');
 }
 
 function formatTimeAgo(timestamp: number): string {
   const days = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60 * 24));
-  if (days === 0) return "today";
-  if (days === 1) return "1 day ago";
+  if (days === 0) return 'today';
+  if (days === 1) return '1 day ago';
   if (days < 7) return `${days} days ago`;
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
   return `${Math.floor(days / 30)}mo ago`;

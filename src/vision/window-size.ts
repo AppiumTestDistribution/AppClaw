@@ -11,15 +11,15 @@
  *   divided by the scale factor before use.
  */
 
-import type { MCPClient, MCPToolResult } from "../mcp/types.js";
-import { pngDimensionsFromBase64 } from "./png-dimensions.js";
+import type { MCPClient, MCPToolResult } from '../mcp/types.js';
+import { pngDimensionsFromBase64 } from './png-dimensions.js';
 
 /**
  * Per-MCP-client caches — keyed by the MCPClient instance so parallel workers
  * running on different devices never share or overwrite each other's values.
  */
 const screenSizeCache = new WeakMap<MCPClient, { width: number; height: number }>();
-const platformCache = new WeakMap<MCPClient, "android" | "ios">();
+const platformCache = new WeakMap<MCPClient, 'android' | 'ios'>();
 
 /**
  * Set the cached screen size from a "WxH" string (e.g. "720x1600").
@@ -38,20 +38,20 @@ export function getCachedScreenSize(mcp: MCPClient): { width: number; height: nu
 }
 
 /** Set the current platform so coordinate scaling knows pixel vs point mode. */
-export function setDevicePlatform(mcp: MCPClient, platform: "android" | "ios"): void {
+export function setDevicePlatform(mcp: MCPClient, platform: 'android' | 'ios'): void {
   platformCache.set(mcp, platform);
 }
 
 /** Get the current platform for this MCP client. */
-export function getDevicePlatform(mcp: MCPClient): "android" | "ios" {
-  return platformCache.get(mcp) ?? "android";
+export function getDevicePlatform(mcp: MCPClient): 'android' | 'ios' {
+  return platformCache.get(mcp) ?? 'android';
 }
 
 function mcpResultText(result: MCPToolResult): string {
   for (const content of result.content) {
-    if (content.type === "text") return content.text;
+    if (content.type === 'text') return content.text;
   }
-  return "";
+  return '';
 }
 
 function tryParseSizeFromText(text: string): { width: number; height: number } | null {
@@ -91,7 +91,11 @@ export async function getScreenSizeForStark(
 
   // 1. Standard window rect tools — returns POINTS on iOS, PIXELS on Android
   //    This is the most reliable source for iOS since it gives the correct coordinate space.
-  for (const name of ["appium_get_window_rect", "appium_get_window_size", "get_window_rect"] as const) {
+  for (const name of [
+    'appium_get_window_rect',
+    'appium_get_window_size',
+    'get_window_rect',
+  ] as const) {
     try {
       const result = await mcp.callTool(name, {});
       const parsed = tryParseSizeFromText(mcpResultText(result));
@@ -99,12 +103,14 @@ export async function getScreenSizeForStark(
         screenSizeCache.set(mcp, parsed);
         return parsed;
       }
-    } catch { /* tool missing */ }
+    } catch {
+      /* tool missing */
+    }
   }
 
   // 2. appium_mobile_get_device_info — Android: realDisplaySize in physical pixels
   try {
-    const result = await mcp.callTool("appium_mobile_get_device_info", {});
+    const result = await mcp.callTool('appium_mobile_get_device_info', {});
     const text = mcpResultText(result);
     const sizeMatch = text.match(/realDisplaySize['":\s]+(\d+)x(\d+)/i);
     if (sizeMatch) {
@@ -112,7 +118,9 @@ export async function getScreenSizeForStark(
       screenSizeCache.set(mcp, size);
       return size;
     }
-  } catch { /* tool missing */ }
+  } catch {
+    /* tool missing */
+  }
 
   // 3. Screenshot dimensions (last resort)
   const fromImage = pngDimensionsFromBase64(screenshotBase64);
@@ -120,7 +128,7 @@ export async function getScreenSizeForStark(
     // iOS: screenshots are in physical pixels (e.g. 1320x2868 at 3x) but
     // XCUITest W3C Actions expect logical points (e.g. 440x956).
     // Divide by scale factor to get the correct tap coordinate space.
-    if ((platformCache.get(mcp) ?? "android") === "ios") {
+    if ((platformCache.get(mcp) ?? 'android') === 'ios') {
       const scale = guessIOSScaleFactor(fromImage.width, fromImage.height);
       const pointSize = {
         width: Math.round(fromImage.width / scale),
@@ -133,8 +141,8 @@ export async function getScreenSizeForStark(
   }
 
   throw new Error(
-    "Could not determine screen size for Stark. " +
-      "Ensure appium-mcp exposes device info or window size tools."
+    'Could not determine screen size for Stark. ' +
+      'Ensure appium-mcp exposes device info or window size tools.'
   );
 }
 

@@ -9,7 +9,7 @@
 /** A single stored trajectory — one winning action on one screen */
 export interface TrajectoryEntry {
   id: string;
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
   appId: string;
   /** Semantic hash of top screen labels — stable across devices */
   screenFingerprint: string;
@@ -19,7 +19,7 @@ export interface TrajectoryEntry {
   goalKeywords: string[];
 
   // ── What worked ──
-  agentMode: "dom" | "vision";
+  agentMode: 'dom' | 'vision';
   action: {
     toolName: string;
     /** DOM mode: "accessibility id" | "id" | "xpath" */
@@ -47,11 +47,11 @@ export interface TrajectoryStore {
 
 /** Query parameters for retrieving relevant trajectories */
 export interface TrajectoryQuery {
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
   appId: string;
   currentScreenLabels: string[];
   goalKeywords: string[];
-  agentMode: "dom" | "vision";
+  agentMode: 'dom' | 'vision';
   maxResults?: number;
 }
 
