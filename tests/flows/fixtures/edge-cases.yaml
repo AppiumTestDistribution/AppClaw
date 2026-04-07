@@ -1,0 +1,17 @@
+# Edge cases for the natural language parser
+name: Edge Cases
+---
+- wait
+- wait a moment
+- go back
+- go home
+- press enter
+- submit
+- swipe up 5 times
+- scroll down
+- search for something
+- enter text 'hello'
+- navigate to Settings
+- toggle WiFi
+- close dialog
+- scroll down 3 times until Submit is visible

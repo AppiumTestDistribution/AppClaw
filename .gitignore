@@ -6,3 +6,4 @@ dist/
 .claude/
 recordings/
 logs/
+.appclaw/

@@ -25,8 +25,41 @@ marked.use(markedTerminal({ reflowText: true, width: 76, tab: 2 }) as any);
 const appGradient: (text: string) => string = gradient(["#7C6FFF", "#6CB6FF"]);
 const successGradient: (text: string) => string = gradient(["#7C6FFF", "#22C55E"]);
 
+import { isJsonMode } from "../json-emitter.js";
+
 /** No-op — kept for call-site compat. */
 export async function initUI(): Promise<void> {}
+
+/**
+ * Suppress all console.log output in --json mode.
+ * JSON events go via process.stdout.write in json-emitter.ts;
+ * everything else (spinners, boxes, tables) must be silenced
+ * so the bridge only sees clean NDJSON lines.
+ */
+const _origLog = console.log;
+const _origError = console.error;
+const _origWarn = console.warn;
+const _origWrite = process.stdout.write.bind(process.stdout);
+
+/** Call once after enableJsonMode() to silence terminal UI on stdout. */
+export function silenceTerminalUI(): void {
+  if (!isJsonMode()) {return;}
+  console.log = (..._args: unknown[]) => {};
+  console.warn = (..._args: unknown[]) => {};
+  // Intercept stdout.write — only allow JSON lines through
+  process.stdout.write = (chunk: any, ...rest: any[]) => {
+    const str = typeof chunk === "string" ? chunk : chunk.toString();
+    // Allow our NDJSON lines (start with '{') through
+    const lines = str.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+        _origWrite(trimmed + "\n");
+      }
+    }
+    return true;
+  };
+}
 
 // ─── Theme ───────────────────────────────────────────────
 

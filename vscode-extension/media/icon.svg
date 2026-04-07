@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Background rounded square -->
+  <rect width="128" height="128" rx="24" fill="#1a1a2e"/>
+
+  <!-- Antennae -->
+  <line x1="55" y1="34" x2="48" y2="22" stroke="#e53e3e" stroke-width="3" stroke-linecap="round"/>
+  <line x1="73" y1="34" x2="80" y2="22" stroke="#e53e3e" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Antenna tips -->
+  <line x1="45" y1="20" x2="51" y2="24" stroke="#e53e3e" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="83" y1="20" x2="77" y2="24" stroke="#e53e3e" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Side claws -->
+  <ellipse cx="27" cy="68" rx="8" ry="7" fill="#e53e3e"/>
+  <ellipse cx="101" cy="68" rx="8" ry="7" fill="#e53e3e"/>
+
+  <!-- Legs -->
+  <rect x="49" y="100" width="4" height="10" rx="2" fill="#e53e3e"/>
+  <rect x="75" y="100" width="4" height="10" rx="2" fill="#e53e3e"/>
+
+  <!-- Main body -->
+  <circle cx="64" cy="68" r="35" fill="#e53e3e"/>
+
+  <!-- Eyes -->
+  <circle cx="54" cy="62" r="5" fill="#1a1a2e"/>
+  <circle cx="55" cy="61" r="2" fill="white"/>
+
+  <circle cx="74" cy="62" r="5" fill="#1a1a2e"/>
+  <circle cx="75" cy="61" r="2" fill="white"/>
+</svg>

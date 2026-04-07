@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AppClaw Flow",
+  "description": "YAML schema for AppClaw test flows. Supports flat and phased (setup/steps/assertions) formats.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable name for this test flow"
+    },
+    "description": {
+      "type": "string",
+      "description": "What this test flow verifies"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["android", "ios"],
+      "description": "Target platform"
+    },
+    "appId": {
+      "type": "string",
+      "description": "App package/bundle ID (e.g. com.example.myapp)",
+      "examples": ["com.google.android.youtube", "com.apple.mobilesafari"]
+    },
+    "env": {
+      "type": "string",
+      "description": "Environment name — loads variables/secrets from .appclaw/env/<name>.yaml",
+      "examples": ["dev", "staging", "prod"]
+    },
+    "setup": {
+      "type": "array",
+      "description": "Setup phase — initialization steps run before the main test (app launch, login, navigation)",
+      "items": { "$ref": "#/definitions/step" }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Test phase — main test actions",
+      "items": { "$ref": "#/definitions/step" }
+    },
+    "assertions": {
+      "type": "array",
+      "description": "Assertion phase — verification checks run after the main test",
+      "items": { "$ref": "#/definitions/step" }
+    }
+  },
+  "definitions": {
+    "step": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Natural language step (e.g. 'tap Login', 'type \"hello\" in search field', 'wait 3s')",
+          "examples": [
+            "open MyApp",
+            "tap Login button",
+            "click on Settings",
+            "type '${secrets.email}' in email field",
+            "type '${secrets.password}' in password field",
+            "wait 2s",
+            "wait until screen is loaded",
+            "wait for Dashboard to be visible",
+            "swipe up",
+            "scroll down 3 times",
+            "scroll down until Save is visible",
+            "verify Welcome is visible",
+            "assert Dashboard is visible",
+            "check ${variables.expected_text} is visible",
+            "go back",
+            "press home",
+            "press enter",
+            "done"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tap": { "type": "string", "description": "Element label to tap" }
+          },
+          "required": ["tap"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "description": "Text to type. Supports ${secrets.X} and ${variables.X}" }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wait": { "type": "number", "description": "Seconds to wait", "minimum": 0 }
+          },
+          "required": ["wait"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "waitUntil": { "type": "string", "description": "Wait for element/text to be visible, or 'screen loaded'" },
+            "timeout": { "type": "number", "description": "Timeout in seconds (default: 10)", "default": 10 }
+          },
+          "required": ["waitUntil"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "waitUntilGone": { "type": "string", "description": "Wait for element/text to disappear" },
+            "timeout": { "type": "number", "description": "Timeout in seconds (default: 10)", "default": 10 }
+          },
+          "required": ["waitUntilGone"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "assert": { "type": "string", "description": "Text/element to verify is visible on screen" }
+          },
+          "required": ["assert"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "verify": { "type": "string", "description": "Text/element to verify is visible (alias for assert)" }
+          },
+          "required": ["verify"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "scrollAssert": { "type": "string", "description": "Text to find by scrolling" },
+            "direction": {
+              "type": "string",
+              "enum": ["up", "down", "left", "right"],
+              "default": "down",
+              "description": "Scroll direction"
+            },
+            "maxScrolls": {
+              "type": "number",
+              "default": 3,
+              "minimum": 1,
+              "description": "Maximum scroll attempts"
+            }
+          },
+          "required": ["scrollAssert"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "getInfo": { "type": "string", "description": "Question about the current screen (uses vision)" }
+          },
+          "required": ["getInfo"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "done": { "type": "string", "description": "Final message to verify. Leave empty for unconditional pass." }
+          },
+          "required": ["done"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

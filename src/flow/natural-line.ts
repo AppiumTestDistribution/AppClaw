@@ -127,6 +127,48 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     return { kind: "swipe", direction, ...(repeat && repeat > 1 ? { repeat } : {}), verbatim };
   }
 
+  // ── waitUntil: "wait until screen is loaded", "wait until <text> is visible/gone" ──
+  // Also: "wait 5s until ..." / "wait 10 seconds until ..."
+
+  // "wait until screen is loaded/stable/ready" (with optional timeout)
+  const waitScreenMatch = t.match(
+    /^wait\s+(?:(\d+)\s*(?:s|sec|seconds?)?\s+)?(?:until|for|till)\s+(?:the\s+)?screen\s+(?:is\s+)?(?:loaded|stable|ready|settled|idle)$/i
+  );
+  if (waitScreenMatch) {
+    const timeout = waitScreenMatch[1] ? Number(waitScreenMatch[1]) : 10;
+    return { kind: "waitUntil", condition: "screenLoaded", timeoutSeconds: timeout, verbatim };
+  }
+  // Also match trailing timeout: "wait until screen is loaded 15s"
+  const waitScreenMatch2 = t.match(
+    /^wait\s+(?:until|for|till)\s+(?:the\s+)?screen\s+(?:is\s+)?(?:loaded|stable|ready|settled|idle)\s+(\d+)\s*(?:s|sec|seconds?)?$/i
+  );
+  if (waitScreenMatch2) {
+    const timeout = Number(waitScreenMatch2[1]);
+    return { kind: "waitUntil", condition: "screenLoaded", timeoutSeconds: timeout, verbatim };
+  }
+
+  // "wait [Ns] until <text> is visible/present/shown" OR "wait until <text> is visible [Ns]"
+  // Also: "wait for <text> to be visible"
+  const waitVisibleMatch = t.match(
+    /^wait\s+(?:(\d+)\s*(?:s|sec|seconds?)?\s+)?(?:until|for|till)\s+["']?(.+?)["']?\s+(?:(?:is|to\s+be)\s+)?(?:visible|present|shown|displayed|appears?|exists?|loaded)(?:\s+(\d+)\s*(?:s|sec|seconds?)?)?$/i
+  );
+  if (waitVisibleMatch) {
+    const text = stripTextPrefix(trimPunct(waitVisibleMatch[2].trim()));
+    const timeout = waitVisibleMatch[1] ? Number(waitVisibleMatch[1]) : waitVisibleMatch[3] ? Number(waitVisibleMatch[3]) : 10;
+    if (text) return { kind: "waitUntil", condition: "visible", text, timeoutSeconds: timeout, verbatim };
+  }
+
+  // "wait [Ns] until <text> is gone/hidden/invisible/disappears" OR trailing timeout
+  // Also: "wait for <text> to be gone"
+  const waitGoneMatch = t.match(
+    /^wait\s+(?:(\d+)\s*(?:s|sec|seconds?)?\s+)?(?:until|for|till)\s+["']?(.+?)["']?\s+(?:(?:is|to\s+be)\s+)?(?:gone|hidden|invisible|disappeared?|removed|not\s+visible|not\s+shown)(?:\s+(\d+)\s*(?:s|sec|seconds?)?)?$/i
+  );
+  if (waitGoneMatch) {
+    const text = stripTextPrefix(trimPunct(waitGoneMatch[2].trim()));
+    const timeout = waitGoneMatch[1] ? Number(waitGoneMatch[1]) : waitGoneMatch[3] ? Number(waitGoneMatch[3]) : 10;
+    if (text) return { kind: "waitUntil", condition: "gone", text, timeoutSeconds: timeout, verbatim };
+  }
+
   // "wait" / "wait a moment" / "wait a bit" (no number) — default 2 seconds
   const waitBareMatch = t.match(/^(?:wait|sleep|pause)(?:\s+(?:a\s+)?(?:moment|bit|while|sec|second))?$/i);
   if (waitBareMatch) {

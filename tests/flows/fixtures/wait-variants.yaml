@@ -1,0 +1,15 @@
+# Various wait/waitUntil patterns
+name: Wait Variants
+---
+- wait
+- wait 2s
+- wait 5 seconds
+- wait for 3 sec
+- sleep 1s
+- pause 500ms
+- wait until screen is loaded
+- wait until Login is visible
+- wait 10s until Dashboard is visible
+- wait until popup is gone
+- wait until loading is hidden
+- wait a bit

@@ -1,0 +1,12 @@
+# Mix of structured (key: value) and natural language steps
+name: Mixed Format
+platform: android
+---
+- launchApp
+- wait: 2
+- click on Login button
+- type 'hello@world.com' in email field
+- tap: "Submit"
+- wait 3s
+- verify Dashboard is visible
+- done

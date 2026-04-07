@@ -1,0 +1,20 @@
+# Full phased format — setup, steps, and assertions
+name: Login Test
+description: Tests the login flow end to end
+platform: ios
+---
+setup:
+  - open MyApp
+  - wait until login screen is visible
+
+steps:
+  - tap Email field
+  - type 'user@test.com' in email field
+  - tap Password field
+  - type 'password123' in password field
+  - tap Login button
+  - wait 5s
+
+assertions:
+  - verify Dashboard is visible
+  - verify Welcome is visible

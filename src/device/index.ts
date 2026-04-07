@@ -27,6 +27,13 @@ export interface DeviceSetupArgs {
   cliUdid: string | null;
   cliDeviceName: string | null;
   config: AppClawConfig;
+  /**
+   * Extra Appium capabilities merged into the session for this specific device.
+   * Used by parallel runners to assign unique ports per worker:
+   * - Android: `appium:systemPort`, `appium:mjpegServerPort`, `appium:mjpegScreenshotUrl`
+   * - iOS: `appium:wdaLocalPort`
+   */
+  extraCaps?: Record<string, unknown>;
 }
 
 export interface DeviceSetupResult {
@@ -35,6 +42,14 @@ export interface DeviceSetupResult {
   deviceName: string;
   deviceUdid: string;
   session: SessionResult;
+  /** Appium session ID returned by create_session. */
+  sessionId: string;
+  /**
+   * Session-scoped MCP wrapper. Use this for all post-setup tool calls
+   * (flows, agent loop, app resolver) so every call targets the right device.
+   * Especially important in parallel runs where multiple sessions share one process.
+   */
+  scopedMcp: MCPClient;
 }
 
 /**
@@ -78,7 +93,7 @@ export async function setupDevice(
   }
 
   // Step 4: Create session
-  const session = await createPlatformSession(mcp, args.config, platform, deviceType);
+  const session = await createPlatformSession(mcp, args.config, platform, deviceType, args.extraCaps);
 
   return {
     platform,
@@ -86,5 +101,7 @@ export async function setupDevice(
     deviceName: selection.device.name,
     deviceUdid: selection.device.udid,
     session,
+    sessionId: session.sessionId,
+    scopedMcp: session.scopedMcp,
   };
 }

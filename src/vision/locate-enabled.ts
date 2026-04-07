@@ -1,6 +1,9 @@
 import { Config, type AppClawConfig } from "../config.js";
 
-/** API key used by StarkVisionClient */
+/**
+ * API key used by StarkVisionClient.
+ * Priority: STARK_VISION_API_KEY → GEMINI_API_KEY → LLM_API_KEY (when provider is gemini)
+ */
 export function getStarkVisionApiKey(): string {
   const explicit = (Config.STARK_VISION_API_KEY || Config.GEMINI_API_KEY).trim();
   if (explicit) return explicit;
@@ -11,16 +14,14 @@ export function getStarkVisionApiKey(): string {
 }
 
 /**
- * Gemini model id for Stark. Prefer STARK_VISION_MODEL; if unset and the agent LLM is Gemini, reuse LLM_MODEL
- * (avoids 404s when the default model is not enabled for the project).
+ * Gemini model id for Stark.
+ * Uses LLM_MODEL when provider is gemini, otherwise falls back to the default.
  */
 export function getStarkVisionModel(): string {
-  const explicit = Config.STARK_VISION_MODEL.trim();
-  if (explicit) return explicit;
   if (Config.LLM_PROVIDER === "gemini" && Config.LLM_MODEL.trim()) {
     return Config.LLM_MODEL.trim();
   }
-  return "gemini-2.5-flash";
+  return "gemini-3.1-flash-lite-preview";
 }
 
 function starkConfigured(c: AppClawConfig): boolean {
@@ -29,12 +30,9 @@ function starkConfigured(c: AppClawConfig): boolean {
   return false;
 }
 
-/** Whether NL visual locate is available (Stark or appium ai_instruction). */
+/** Whether NL visual locate is available (Stark vision). */
 export function isVisionLocateEnabledFromConfig(c: AppClawConfig): boolean {
-  if (c.VISION_LOCATE_PROVIDER === "stark") {
-    return starkConfigured(c);
-  }
-  return c.AI_VISION_ENABLED;
+  return starkConfigured(c);
 }
 
 /** Uses process-wide `Config` (same as CLI). */

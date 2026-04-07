@@ -1,0 +1,8 @@
+# Phased format with only steps and assertions (no setup)
+steps:
+  - tap Login
+  - type 'admin'
+  - press enter
+
+assertions:
+  - assert Success is visible

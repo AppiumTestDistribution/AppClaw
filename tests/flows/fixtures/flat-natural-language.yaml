@@ -1,0 +1,10 @@
+# Natural language steps — regex-parsed, no structured keys
+name: Natural Language Demo
+---
+- open YouTube app
+- click on Search Button
+- type 'Appium 3.0'
+- wait 3 seconds
+- scroll down 2 times
+- verify video is visible
+- done

@@ -19,7 +19,7 @@ import { extractText } from "../mcp/tools.js";
 import { setupDevice } from "../device/index.js";
 import { AppResolver } from "../agent/app-resolver.js";
 import { tryParseNaturalFlowLine } from "../flow/natural-line.js";
-import { classifyInstruction } from "../flow/llm-parser.js";
+import { resolveNaturalStep } from "../flow/llm-parser.js";
 import { visionExecute } from "../flow/vision-execute.js";
 import type { FlowStep, FlowMeta } from "../flow/types.js";
 import type { MCPClient } from "../mcp/types.js";
@@ -59,6 +59,7 @@ function stepAction(step: FlowStep): string {
     case "type":         return "type";
     case "swipe":        return "swipe";
     case "wait":         return "wait";
+    case "waitUntil":    return "wait";
     case "enter":        return "enter";
     case "back":         return "back";
     case "home":         return "home";
@@ -66,6 +67,7 @@ function stepAction(step: FlowStep): string {
     case "scrollAssert": return "scroll";
     case "getInfo":      return "info";
     case "done":         return "done";
+
   }
 }
 
@@ -78,6 +80,10 @@ function stepTarget(step: FlowStep): string {
     case "type":         return `"${step.text}"${step.target ? ` → ${step.target}` : ""}`;
     case "swipe":        return step.direction;
     case "wait":         return `${step.seconds}s`;
+    case "waitUntil":
+      if (step.condition === "screenLoaded") return `screen loaded (${step.timeoutSeconds}s)`;
+      if (step.condition === "gone") return `"${step.text}" gone (${step.timeoutSeconds}s)`;
+      return `"${step.text}" visible (${step.timeoutSeconds}s)`;
     case "enter":        return "";
     case "back":         return "";
     case "home":         return "";
@@ -85,6 +91,7 @@ function stepTarget(step: FlowStep): string {
     case "scrollAssert": return `"${step.text}" ${step.direction} ×${step.maxScrolls}`;
     case "getInfo":      return `"${step.query}"`;
     case "done":         return step.message ?? "";
+
   }
 }
 
@@ -105,6 +112,7 @@ function spinnerDetail(step: FlowStep): string {
     case "launchApp":     return "launching the app…";
     case "openApp":       return "opening the app…";
     case "wait":          return "waiting…";
+    case "waitUntil":     return "waiting for condition…";
     case "enter":         return "pressing enter…";
     case "back":          return "navigating back…";
     case "home":          return "going home…";
@@ -156,6 +164,10 @@ function stepToYaml(step: FlowStep): unknown {
     case "type":         return `type "${step.text}"`;
     case "swipe":        return `swipe ${step.direction}`;
     case "wait":         return `wait ${step.seconds} s`;
+    case "waitUntil":
+      if (step.condition === "screenLoaded") return "wait until screen is loaded";
+      if (step.condition === "gone") return `wait until "${step.text}" is gone`;
+      return `wait until "${step.text}" is visible`;
     case "enter":        return "press enter";
     case "back":         return "go back";
     case "home":         return "go home";
@@ -163,22 +175,31 @@ function stepToYaml(step: FlowStep): unknown {
     case "scrollAssert": return `scroll ${step.direction} until "${step.text}" is visible`;
     case "getInfo":      return `getInfo: ${step.query}`;
     case "done":         return step.message ? `done: ${step.message}` : "done";
+
   }
 }
 
 function buildYamlString(): string {
   const parts: string[] = [];
 
-  if (state.meta.appId || state.meta.name) {
+  if (state.meta.appId || state.meta.name || state.meta.platform) {
     const metaObj: Record<string, string> = {};
     if (state.meta.appId) metaObj.appId = state.meta.appId;
     if (state.meta.name) metaObj.name = state.meta.name;
+    if (state.meta.platform) metaObj.platform = state.meta.platform;
     parts.push(stringify(metaObj).trim());
     parts.push("---");
   }
 
   const yamlSteps = state.steps.map(stepToYaml);
-  parts.push(stringify(yamlSteps).trim());
+
+  // Auto-append "done" if the last step isn't already a done step
+  const lastStep = state.steps[state.steps.length - 1];
+  if (!lastStep || lastStep.kind !== "done") {
+    yamlSteps.push("done");
+  }
+
+  parts.push(stringify({ steps: yamlSteps }).trim());
 
   return parts.join("\n") + "\n";
 }
@@ -326,7 +347,7 @@ const COMMANDS: Record<string, { desc: string; run: (arg: string) => Promise<voi
     },
   },
   "/meta": {
-    desc: "Set flow metadata (e.g. /meta appId com.android.settings)",
+    desc: "Set flow metadata (e.g. /meta appId com.android.settings, /meta platform ios)",
     run: (arg: string) => {
       const parts = arg.trim().split(/\s+/);
       const key = parts[0];
@@ -337,12 +358,21 @@ const COMMANDS: Record<string, { desc: string; run: (arg: string) => Promise<voi
       } else if (key === "name" && value) {
         state.meta.name = value;
         console.log(`  ${theme.success("✓")} name = ${theme.white(value)}`);
+      } else if (key === "platform") {
+        const p = value.toLowerCase();
+        if (p === "android" || p === "ios") {
+          state.meta.platform = p;
+          console.log(`  ${theme.success("✓")} platform = ${theme.white(p)}`);
+        } else {
+          console.log(`  ${theme.label("Usage:")} /meta platform <android|ios>`);
+        }
       } else {
-        console.log(`  ${theme.label("Usage:")} /meta appId <package.id>  or  /meta name <flow name>`);
-        if (state.meta.appId || state.meta.name) {
+        console.log(`  ${theme.label("Usage:")} /meta appId <package.id>  |  /meta name <flow name>  |  /meta platform <android|ios>`);
+        if (state.meta.appId || state.meta.name || state.meta.platform) {
           console.log(`  ${theme.label("Current:")}`);
-          if (state.meta.appId) console.log(`    appId: ${theme.white(state.meta.appId)}`);
-          if (state.meta.name) console.log(`    name:  ${theme.white(state.meta.name)}`);
+          if (state.meta.appId) console.log(`    appId:    ${theme.white(state.meta.appId)}`);
+          if (state.meta.name) console.log(`    name:     ${theme.white(state.meta.name)}`);
+          if (state.meta.platform) console.log(`    platform: ${theme.white(state.meta.platform)}`);
         }
       }
     },
@@ -480,11 +510,21 @@ function printHelp(): void {
       ],
     },
     {
+      category: "Wait & Sync",
+      lines: [
+        "wait 3 s",
+        "wait until screen is loaded",
+        'wait until "Search results" is visible',
+        'wait until "Loading..." is gone',
+        'wait 5s until search icon is visible',
+        'wait 15s until screen is loaded',
+      ],
+    },
+    {
       category: "Device Controls",
       lines: [
         "go back",
         "go home",
-        "wait 3 s",
         "toggle WiFi",
         "close popup",
       ],
@@ -537,6 +577,8 @@ function getPrompt(): string {
 
 // ─── Device connection ──────────────────────────────────
 
+let _resolvedPlatform: "android" | "ios" = "android";
+
 async function connectToDevice(): Promise<boolean> {
   const config = loadConfig();
 
@@ -559,6 +601,12 @@ async function connectToDevice(): Promise<boolean> {
       cliDeviceName: _deviceArgs.deviceName ?? null,
       config,
     });
+    _resolvedPlatform = deviceResult.platform;
+
+    // Auto-set platform in flow metadata so exported YAML includes it
+    if (!state.meta.platform) {
+      state.meta.platform = deviceResult.platform;
+    }
 
     // Initialize app resolver for "open X app" commands
     ui.startSpinner("Loading installed apps…");
@@ -588,6 +636,9 @@ async function connectToDevice(): Promise<boolean> {
     return true;
   } catch (err: any) {
     ui.stopSpinner();
+    // Always write to stderr so IDE extensions can see the error
+    process.stderr.write(`[playground] Connection failed: ${err?.message ?? err}\n`);
+    if (err?.stack) process.stderr.write(`[playground] ${err.stack}\n`);
     ui.printError(`Failed to connect: ${err?.message ?? err}`);
     ui.printInfo("Make sure Appium server is running and a device/emulator is connected.");
     console.log();
@@ -607,9 +658,203 @@ export interface PlaygroundDeviceArgs {
 /** Stash device args so connectToDevice can use them */
 let _deviceArgs: PlaygroundDeviceArgs = {};
 
+/**
+ * JSON-mode playground — reads commands from stdin (one per line),
+ * emits NDJSON events to stdout. Used by IDE extensions.
+ */
+export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Promise<void> {
+  if (deviceArgs) _deviceArgs = deviceArgs;
+
+  const { emitJson } = await import("../json-emitter.js");
+
+  let connectError: string | undefined;
+  try {
+    const connected = await connectToDevice();
+    if (!connected) {
+      connectError = "connectToDevice returned false";
+    }
+  } catch (err: any) {
+    connectError = err?.message ?? String(err);
+  }
+
+  if (connectError) {
+    emitJson({ event: "error", data: { message: `Failed to connect: ${connectError}` } });
+    process.exit(1);
+  }
+
+  emitJson({ event: "connected", data: { transport: "stdio" } });
+  emitJson({ event: "device_ready", data: { platform: _resolvedPlatform } });
+
+  // Graceful shutdown on SIGTERM (sent by VS Code extension bridge.stop())
+  const gracefulShutdown = async () => {
+    await cleanup();
+    emitJson({ event: "done", data: { success: true, totalSteps: state.steps.length } });
+    process.exit(0);
+  };
+  process.on("SIGTERM", gracefulShutdown);
+  process.on("SIGINT", gracefulShutdown);
+
+  if (process.stdin.isPaused()) process.stdin.resume();
+
+  const rl = readline.createInterface({ input: process.stdin });
+  let processing = false;
+
+  rl.on("line", async (input: string) => {
+    const line = input.trim();
+    if (!line) return;
+
+    if (processing) {
+      emitJson({ event: "error", data: { message: "Still processing previous command" } });
+      return;
+    }
+
+    processing = true;
+
+    // Slash commands
+    if (line.startsWith("/")) {
+      if (line === "/quit" || line === "/exit" || line === "/q") {
+        await cleanup();
+        emitJson({ event: "done", data: { success: true, totalSteps: state.steps.length } });
+        rl.close();
+        processing = false;
+        return;
+      }
+      if (line === "/yaml") {
+        if (state.steps.length === 0) {
+          emitJson({ event: "flow_step", data: { step: 0, total: 0, kind: "yaml", target: "No steps to preview", status: "failed" } });
+        } else {
+          const yamlStr = buildYamlString();
+          emitJson({ event: "flow_step", data: { step: state.steps.length, total: state.steps.length, kind: "yaml", target: yamlStr, status: "passed" } });
+        }
+        processing = false;
+        return;
+      }
+      if (line.startsWith("/export")) {
+        const arg = line.slice(7).trim();
+        const filename = arg || `flow-${Date.now()}.yaml`;
+        const filepath = filename.startsWith("/") ? filename : path.resolve(process.cwd(), filename);
+        if (state.steps.length === 0) {
+          emitJson({ event: "flow_step", data: { step: 0, total: 0, kind: "export", target: "No steps to export", status: "failed" } });
+        } else {
+          const yamlStr = buildYamlString();
+          writeFileSync(filepath, yamlStr, "utf-8");
+          emitJson({ event: "flow_step", data: { step: state.steps.length, total: state.steps.length, kind: "export", target: filepath, status: "passed" } });
+        }
+        processing = false;
+        return;
+      }
+      if (line === "/clear") {
+        state.steps.length = 0;
+        state.meta = {};
+        emitJson({ event: "flow_step", data: { step: 0, total: 0, kind: "clear", target: "All steps cleared", status: "passed" } });
+        processing = false;
+        return;
+      }
+      if (line === "/undo") {
+        if (state.steps.length === 0) {
+          emitJson({ event: "flow_step", data: { step: 0, total: 0, kind: "undo", target: "Nothing to undo", status: "failed" } });
+        } else {
+          const removed = state.steps.pop()!;
+          emitJson({ event: "flow_step", data: { step: state.steps.length, total: state.steps.length, kind: "undo", target: removed.verbatim ?? removed.kind, status: "passed" } });
+        }
+        processing = false;
+        return;
+      }
+      if (line === "/list") {
+        const stepsInfo = state.steps.map((s, i) => `${i + 1}. ${s.verbatim ?? s.kind}`).join("\n");
+        emitJson({ event: "flow_step", data: { step: state.steps.length, total: state.steps.length, kind: "list", target: stepsInfo || "No steps yet", status: state.steps.length > 0 ? "passed" : "failed" } });
+        processing = false;
+        return;
+      }
+      // Unknown slash command
+      emitJson({ event: "flow_step", data: { step: 0, total: 0, kind: "info", target: `Unknown command: ${line}. Available: /yaml /export /list /undo /clear /quit`, status: "failed" } });
+      processing = false;
+      return;
+    }
+
+    const stepNum = state.steps.length + 1;
+
+    // Vision mode execution
+    if (state.mcp && Config.AGENT_MODE === "vision") {
+      try {
+        const vResult = await visionExecute(state.mcp, line);
+        if (vResult) {
+          if (vResult.isGetInfo) {
+            emitJson({ event: "step", data: { step: stepNum, action: "getInfo", target: line, success: true, message: vResult.getInfoAnswer || vResult.result.message } });
+            processing = false;
+            return;
+          }
+          if (vResult.result.message === "__needs_executeStep__") {
+            const execResult = await runStepOnDevice(vResult.step);
+            if (execResult.success) state.steps.push(vResult.step);
+            emitJson({ event: "step", data: { step: stepNum, action: vResult.step.kind, target: line, success: execResult.success, message: execResult.message } });
+            processing = false;
+            return;
+          }
+          if (vResult.result.success) state.steps.push(vResult.step);
+          emitJson({ event: "step", data: { step: stepNum, action: vResult.step.kind, target: line, success: vResult.result.success, message: vResult.result.message } });
+          processing = false;
+          return;
+        }
+      } catch {
+        // Fall through to two-call path
+      }
+    }
+
+    // Two-call fallback: classify → execute
+    let parsed: FlowStep;
+    try {
+      parsed = await resolveNaturalStep(line);
+    } catch (err: any) {
+      emitJson({ event: "step", data: { step: stepNum, action: "error", target: line, success: false, message: `Could not classify: ${err?.message ?? String(err)}` } });
+      processing = false;
+      return;
+    }
+
+    if (parsed.kind === "getInfo") {
+      const infoAnswer = await handleGetInfo(parsed.query);
+      emitJson({ event: "step", data: { step: stepNum, action: "getInfo", target: line, success: true, message: infoAnswer || "No answer" } });
+      processing = false;
+      return;
+    }
+
+    if (parsed.kind === "done") {
+      state.steps.push(parsed);
+      emitJson({ event: "step", data: { step: stepNum, action: "done", target: line, success: true, message: "recorded" } });
+      processing = false;
+      return;
+    }
+
+    try {
+      const result = await runStepOnDevice(parsed);
+      if (result.success) state.steps.push(parsed);
+      emitJson({ event: "step", data: { step: stepNum, action: parsed.kind, target: line, success: result.success, message: result.message } });
+    } catch (err: any) {
+      emitJson({ event: "step", data: { step: stepNum, action: parsed.kind, target: line, success: false, message: err?.message ?? String(err) } });
+    }
+
+    processing = false;
+  });
+
+  rl.on("close", () => {
+    process.exit(0);
+  });
+
+  return new Promise((resolve) => {
+    rl.on("close", resolve);
+  });
+}
+
 export async function runPlayground(deviceArgs?: PlaygroundDeviceArgs): Promise<void> {
   if (deviceArgs) _deviceArgs = deviceArgs;
   printPlaygroundHeader();
+
+  // If no platform specified, prompt the user before connecting
+  if (!_deviceArgs.platform) {
+    const { promptPlatformInline } = await import("../device/platform-picker.js");
+    const picked = await promptPlatformInline();
+    if (picked) _deviceArgs.platform = picked;
+  }
 
   // Connect to device first
   const connected = await connectToDevice();
@@ -692,6 +937,9 @@ export async function runPlayground(deviceArgs?: PlaygroundDeviceArgs): Promise<
 async function cleanup(): Promise<void> {
   if (state.mcp) {
     try {
+      await state.mcp.callTool("delete_session", {});
+    } catch { /* ignore — session may already be gone */ }
+    try {
       await state.mcp.close();
     } catch { /* ignore */ }
   }
@@ -699,10 +947,10 @@ async function cleanup(): Promise<void> {
 
 // ─── Screen queries (via vision getInfo) ─────────────
 
-async function handleGetInfo(query: string): Promise<void> {
+async function handleGetInfo(query: string): Promise<string | null> {
   if (!state.mcp) {
     console.log(`  ${theme.error("✗")} Not connected to device`);
-    return;
+    return null;
   }
 
   try {
@@ -712,15 +960,15 @@ async function handleGetInfo(query: string): Promise<void> {
     if (!imageBase64) {
       ui.stopSpinner();
       console.log(`  ${theme.error("✗")} Failed to capture screenshot`);
-      return;
+      return null;
     }
 
     const { getStarkVisionApiKey, getStarkVisionModel } = await import("../vision/locate-enabled.js");
     const apiKey = getStarkVisionApiKey();
     if (!apiKey) {
       ui.stopSpinner();
-      console.log(`  ${theme.error("✗")} getInfo requires STARK_VISION_API_KEY or GEMINI_API_KEY`);
-      return;
+      console.log(`  ${theme.error("✗")} getInfo requires LLM_API_KEY (Gemini)`);
+      return null;
     }
 
     const { default: starkVision } = await import("df-vision");
@@ -743,9 +991,11 @@ async function handleGetInfo(query: string): Promise<void> {
     const ansContent = explanation ? `${answer}\n\n${theme.dim(explanation)}` : answer;
     printPanel({ title: "Answer", content: ansContent });
     console.log();
+    return answer;
   } catch (err: any) {
     ui.stopSpinner();
     console.log(`  ${theme.error("✗")} Failed to get info: ${theme.error(err?.message ?? String(err))}`);
+    return null;
   }
 }
 
@@ -767,7 +1017,7 @@ async function processLine(line: string): Promise<void> {
 
   // ── Hybrid single-call path (vision mode) ──
   // In vision mode: screenshot + instruction → one LLM call → classify + locate → execute.
-  // Falls back to two-call path (classifyInstruction → executeStep) for non-visual instructions.
+  // Falls back to two-call path (resolveNaturalStep → executeStep) for non-visual instructions.
   if (state.mcp && Config.AGENT_MODE === "vision") {
     try {
       ui.startSpinner("Executing", line);
@@ -818,7 +1068,7 @@ async function processLine(line: string): Promise<void> {
   let parsed: FlowStep;
   try {
     ui.startSpinner("Classifying", line);
-    parsed = await classifyInstruction(line);
+    parsed = await resolveNaturalStep(line);
     ui.stopSpinner();
   } catch (err: any) {
     ui.stopSpinner();

@@ -1,0 +1,9 @@
+# Flat format with metadata header (two-document YAML)
+platform: android
+appId: com.android.settings
+name: WiFi Toggle
+---
+- launchApp
+- wait: 2
+- tap: "WiFi"
+- done: "WiFi toggled"

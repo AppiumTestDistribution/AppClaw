@@ -34,7 +34,8 @@ function logMCP(name: string, args: Record<string, unknown>, result: MCPToolResu
   }
 }
 
-export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
+/** Build the underlying MCP Client + connect transport */
+async function connectClient(config: MCPConfig): Promise<Client> {
   const client = new Client({ name: "appclaw", version: "0.1.0" });
 
   if (config.transport === "stdio") {
@@ -45,7 +46,8 @@ export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
 
     const transport = new StdioClientTransport({
       command: "npx",
-      args: ["appium-mcp@latest"],
+      // --yes: auto-confirm installation without prompting (avoids consuming MCP stdin as "y/n" answer)
+      args: ["--yes", "appium-mcp@1.44.0"],
       env: {
         ...process.env,
         ANDROID_HOME: androidHome,
@@ -62,23 +64,43 @@ export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
       stderr: "pipe",
     });
 
-    // Log appium-mcp stderr for debugging (especially AI vision errors)
+    // Buffer stderr — log live in debug mode, attach to error on failure so root cause is visible
+    const stderrLines: string[] = [];
     if (transport.stderr) {
       transport.stderr.on("data", (data: Buffer) => {
         const msg = data.toString().trim();
-        if (msg && mcpDebug) {
+        if (!msg) return;
+        // Filter npm install noise so only real appium-mcp output remains
+        if (!msg.startsWith("npm warn") && !msg.startsWith("npm notice")) {
+          stderrLines.push(msg);
+        }
+        if (mcpDebug) {
           console.error(`  ${theme.dim("[appium-mcp]")} ${theme.dim(msg)}`);
         }
       });
     }
 
-    await client.connect(transport);
+    try {
+      await client.connect(transport);
+    } catch (err: any) {
+      if (stderrLines.length > 0) {
+        const detail = stderrLines.join("\n");
+        err.mcpStderr = detail;
+        err.message = `${err.message}\n\nappium-mcp output:\n${detail}`;
+      }
+      throw err;
+    }
   } else {
     const url = new URL(`http://${config.host}:${config.port}/sse`);
     const transport = new SSEClientTransport(url);
     await client.connect(transport);
   }
 
+  return client;
+}
+
+/** Wrap a raw Client into our MCPClient interface */
+function wrapClient(client: Client): MCPClient {
   return {
     async callTool(name: string, args: Record<string, unknown>): Promise<MCPToolResult> {
       const t0 = mcpDebug ? performance.now() : 0;
@@ -99,6 +121,77 @@ export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
 
     async close(): Promise<void> {
       await client.close();
+    },
+  };
+}
+
+/** Create a standalone MCP client (one connection, one owner). */
+export async function createMCPClient(config: MCPConfig): Promise<MCPClient> {
+  const client = await connectClient(config);
+  return wrapClient(client);
+}
+
+// ─── Shared MCP client with reference counting ───────────────────
+// Allows multiple parallel flows to share one appium-mcp server.
+
+/** Config key for deduplication */
+function configKey(config: MCPConfig): string {
+  return `${config.transport}:${config.host}:${config.port}`;
+}
+
+interface SharedEntry {
+  client: Client;
+  refCount: number;
+  /** The promise used for initial connection (for dedup of concurrent acquires) */
+  connectPromise: Promise<Client>;
+}
+
+const sharedClients = new Map<string, SharedEntry>();
+
+/**
+ * Acquire a shared MCP client. Multiple callers with the same config
+ * will share a single underlying connection + appium-mcp process.
+ *
+ * Call `release()` on the returned handle when done. The underlying
+ * connection is closed only when the last handle is released.
+ */
+export async function acquireSharedMCPClient(
+  config: MCPConfig,
+): Promise<MCPClient & { release(): Promise<void> }> {
+  const key = configKey(config);
+  let entry = sharedClients.get(key);
+
+  if (!entry) {
+    // First caller — start connecting
+    const connectPromise = connectClient(config);
+    entry = {
+      client: undefined as unknown as Client, // filled after await
+      refCount: 0,
+      connectPromise,
+    };
+    sharedClients.set(key, entry);
+    entry.client = await connectPromise;
+  } else {
+    // Connection may still be in progress from a concurrent acquire
+    await entry.connectPromise;
+  }
+
+  entry.refCount++;
+  const wrapped = wrapClient(entry.client);
+
+  return {
+    callTool: wrapped.callTool,
+    listTools: wrapped.listTools,
+    // close() on shared clients is a no-op — use release() instead
+    async close() { /* no-op for shared clients */ },
+    async release() {
+      const e = sharedClients.get(key);
+      if (!e) return;
+      e.refCount--;
+      if (e.refCount <= 0) {
+        sharedClients.delete(key);
+        await e.client.close();
+      }
     },
   };
 }

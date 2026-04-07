@@ -1,0 +1,23 @@
+{
+  "skill_name": "review-changes",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "review my changes - I just added a new 'recording_start' event to json-emitter.ts but haven't touched the extension yet",
+      "expected_output": "Should detect that the new event is missing from bridge.ts and extension.ts, flag it as cross-surface drift, run tests, and provide a summary with specific fix recommendations",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I modified the natural-line.ts parser to add support for 'long press' actions. Can you review my changes and make sure nothing is broken?",
+      "expected_output": "Should run the YAML parsing tests, check if new regex patterns conflict with existing ones, verify all existing example flows still parse correctly, and run typecheck",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "check if my changes are safe - I updated the flow types to add a new 'screenshot' step kind",
+      "expected_output": "Should detect that types.ts changed, check if parse-yaml-flow.ts handles the new kind, check if natural-line.ts can parse it, verify extension bridge doesn't need updates, run tests",
+      "files": []
+    }
+  ]
+}

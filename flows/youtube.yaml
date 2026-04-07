@@ -1,0 +1,12 @@
+platform: android
+---
+steps:
+  - Open youtube app
+  - wait for search icon to be visible
+  - Click on Search icon
+  - Enter appium 3.0
+  - Click on the first result from the list
+  - wait 3s
+  - scroll down
+  - Verify if the screen has video uploaded by TestMu AI
+  - done

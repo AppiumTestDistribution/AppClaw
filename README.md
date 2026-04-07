@@ -66,7 +66,7 @@ cp .env.example .env
 Edit `.env` based on your preferred mode:
 
 <details>
-<summary><strong>Vision + Stark (recommended)</strong></summary>
+<summary><strong>Vision mode (recommended)</strong></summary>
 
 Screenshot-first mode using Stark (df-vision + Gemini) for element location. Requires a Gemini API key.
 
@@ -75,26 +75,6 @@ LLM_PROVIDER=gemini
 LLM_API_KEY=your-gemini-api-key
 LLM_MODEL=gemini-3.1-flash-lite-preview
 AGENT_MODE=vision
-VISION_LOCATE_PROVIDER=stark
-```
-
-</details>
-
-<details>
-<summary><strong>Vision + Appium MCP</strong></summary>
-
-Screenshot-first mode using appium-mcp's server-side AI vision for element location. See [appium-mcp AI Vision setup](https://github.com/appium/appium-mcp?tab=readme-ov-file#ai-vision-element-finding) for details.
-
-```env
-LLM_PROVIDER=gemini
-LLM_API_KEY=your-gemini-api-key
-LLM_MODEL=gemini-3.1-flash-lite-preview
-AGENT_MODE=vision
-VISION_LOCATE_PROVIDER=appium_mcp
-AI_VISION_ENABLED=true
-AI_VISION_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-AI_VISION_API_KEY=your-vision-api-key
-AI_VISION_MODEL=gemini-2.0-flash
 ```
 
 </details>
@@ -197,6 +177,41 @@ name: YouTube search
 
 Supported natural language patterns include: `open <app>`, `click/tap <element>`, `type "text"`, `scroll up/down`, `swipe left/right`, `scroll down until "X" is visible`, `wait N seconds`, `go back`, `press home`, `verify/assert <element> is visible`, `press enter`, and `done`. Questions like `"whats on the screen?"` or `"how many items are there?"` are answered via vision without executing any action.
 
+### Parallel & suite runs
+
+Run the same flow on N devices simultaneously, or distribute a suite of flows across N workers:
+
+**Same flow, N devices** — add `parallel: N` to the flow's metadata:
+```yaml
+name: youtube_parallel
+platform: android
+parallel: 2
+---
+- open YouTube app
+- search for "Appium 3.0"
+- assert "TestMu AI" is visible
+- done
+```
+```bash
+appclaw --flow youtube.yaml   # spins up 2 devices, runs flow on both concurrently
+```
+
+**Suite: different flows, N workers** — a suite YAML lists flows and a worker count:
+```yaml
+name: youtube_suite
+platform: android
+parallel: 2
+flows:
+  - flows/login.yaml
+  - flows/search.yaml
+  - flows/playback.yaml
+```
+```bash
+appclaw --flow youtube-suite.yaml   # 2 devices pull from queue until all 3 flows finish
+```
+
+The VS Code extension shows a **live multi-device grid** — each device card updates in real time with a per-device step log, progress bar, and pass/fail result. Failed flows can be re-run with **Re-run Failed** from the summary notification.
+
 ### Playground (interactive REPL)
 
 Build YAML flows interactively on a real device — type commands and watch them execute live:
@@ -263,9 +278,8 @@ All configuration is via `.env`:
 | **LLM** | | |
 | `LLM_PROVIDER` | `gemini` | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`) |
 | `LLM_API_KEY` | — | API key for your provider |
-| `LLM_MODEL` | (auto) | Model override (e.g. `gemini-2.0-flash`, `claude-sonnet-4-20250514`) |
+| `LLM_MODEL` | (auto) | Model override (e.g. `gemini-3.1-flash-lite-preview`, `claude-sonnet-4-20250514`) |
 | `AGENT_MODE` | `vision` | `dom` (XML locators) or `vision` (screenshot-first) |
-| `VISION_LOCATE_PROVIDER` | `stark` | Vision backend for locating elements (`stark` or `appium_mcp`) |
 | **Agent** | | |
 | `MAX_STEPS` | `30` | Max steps per goal |
 | `STEP_DELAY` | `500` | Milliseconds between steps |
@@ -335,6 +349,23 @@ Environment variables (CI-friendly):
   DEVICE_UDID       Device UDID
   DEVICE_NAME       Device name
 ```
+
+## AI Agent Skills
+
+If you're using **Claude Code**, **Codex**, or another tool that supports [skills](https://github.com/vercel-labs/skills), add the AppClaw skills to get expert help writing YAML flows and using the CLI:
+
+```sh
+npx skills add AppiumTestDistribution/appclaw
+```
+
+This installs two skills:
+
+| Skill | What it does |
+|---|---|
+| `generate-appclaw-flow` | Generates YAML flow files — knows the exact step syntax, natural language patterns, phased formats, and variable interpolation |
+| `use-appclaw-cli` | Helps run flows, configure `.env`, set up devices, choose vision providers, and troubleshoot |
+
+Skills are auto-discovered if you're working inside a clone of this repo.
 
 ## License
 

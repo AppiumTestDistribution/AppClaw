@@ -23,6 +23,18 @@ export interface MCPClient {
   callTool(name: string, args: Record<string, unknown>): Promise<MCPToolResult>;
   listTools(): Promise<MCPToolInfo[]>;
   close(): Promise<void>;
+  /**
+   * Set by SessionScopedMCPClient. Absent on the base client.
+   * Used by WeakMap-based caches (e.g. window-size.ts) to partition
+   * per-session state even when workers share the same base connection.
+   */
+  sessionId?: string;
+}
+
+/** Shared MCP client with reference-counted lifecycle */
+export interface SharedMCPClient extends MCPClient {
+  /** Release this handle. The underlying connection closes when the last handle is released. */
+  release(): Promise<void>;
 }
 
 export interface MCPToolResult {

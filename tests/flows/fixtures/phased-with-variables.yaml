@@ -1,0 +1,17 @@
+# Phased format with variable and secret interpolation
+name: Variable Test
+platform: android
+env: dev
+---
+setup:
+  - open ${variables.app_name} app
+  - wait until home screen is visible
+
+steps:
+  - tap Login
+  - type '${secrets.email}' in email field
+  - type '${secrets.password}' in password field
+  - tap Submit
+
+assertions:
+  - verify ${variables.welcome_text} is visible

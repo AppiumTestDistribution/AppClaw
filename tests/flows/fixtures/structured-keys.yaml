@@ -1,0 +1,9 @@
+# Legacy structured format — uses explicit kind: value pairs
+appId: com.example.app
+name: Structured Keys
+---
+- launchApp
+- wait: 3
+- tap: "Login"
+- type: "user@example.com"
+- done: "Login complete"
