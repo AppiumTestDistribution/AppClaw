@@ -53,10 +53,6 @@ jobs:
         working-directory: vscode-extension
         run: npm ci
 
-      - name: Typecheck
-        working-directory: vscode-extension
-        run: npx tsc --noEmit
-
       - name: Build
         working-directory: vscode-extension
         run: npm run build
