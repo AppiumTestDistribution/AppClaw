@@ -38,9 +38,10 @@ const execAsync = promisify(exec);
 import type { FlowMeta, FlowStep, FlowPhase, PhasedStep, PhaseResult } from './types.js';
 import type { AppResolver } from '../agent/app-resolver.js';
 import type { RunArtifactCollector } from '../report/writer.js';
+import { lastVisionScreenshot } from './vision-execute.js';
 import { resolveAppId } from '../agent/preprocessor.js';
 import { pngDimensionsFromBase64 } from '../vision/png-dimensions.js';
-import { getCachedScreenSize } from '../vision/window-size.js';
+import { getCachedScreenSize, getScreenSizeForStark } from '../vision/window-size.js';
 import chalk from 'chalk';
 import * as ui from '../ui/terminal.js';
 
@@ -141,6 +142,8 @@ function stepLabel(step: FlowStep): string {
       return 'goHome';
     case 'swipe':
       return `swipe ${step.direction}`;
+    case 'drag':
+      return `drag "${step.from}" to "${step.to}"`;
     case 'assert':
       return `assert "${step.text}"`;
     case 'scrollAssert':
@@ -560,10 +563,10 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
   // is showing results, not that the exact words "search results" appear).
   const query = `Check if "${text}" is satisfied on this screen. This could mean: (1) the exact text "${text}" is literally visible, OR (2) the screen visually shows what "${text}" describes (e.g. "search results" means a list of results is displayed, "login page" means a login form is shown). Use your judgment — if it reads like a description of screen state, check the overall content and layout rather than looking for exact text.`;
 
-  // Retry up to 2 attempts with a fresh screenshot each time (vision can be flaky)
-  const maxAttempts = 2;
+  // Single attempt — callers (waitUntilCondition, assertTextVisible) handle retrying
+  const maxAttempts = 1;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (attempt > 0) await sleep(500); // brief pause before retry
+    if (attempt > 0) await sleep(500);
 
     if (mcpDebug)
       ui.printAgentBullet(
@@ -584,7 +587,7 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
         `[vision-assert] Asking LLM: is "${text}" visible? (model: ${getStarkVisionModel()})`
       );
     const visT0 = performance.now();
-    const response = await client.isElementVisible(imageBase64, query, true);
+    const response = await client.isElementVisible(imageBase64, query, false);
     const visElapsed = Math.round(performance.now() - visT0);
     if (mcpDebug)
       ui.printAgentBullet(`[vision-assert] LLM response (${visElapsed}ms): ${response}`);
@@ -775,13 +778,25 @@ async function waitUntilCondition(
   const deadline = Date.now() + timeoutSeconds * 1000;
 
   if (condition === 'screenLoaded') {
-    // Wait until two consecutive DOM snapshots are identical (screen stable)
-    let prevSnapshot = '';
+    // Wait until the screen has stabilized.
+    // In vision mode: compare screenshot sizes (no DOM call).
+    // In DOM mode: compare DOM lengths as a proxy for structural stability.
+    // Either way: if the size stays within 2% for 2 consecutive polls, the screen is loaded.
+    let prevLen = 0;
     let stableCount = 0;
-    const stableThreshold = 2; // need 2 consecutive matches
+    const stableThreshold = 2;
+    const visionMode = isVisionMode();
     while (Date.now() < deadline) {
-      const pageSource = await getPageSource(mcp);
-      if (prevSnapshot && pageSource === prevSnapshot) {
+      let len: number;
+      if (visionMode) {
+        const img = await screenshot(mcp);
+        len = img?.length ?? 0;
+      } else {
+        const pageSource = await getPageSource(mcp);
+        len = pageSource.length;
+      }
+      const delta = prevLen > 0 ? Math.abs(len - prevLen) / prevLen : 1;
+      if (prevLen > 0 && delta <= 0.02) {
         stableCount++;
         if (stableCount >= stableThreshold) {
           return {
@@ -792,7 +807,7 @@ async function waitUntilCondition(
       } else {
         stableCount = 0;
       }
-      prevSnapshot = pageSource;
+      prevLen = len;
       await sleep(pollMs);
     }
     return { success: false, message: `Screen did not stabilize within ${timeoutSeconds}s` };
@@ -842,6 +857,22 @@ export async function executeStep(
   tapPoll: FlowTapPollOptions,
   deviceUdid?: string
 ): Promise<ActionResult> {
+  // Vision mode: natural language steps (verbatim set) use visionExecute with the original
+  // instruction — same path as the playground — for precise context-aware element location.
+  // Explicit YAML steps (no verbatim) fall through to the normal DOM/vision-locate paths.
+  if (
+    isVisionMode() &&
+    step.verbatim &&
+    (step.kind === 'tap' || step.kind === 'type' || step.kind === 'assert')
+  ) {
+    const { visionExecute } = await import('./vision-execute.js');
+    const vr = await visionExecute(mcp, step.verbatim);
+    if (vr && vr.result.message !== '__needs_executeStep__') {
+      return vr.result;
+    }
+    // null = no vision API key, or needs executeStep — fall through
+  }
+
   switch (step.kind) {
     case 'launchApp': {
       const id = meta.appId?.trim();
@@ -910,6 +941,82 @@ export async function executeStep(
       return {
         success: true,
         message: count > 1 ? `Swiped ${dir} ${count} times` : `Swiped ${dir}`,
+      };
+    }
+    case 'drag': {
+      const dragApiKey = getStarkVisionApiKey();
+      if (!dragApiKey) {
+        return { success: false, message: 'drag step requires vision (LLM_API_KEY)' };
+      }
+      const dragImage = await screenshot(mcp);
+      if (!dragImage) {
+        return { success: false, message: 'Failed to capture screenshot for drag' };
+      }
+      const { StarkVisionClient: DragClient, scaleCoordinates: scaleDragCoords } = (
+        await import('df-vision')
+      ).default;
+      const dragClient = new DragClient({
+        apiKey: dragApiKey,
+        model: getStarkVisionModel(),
+        disableThinking: true,
+      });
+      const dragScreenSize = await getScreenSizeForStark(mcp, dragImage);
+      const dragInstruction = `drag ${step.from} to ${step.to}`;
+      const rawDragResp = await dragClient.understandAndLocate(dragInstruction, dragImage);
+      const cleanedDragText = rawDragResp.trim().replace(/(^```json|```$)/g, '');
+      let dragActions: any[];
+      try {
+        const parsed = JSON.parse(cleanedDragText);
+        dragActions = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return { success: false, message: 'Vision could not parse drag response' };
+      }
+      const dragAction = dragActions[0];
+      if (!dragAction || dragAction.action !== 'drag' || (dragAction.locators?.length ?? 0) < 2) {
+        const locCount = dragAction?.locators?.length ?? 0;
+        let msg: string;
+        if (!dragAction || dragAction.action !== 'drag') {
+          msg = `"${step.from}" and "${step.to}" are not visible on screen`;
+        } else if (locCount === 0) {
+          msg = `"${step.from}" and "${step.to}" are not visible on screen`;
+        } else {
+          // One locator found — assume "from" was found, "to" is missing
+          msg = `"${step.to}" is not visible on screen`;
+        }
+        return { success: false, message: msg };
+      }
+      const fromCoords = dragAction.locators[0].coordinates as [number, number] | undefined;
+      const toCoords = dragAction.locators[1].coordinates as [number, number] | undefined;
+      if (!fromCoords || !toCoords) {
+        return { success: false, message: 'Drag: vision returned no coordinates' };
+      }
+
+      if (fromCoords[0] === 0 && fromCoords[1] === 0) {
+        return { success: false, message: `Drag failed: "${step.from}" is not visible on screen` };
+      }
+      if (toCoords[0] === 0 && toCoords[1] === 0) {
+        return { success: false, message: `Drag failed: "${step.to}" is not visible on screen` };
+      }
+
+      const fromBbox = scaleDragCoords(fromCoords, dragScreenSize);
+      const toBbox = scaleDragCoords(toCoords, dragScreenSize);
+      const dragResult = await mcp.callTool('appium_drag_and_drop', {
+        sourceX: Math.round(fromBbox.center.x),
+        sourceY: Math.round(fromBbox.center.y),
+        targetX: Math.round(toBbox.center.x),
+        targetY: Math.round(toBbox.center.y),
+        duration: step.duration ?? 600,
+        longPressDuration: step.longPressDuration ?? 400,
+      });
+      const dragText =
+        dragResult.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
+      const dragSuccess =
+        !dragText.toLowerCase().includes('failed') && !dragText.toLowerCase().includes('error');
+      return {
+        success: dragSuccess,
+        message: dragSuccess
+          ? `Dragged "${step.from}" to "${step.to}"`
+          : `Drag failed: ${dragText.slice(0, 200)}`,
       };
     }
     case 'assert':
@@ -1000,10 +1107,11 @@ async function executePhase(
     artifactCollector?.startStep(globalIdx);
 
     // Capture "before" screenshot for interactive steps (tap, type, swipe)
+    // Skip in vision mode — visionExecute takes its own screenshot internally.
     const isInteractive = step.kind === 'tap' || step.kind === 'type' || step.kind === 'swipe';
     let beforeImg: string | null = null;
     let beforeDims: { width: number; height: number } | undefined;
-    if (artifactCollector && isInteractive) {
+    if (artifactCollector && isInteractive && !isVisionMode()) {
       try {
         beforeImg = await screenshot(mcp);
         if (beforeImg) beforeDims = pngDimensionsFromBase64(beforeImg) ?? undefined;
@@ -1041,19 +1149,32 @@ async function executePhase(
         tapCoordinates: tapCoords,
         deviceScreenSize: getCachedScreenSize(mcp) ?? undefined,
       });
-      // Attach "before" screenshot (shows where the tap/click happened)
-      if (beforeImg) {
-        artifactCollector.attachBeforeScreenshot(globalIdx, beforeImg, beforeDims);
-      }
-      // Attach "after" screenshot (shows the result)
-      try {
-        const img = await screenshot(mcp);
-        if (img) {
-          const dims = pngDimensionsFromBase64(img) ?? undefined;
-          artifactCollector.attachScreenshot(globalIdx, img, dims);
+      // In vision mode, visionExecute already captured the pre-action screenshot.
+      // - Tap actions: attach as "before" so the tap dot overlay is rendered.
+      // - Other actions (type, assert, swipe): attach as "after" so the screenshot is shown.
+      // In DOM mode, use the explicit before screenshot + take an "after" screenshot.
+      const visionShot = lastVisionScreenshot;
+      if (visionShot) {
+        const dims = pngDimensionsFromBase64(visionShot) ?? undefined;
+        if (tapCoords) {
+          artifactCollector.attachBeforeScreenshot(globalIdx, visionShot, dims);
+        } else {
+          artifactCollector.attachScreenshot(globalIdx, visionShot, dims);
         }
-      } catch {
-        /* non-critical */
+      } else {
+        if (beforeImg) {
+          artifactCollector.attachBeforeScreenshot(globalIdx, beforeImg, beforeDims);
+        }
+        // Attach "after" screenshot (shows the result)
+        try {
+          const img = await screenshot(mcp);
+          if (img) {
+            const dims = pngDimensionsFromBase64(img) ?? undefined;
+            artifactCollector.attachScreenshot(globalIdx, img, dims);
+          }
+        } catch {
+          /* non-critical */
+        }
       }
     }
 
@@ -1202,10 +1323,11 @@ export async function runYamlFlow(
     options.artifactCollector?.startStep(i);
 
     // Capture "before" screenshot for interactive steps (tap, type, swipe)
+    // Skip in vision mode — visionExecute takes its own screenshot internally.
     const isInteractiveFlat = step.kind === 'tap' || step.kind === 'type' || step.kind === 'swipe';
     let beforeImgFlat: string | null = null;
     let beforeDimsFlat: { width: number; height: number } | undefined;
-    if (options.artifactCollector && isInteractiveFlat) {
+    if (options.artifactCollector && isInteractiveFlat && !isVisionMode()) {
       try {
         beforeImgFlat = await screenshot(mcp);
         if (beforeImgFlat) beforeDimsFlat = pngDimensionsFromBase64(beforeImgFlat) ?? undefined;
@@ -1243,19 +1365,32 @@ export async function runYamlFlow(
         tapCoordinates: tapCoords,
         deviceScreenSize: getCachedScreenSize(mcp) ?? undefined,
       });
-      // Attach "before" screenshot (shows where the tap/click happened)
-      if (beforeImgFlat) {
-        options.artifactCollector.attachBeforeScreenshot(i, beforeImgFlat, beforeDimsFlat);
-      }
-      // Attach "after" screenshot (shows the result)
-      try {
-        const img = await screenshot(mcp);
-        if (img) {
-          const dims = pngDimensionsFromBase64(img) ?? undefined;
-          options.artifactCollector.attachScreenshot(i, img, dims);
+      // In vision mode, visionExecute already captured the pre-action screenshot.
+      // - Tap actions: attach as "before" so the tap dot overlay is rendered.
+      // - Other actions (type, assert, swipe): attach as "after" so the screenshot is shown.
+      // In DOM mode, use the explicit before screenshot + take an "after" screenshot.
+      const visionShotFlat = lastVisionScreenshot;
+      if (visionShotFlat) {
+        const dims = pngDimensionsFromBase64(visionShotFlat) ?? undefined;
+        if (tapCoords) {
+          options.artifactCollector.attachBeforeScreenshot(i, visionShotFlat, dims);
+        } else {
+          options.artifactCollector.attachScreenshot(i, visionShotFlat, dims);
         }
-      } catch {
-        /* non-critical */
+      } else {
+        if (beforeImgFlat) {
+          options.artifactCollector.attachBeforeScreenshot(i, beforeImgFlat, beforeDimsFlat);
+        }
+        // Attach "after" screenshot (shows the result)
+        try {
+          const img = await screenshot(mcp);
+          if (img) {
+            const dims = pngDimensionsFromBase64(img) ?? undefined;
+            options.artifactCollector.attachScreenshot(i, img, dims);
+          }
+        } catch {
+          /* non-critical */
+        }
       }
     }
 

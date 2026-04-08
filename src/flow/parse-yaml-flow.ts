@@ -106,6 +106,20 @@ export function normalizeStructured(raw: unknown, index: number): FlowStep | nul
       };
     }
 
+    // ── Multi-key: drag { from, to } ──
+    if (keys.includes('from') && keys.includes('to')) {
+      const duration = o.duration != null ? Number(o.duration) : undefined;
+      const longPressDuration =
+        o.longPressDuration != null ? Number(o.longPressDuration) : undefined;
+      return {
+        kind: 'drag',
+        from: String(o.from).trim(),
+        to: String(o.to).trim(),
+        ...(duration != null && { duration }),
+        ...(longPressDuration != null && { longPressDuration }),
+      };
+    }
+
     // ── Multi-key: scrollAssert ──
     if (
       keys.includes('scrollAssert') ||
@@ -168,6 +182,16 @@ export function normalizeStructured(raw: unknown, index: number): FlowStep | nul
     }
     if (k === 'waitUntilGone') {
       return { kind: 'waitUntil', condition: 'gone', text: String(v).trim(), timeoutSeconds: 10 };
+    }
+    if (k === 'drag') {
+      const val = String(v).trim();
+      const toIdx = val.indexOf(' to ');
+      if (toIdx !== -1) {
+        return { kind: 'drag', from: val.slice(0, toIdx).trim(), to: val.slice(toIdx + 4).trim() };
+      }
+      throw new Error(
+        `Step ${index + 1}: drag requires "from to to" syntax, e.g. drag: "green dot to +100 mark"`
+      );
     }
     if (k === 'tap') return { kind: 'tap', label: String(v) };
     if (k === 'type') return { kind: 'type', text: String(v) };

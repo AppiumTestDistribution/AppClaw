@@ -1,0 +1,19 @@
+platform: android
+---
+steps:
+  - open rapido app
+  - wait for the app to be ready
+  - click on where are you going
+  - wait for drop screen to be visible
+  - Enter Bangalore Airport in the drop location
+  - click on the first suggestion from the list
+  - wait for the vehicle list to be visible
+  - Select the cheapest vehicle option
+  - Click on Book a can
+  - Click on confirm pickup
+  - wait for 2 seconds
+  - drag green circle until +90
+  - wait for 2seconds
+  - assert the green circle is at the +90 mark
+  - Click on back arrow
+  - done

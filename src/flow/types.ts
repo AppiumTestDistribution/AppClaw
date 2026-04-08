@@ -54,6 +54,15 @@ export type FlowStep =
   | ({ kind: 'back' } & Verbatim)
   | ({ kind: 'home' } & Verbatim)
   | ({ kind: 'swipe'; direction: 'up' | 'down' | 'left' | 'right'; repeat?: number } & Verbatim)
+  | ({
+      kind: 'drag';
+      from: string;
+      to: string;
+      /** Drag movement duration in ms. Default: 600 */
+      duration?: number;
+      /** Hold duration before dragging in ms. Default: 400 */
+      longPressDuration?: number;
+    } & Verbatim)
   | ({ kind: 'assert'; text: string } & Verbatim)
   | ({
       kind: 'scrollAssert';

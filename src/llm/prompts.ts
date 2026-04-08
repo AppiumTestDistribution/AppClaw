@@ -76,7 +76,15 @@ The system handles scaling to device coordinates. If your coordinates miss, it f
 - Position: "top right corner", "bottom center", "below the To field"
 - Context: "icon next to the profile picture"
 
-**Bad descriptions (will fail):** "the button", "input field", "that icon"`;
+**Bad descriptions (will fail):** "the button", "input field", "that icon"
+
+**GAME / CANVAS KEYBOARDS — tapping individual keys:**
+Some apps (games, custom UIs) have on-screen keyboards where you must tap each key individually with find_and_click.
+- BEFORE tapping any key, decide the COMPLETE, VALID input you want to enter. For word games this must be a real dictionary word — think it through fully before touching any key.
+- Then tap each letter key one by one in the correct order.
+- After the last letter, tap the submit/enter/confirm key.
+- Use the screenshot to locate each key by its label and position on the keyboard.
+- After submitting, ALWAYS read the full screen feedback (colors, highlights, error messages) before deciding your next input. If the game rejects your input (e.g. "not a word"), delete it and choose a different valid input.`;
 
 /** Shared rules for both modes */
 const SHARED_RULES = `

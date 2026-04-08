@@ -421,6 +421,7 @@ Rules:
 8. For search goals: separate "open search" from "type query" from "select result"
 9. IMPORTANT: When a sub-goal involves typing/entering text into a field, use the word "Type" explicitly (not "Enter" which is ambiguous). Example: "Type 'hello@email.com' into the To field" NOT "Enter hello@email.com in the recipient field"
 10. FIELD-SPECIFIC SUB-GOALS: When a screen has multiple input fields, create a separate sub-goal for EACH field that needs to be filled. Always name the specific field in the sub-goal (e.g., "Type 'X' into the [field name] field"). NEVER say "Type into the field" without specifying WHICH field. The agent needs to know exactly which field to target.
+11. ITERATIVE FEEDBACK LOOPS — Do NOT decompose tasks that require repeated action→observe→adapt cycles. If completing the goal requires submitting input, reading a response, and submitting again based on that response (e.g., word puzzles, quizzes, multi-round challenges), keep ALL of those cycles inside ONE sub-goal. Splitting "type", "tap submit", and "analyze result" into separate sub-goals destroys the agent's ability to adapt between rounds — it loses the context of previous results. The single sub-goal description should explain the full loop: what to input, how to submit, and how to interpret the feedback for the next round.
 
 Examples of SIMPLE goals (no decomposition needed):
 - "Open Settings" → simple (single app launch)

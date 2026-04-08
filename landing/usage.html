@@ -767,6 +767,7 @@
             <li><a href="#wait">Wait / Pause</a></li>
             <li><a href="#wait-until">Wait Until</a></li>
             <li><a href="#scroll-swipe">Scroll / Swipe</a></li>
+            <li><a href="#drag">Drag / Slider</a></li>
             <li><a href="#assert">Assert / Verify</a></li>
             <li><a href="#navigation">Navigation</a></li>
             <li><a href="#all-commands">Full Reference</a></li>
@@ -1377,6 +1378,52 @@
             </div>
           </section>
 
+          <section id="drag" class="reveal">
+            <h2>Drag / Slider</h2>
+            <p>
+              Drag one element to another — sliders, carousels, reorderable lists, and any
+              drag-and-drop interaction. Requires vision mode (<code>AGENT_MODE=vision</code>).
+            </p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Natural language</span>
+              </div>
+              <pre><span class="p">-</span> drag the green circle slider to the +100 mark
+<span class="p">-</span> slide the price handle to +80
+<span class="p">-</span> move the volume knob to maximum</pre>
+            </div>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Structured YAML — shorthand</span>
+              </div>
+              <pre><span class="c"># "drag: from to to"</span>
+<span class="p">-</span> <span class="k">drag</span><span class="p">:</span> <span class="s">"green circle slider to +100 mark"</span></pre>
+            </div>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <div class="code-block-dots"><span></span><span></span><span></span></div>
+                <span class="code-block-label">Structured YAML — explicit from/to</span>
+              </div>
+              <pre><span class="p">-</span> <span class="k">drag</span><span class="p">:</span>
+    <span class="k">from</span><span class="p">:</span> <span class="s">green circle slider</span>
+    <span class="k">to</span><span class="p">:</span>   <span class="s">+100 mark</span></pre>
+            </div>
+
+            <div class="callout callout-tip">
+              <div class="callout-title">Vision required</div>
+              <p>
+                Drag uses AI vision to locate both the source and target by visual description. Set
+                <code>AGENT_MODE=vision</code> and <code>VISION_LOCATE_PROVIDER=stark</code> with a
+                valid <code>LLM_API_KEY</code>.
+              </p>
+            </div>
+          </section>
+
           <section id="assert" class="reveal">
             <h2>Assert / Verify</h2>
             <p>
@@ -1499,6 +1546,11 @@
                   <td>swipe</td>
                   <td>direction, repeat?</td>
                   <td>Swipe up/down/left/right</td>
+                </tr>
+                <tr>
+                  <td>drag</td>
+                  <td>from, to</td>
+                  <td>Drag from one element to another (vision mode)</td>
                 </tr>
                 <tr>
                   <td>assert</td>

@@ -29,11 +29,18 @@ import { theme } from '../ui/terminal.js';
 
 const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
 
+/**
+ * The raw (full-res) screenshot captured by the most recent visionExecute call.
+ * Set before the action executes so callers can use it as the "before" screenshot
+ * for artifact reporting (tap dot overlay). Cleared at the start of each call.
+ */
+export let lastVisionScreenshot: string | null = null;
+
 /** Max edge for screenshots sent to Stark vision. 512px for faster Gemini processing. */
 const VISION_MAX_EDGE_PX = 512;
 
 /** Downscale screenshot for vision — outputs JPEG (not PNG) to avoid size inflation. */
-async function downscaleForVision(base64: string): Promise<string> {
+export async function downscaleForVision(base64: string): Promise<string> {
   try {
     const input = Buffer.from(base64, 'base64');
     const meta = await sharp(input).metadata();
@@ -191,9 +198,7 @@ function preCheck(instruction: string): PreCheckResult | null {
   // 7. Questions about the screen → getInfo
   //    If the instruction ends with "?" and didn't match an assert verb above,
   //    or if it lacks any actionable verb, it's a question.
-  const ACTION_VERB_RE =
-    /\b(tap|click|press|type|enter|send|set|swipe|scroll|open|launch|start|go\s+to|verify|validate|check|assert|confirm|wait|sleep|pause|long\s+press|drag|clear|delete|back|home|done)\b/i;
-  if (t.endsWith('?') || !ACTION_VERB_RE.test(t)) {
+  if (t.endsWith('?')) {
     return { getInfoQuery: t };
   }
 
@@ -225,6 +230,7 @@ export async function visionExecute(
   instruction: string,
   appResolver?: { resolve?: (query: string) => string | null }
 ): Promise<VisionExecuteResult | null> {
+  lastVisionScreenshot = null; // Clear before each call
   const apiKey = getStarkVisionApiKey();
   if (!apiKey) return null; // No vision available
 
@@ -321,6 +327,7 @@ export async function visionExecute(
   // ── Single vision call: screenshot + understandAndLocate ──
   const rawScreenshot = await screenshot(mcp);
   if (!rawScreenshot) return null;
+  lastVisionScreenshot = rawScreenshot; // Expose for artifact reporting (tap dot overlay)
   // Downscale for faster Gemini processing — coordinates are normalized 0-1000 so resolution doesn't matter
   const imageBase64 = await downscaleForVision(rawScreenshot);
   if (mcpDebug) {
@@ -522,6 +529,65 @@ export async function visionExecute(
     }
 
     return { step, result: { success: false, message: 'Could not type text' } };
+  }
+
+  // Drag
+  if (actionName === 'drag') {
+    const fromLocator = locators[0];
+    const toLocator = locators[1];
+    const step: FlowStep = {
+      kind: 'drag',
+      from: fromLocator?.element || instruction,
+      to: toLocator?.element || '',
+      verbatim: instruction,
+    };
+
+    if (!fromLocator?.coordinates || !toLocator?.coordinates) {
+      const msg = !fromLocator?.coordinates
+        ? `"${step.from}" is not visible on screen`
+        : `"${step.to}" is not visible on screen`;
+      return { step, result: { success: false, message: msg } };
+    }
+
+    const [fy, fx] = fromLocator.coordinates;
+    const [ty, tx] = toLocator.coordinates;
+
+    if (fy === 0 && fx === 0) {
+      return {
+        step,
+        result: { success: false, message: `Drag failed: "${step.from}" is not visible on screen` },
+      };
+    }
+    if (ty === 0 && tx === 0) {
+      return {
+        step,
+        result: { success: false, message: `Drag failed: "${step.to}" is not visible on screen` },
+      };
+    }
+
+    const fromBbox = scaleCoordinates([fy, fx], screenSize);
+    const toBbox = scaleCoordinates([ty, tx], screenSize);
+    const dragResult = await mcp.callTool('appium_drag_and_drop', {
+      sourceX: Math.round(fromBbox.center.x),
+      sourceY: Math.round(fromBbox.center.y),
+      targetX: Math.round(toBbox.center.x),
+      targetY: Math.round(toBbox.center.y),
+      duration: step.duration ?? 600,
+      longPressDuration: step.longPressDuration ?? 400,
+    });
+    const dragText =
+      dragResult.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
+    const dragSuccess =
+      !dragText.toLowerCase().includes('failed') && !dragText.toLowerCase().includes('error');
+    return {
+      step,
+      result: {
+        success: dragSuccess,
+        message: dragSuccess
+          ? `Dragged "${step.from}" to "${step.to}"`
+          : `Drag failed: ${dragText.slice(0, 200)}`,
+      },
+    };
   }
 
   // Tap/click (default for most actions)

@@ -117,6 +117,14 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     if (text) return { kind: 'scrollAssert', text, direction, maxScrolls, verbatim };
   }
 
+  // "drag X to Y" / "slide X to Y" / "move X to Y"
+  const dragMatch = t.match(/^(?:drag|slide|move)\s+(.+?)\s+(?:to|until|towards?)\s+(.+)$/i);
+  if (dragMatch) {
+    const from = trimPunct(dragMatch[1].trim());
+    const to = trimPunct(dragMatch[2].trim());
+    if (from && to) return { kind: 'drag', from, to, verbatim };
+  }
+
   const swipeMatch = t.match(/^swipe\s+(up|down|left|right)(?:\s+(\d+)\s*(?:times?))?/i);
   if (swipeMatch) {
     const direction = swipeMatch[1].toLowerCase() as 'up' | 'down' | 'left' | 'right';

@@ -41,6 +41,13 @@ const stepSchema = z.discriminatedUnion('kind', [
     direction: z.enum(['up', 'down', 'left', 'right']),
     maxScrolls: z.number(),
   }),
+  z.object({
+    kind: z.literal('drag'),
+    from: z.string().describe('Visual description of the element to drag from'),
+    to: z.string().describe('Visual description of the drop target'),
+    duration: z.number().optional().describe('Drag movement duration in ms, default 1200'),
+    longPressDuration: z.number().optional().describe('Hold before drag in ms, default 600'),
+  }),
   z.object({ kind: z.literal('getInfo'), query: z.string() }),
   z.object({ kind: z.literal('done'), message: z.string().optional() }),
   z.object({ kind: z.literal('launchApp') }),
@@ -56,6 +63,7 @@ const SYSTEM_PROMPT =
   `- "wait for <element> to disappear/be gone" → waitUntil (gone)\n` +
   `- "wait for screen to load/stabilize" → waitUntil (screenLoaded)\n` +
   `- "wait <N> seconds" → wait\n` +
+  `- "drag/slide/move X to Y" → drag (from=X, to=Y)\n` +
   `- "swipe/scroll <direction>" → swipe\n` +
   `- "verify/check/assert <text>" → assert\n` +
   `- "scroll until <text> visible" → scrollAssert\n` +

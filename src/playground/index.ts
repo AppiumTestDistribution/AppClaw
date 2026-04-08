@@ -83,6 +83,8 @@ function stepAction(step: FlowStep): string {
       return 'assert';
     case 'scrollAssert':
       return 'scroll';
+    case 'drag':
+      return 'drag';
     case 'getInfo':
       return 'info';
     case 'done':
@@ -119,6 +121,8 @@ function stepTarget(step: FlowStep): string {
       return `"${step.text}"`;
     case 'scrollAssert':
       return `"${step.text}" ${step.direction} ×${step.maxScrolls}`;
+    case 'drag':
+      return `"${step.from}" → "${step.to}"`;
     case 'getInfo':
       return `"${step.query}"`;
     case 'done':

@@ -64,6 +64,17 @@ export class DevicePanel {
     };
     bridge.on('event', forwardEvent);
 
+    // Forward stderr (raw CLI logs) to webview
+    const forwardStderr = (line: string) => {
+      const msg = { type: 'appclaw-log', line };
+      if (this.webviewReady) {
+        this.panel.webview.postMessage(msg);
+      } else {
+        this.pendingMessages.push(msg);
+      }
+    };
+    bridge.on('stderr', forwardStderr);
+
     // Handle messages from webview
     this.panel.webview.onDidReceiveMessage(
       async (message) => {
@@ -127,6 +138,7 @@ export class DevicePanel {
     this.panel.onDidDispose(
       () => {
         bridge.removeListener('event', forwardEvent);
+        bridge.removeListener('stderr', forwardStderr);
         this.dispose();
       },
       null,
@@ -606,7 +618,8 @@ export class DevicePanel {
         </div>
       </div>
 
-      <div id="debugLog" style="font-size:10px;color:var(--vscode-descriptionForeground);padding:3px 10px;max-height:40px;overflow-y:auto;border-top:1px solid var(--vscode-panel-border);font-family:monospace;"></div>
+      <div id="rawLogToggle" onclick="toggleRawLog()" style="cursor:pointer;font-size:10px;color:var(--vscode-descriptionForeground);padding:2px 10px;border-top:1px solid var(--vscode-panel-border);user-select:none;">▸ Logs</div>
+      <div id="debugLog" style="display:none;font-size:10px;color:var(--vscode-descriptionForeground);padding:3px 10px;max-height:120px;overflow-y:auto;font-family:monospace;"></div>
 
       <div class="input-area">
         <div style="display:flex;gap:6px;align-items:center;">
@@ -1110,11 +1123,24 @@ export class DevicePanel {
     }
 
     const debugLog = document.getElementById("debugLog");
-    function debug(text) {
+    const rawLogToggle = document.getElementById("rawLogToggle");
+    var rawLogOpen = false;
+    function toggleRawLog() {
+      rawLogOpen = !rawLogOpen;
+      debugLog.style.display = rawLogOpen ? "block" : "none";
+      rawLogToggle.textContent = (rawLogOpen ? "▾" : "▸") + " Logs";
+    }
+    function addRawLog(text) {
+      if (!text.trim()) return;
       const line = document.createElement("div");
-      line.textContent = new Date().toLocaleTimeString() + " " + text;
+      line.textContent = text;
+      line.style.whiteSpace = "pre";
       debugLog.appendChild(line);
+      if (debugLog.children.length > 500) debugLog.removeChild(debugLog.firstChild);
       debugLog.scrollTop = debugLog.scrollHeight;
+    }
+    function debug(text) {
+      addRawLog(new Date().toLocaleTimeString() + " " + text);
     }
     debug("webview ready, sending ready signal");
     vscode.postMessage({ command: "webviewReady" });
@@ -1123,6 +1149,12 @@ export class DevicePanel {
     window.addEventListener("message", (event) => {
       const msg = event.data;
       debug("recv: " + JSON.stringify(msg).substring(0, 120));
+
+      // Raw CLI log line (stderr forwarded from bridge)
+      if (msg.type === "appclaw-log") {
+        addRawLog(msg.line);
+        return;
+      }
 
       // Mode switch — sent before each run to set single vs multi-device layout
       if (msg.type === "setRunMode") {
@@ -1331,6 +1363,14 @@ export class DevicePanel {
               infoEntry.className = "step-entry success";
               infoEntry.innerHTML = '<pre style="margin:0;padding:8px 12px;font-size:11px;white-space:pre-wrap;color:var(--vscode-foreground);background:var(--vscode-textBlockQuote-background);border-radius:4px;max-height:150px;overflow-y:auto;">' + escapeHtml(msg.data.message) + '</pre>';
               stepLog.appendChild(infoEntry);
+              stepLog.scrollTop = stepLog.scrollHeight;
+            }
+            // Show failure reason below failed steps
+            if (msg.data.status === "failed" && msg.data.error) {
+              var errorEntry = document.createElement("div");
+              errorEntry.style.cssText = "padding:4px 12px 6px 32px;font-size:11px;color:var(--vscode-errorForeground);";
+              errorEntry.textContent = "↳ " + msg.data.error;
+              stepLog.appendChild(errorEntry);
               stepLog.scrollTop = stepLog.scrollHeight;
             }
           }

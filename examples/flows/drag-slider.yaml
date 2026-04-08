@@ -1,0 +1,26 @@
+# Drag a price slider to a specific position (vision mode required).
+#
+# This flow demonstrates the drag step — useful for sliders, carousels,
+# reorderable lists, and any other drag-and-drop interactions.
+#
+# Requires: AGENT_MODE=vision + VISION_LOCATE_PROVIDER=stark + LLM_API_KEY
+#
+appId: com.example.rideapp
+name: Set ride price to +100
+---
+- launchApp
+- wait: 2
+
+# Natural language — shorthand "drag X to Y"
+- drag the green circle slider to the +100 mark
+
+# -- OR use structured YAML (shorthand) --
+# - drag: "green circle slider to +100 mark"
+
+# -- OR use structured YAML (explicit from/to) --
+# - drag:
+#     from: green circle slider
+#     to: +100 mark
+
+- assert: '+100'
+- done: 'Price slider set to +100'

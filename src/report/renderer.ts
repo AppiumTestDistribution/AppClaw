@@ -90,6 +90,8 @@ function stepKindLabel(kind: string): string {
       return 'Home';
     case 'enter':
       return 'Enter';
+    case 'drag':
+      return 'Drag';
     case 'getInfo':
       return 'Get Info';
     case 'done':
@@ -1815,7 +1817,7 @@ export function renderRunPage(manifest: RunManifest): string {
     }
 
     function kindLabel(kind) {
-      var map = {tap:'Tap',type:'Type',assert:'Assert',scrollAssert:'Scroll Assert',swipe:'Swipe',wait:'Wait',waitUntil:'Wait Until',openApp:'Launch',launchApp:'Launch',back:'Back',home:'Home',enter:'Enter',getInfo:'Get Info',done:'Done'};
+      var map = {tap:'Tap',type:'Type',assert:'Assert',scrollAssert:'Scroll Assert',swipe:'Swipe',drag:'Drag',wait:'Wait',waitUntil:'Wait Until',openApp:'Launch',launchApp:'Launch',back:'Back',home:'Home',enter:'Enter',getInfo:'Get Info',done:'Done'};
       return map[kind] || kind;
     }
 
