@@ -12,6 +12,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import type { MCPClient } from './types.js';
 
 const execAsync = promisify(exec);
 
@@ -91,6 +92,33 @@ export async function pressEnterKey(deviceUdid?: string): Promise<KeyboardResult
     const errMsg = err instanceof Error ? err.message : String(err);
     return { success: false, message: `Press Enter failed: ${errMsg}` };
   }
+}
+
+/**
+ * Type text via W3C Actions API — no element UUID or focused-element lookup needed.
+ * Key events are dispatched to whatever element currently has focus.
+ * Works on Android and iOS, local and cloud.
+ * Requires the target field to already be tapped/focused before calling.
+ */
+export async function typeViaSetValue(
+  mcp: MCPClient,
+  text: string
+): Promise<KeyboardResult> {
+  try {
+    const setResult = await mcp.callTool('appium_set_value', {
+      text,
+      w3cActions: true,
+    });
+    const setText =
+      setResult.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
+    if (!setText.toLowerCase().includes('error') && !setText.toLowerCase().includes('failed')) {
+      return { success: true, message: `Typed "${text}"` };
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return { success: false, message: `Could not type "${text}"` };
 }
 
 function getADBPath(): string {

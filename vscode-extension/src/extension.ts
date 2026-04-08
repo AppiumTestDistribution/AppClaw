@@ -414,6 +414,21 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
+  // ─── Cloud credential helpers ─────────────────────────
+
+  /** Load stored cloud credentials from SecretStorage and inject into bridge env. */
+  async function loadCloudSecrets(): Promise<void> {
+    const username = await context.secrets.get('appclaw.lambdatest.username');
+    const accessKey = await context.secrets.get('appclaw.lambdatest.accessKey');
+    const env: Record<string, string> = {};
+    if (username) env['LAMBDATEST_USERNAME'] = username;
+    if (accessKey) env['LAMBDATEST_ACCESS_KEY'] = accessKey;
+    bridge.extraEnv = { ...bridge.extraEnv, ...env };
+  }
+
+  // Load credentials once at activation so they're ready for first run
+  loadCloudSecrets();
+
   // ─── Commands ─────────────────────────────────────────
 
   // Run Goal — prompt for goal text, execute on device
@@ -627,6 +642,42 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // Stop Execution
+  // Set Cloud Credentials — stores LambdaTest username + access key in OS keychain
+  context.subscriptions.push(
+    vscode.commands.registerCommand('appclaw.setCloudCredentials', async () => {
+      const provider = vscode.workspace
+        .getConfiguration('appclaw')
+        .get<string>('cloudProvider', '');
+      if (!provider) {
+        vscode.window.showWarningMessage(
+          'Set "AppClaw: Cloud Provider" to "lambdatest" in settings first.'
+        );
+        return;
+      }
+
+      const username = await vscode.window.showInputBox({
+        title: 'LambdaTest Username',
+        prompt: 'Enter your LambdaTest username',
+        ignoreFocusOut: true,
+      });
+      if (username === undefined) return;
+
+      const accessKey = await vscode.window.showInputBox({
+        title: 'LambdaTest Access Key',
+        prompt: 'Enter your LambdaTest access key',
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (accessKey === undefined) return;
+
+      await context.secrets.store('appclaw.lambdatest.username', username);
+      await context.secrets.store('appclaw.lambdatest.accessKey', accessKey);
+      await loadCloudSecrets();
+
+      vscode.window.showInformationMessage('LambdaTest credentials saved to secure storage.');
+    })
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand('appclaw.stopExecution', () => {
       bridge.stop();

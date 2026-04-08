@@ -70,6 +70,20 @@ export async function setupDevice(
     config: args.config,
   });
 
+  // Cloud mode: skip local device discovery and iOS setup entirely
+  if (args.config.CLOUD_PROVIDER === 'lambdatest') {
+    const session = await createPlatformSession(mcp, args.config, platform, deviceType);
+    return {
+      platform,
+      deviceType,
+      deviceName: args.config.LAMBDATEST_DEVICE_NAME || 'LambdaTest Cloud',
+      deviceUdid: 'lambdatest-cloud',
+      session,
+      sessionId: session.sessionId,
+      scopedMcp: session.scopedMcp,
+    };
+  }
+
   // Step 2: Discover and select a device
   // Use CLI args first, then fall back to config env vars
   const udid = args.cliUdid || args.config.DEVICE_UDID || null;

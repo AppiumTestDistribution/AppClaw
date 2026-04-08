@@ -3,7 +3,7 @@
   "displayName": "AppClaw",
   "description": "AI-powered mobile automation agent — control Android & iOS devices from VS Code",
   "version": "0.1.0",
-  "publisher": "AppClaw",
+  "publisher": "atddevs",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -111,6 +111,11 @@
         "command": "appclaw.rerunFailed",
         "title": "AppClaw: Re-run Failed Flows",
         "icon": "$(debug-rerun)"
+      },
+      {
+        "command": "appclaw.setCloudCredentials",
+        "title": "AppClaw: Set Cloud Credentials",
+        "icon": "$(key)"
       }
     ],
     "menus": {
@@ -379,13 +384,75 @@
         }
       },
       {
-        "title": "Advanced",
+        "title": "Cloud",
         "order": 8,
+        "properties": {
+          "appclaw.cloudProvider": {
+            "type": "string",
+            "default": "",
+            "enum": [
+              "",
+              "lambdatest"
+            ],
+            "enumDescriptions": [
+              "Local devices only (default)",
+              "LambdaTest real-device cloud"
+            ],
+            "markdownDescription": "Run tests on a cloud device provider instead of a local device. When set, local device discovery and iOS setup are skipped entirely.\n\n⚠️ Set `LAMBDATEST_USERNAME` and `LAMBDATEST_ACCESS_KEY` in your `.env` file — do not store credentials in VS Code settings."
+          },
+          "appclaw.lambdatestDeviceName": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Cloud device name, e.g. `iPhone 14` or `Pixel 7`. Required when **Cloud Provider** is `lambdatest`."
+          },
+          "appclaw.lambdatestOsVersion": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Cloud OS version, e.g. `16` for iOS 16 or `13` for Android 13. Required when **Cloud Provider** is `lambdatest`."
+          },
+          "appclaw.lambdatestBuildName": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Build label shown in the LambdaTest dashboard (optional)."
+          },
+          "appclaw.lambdatestProjectName": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Project label shown in the LambdaTest dashboard (optional)."
+          },
+          "appclaw.lambdatestVideo": {
+            "type": "string",
+            "default": "true",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "description": "Record session video on LambdaTest (default: true)"
+          },
+          "appclaw.lambdatestNetwork": {
+            "type": "string",
+            "default": "false",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "description": "Capture network logs on LambdaTest (default: false)"
+          },
+          "appclaw.lambdatestApp": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "LambdaTest app ID to install and test, e.g. `lt://APP1234567890abcdef`. Upload your app via the LambdaTest dashboard or API to get this value."
+          }
+        }
+      },
+      {
+        "title": "Advanced",
+        "order": 9,
         "properties": {
           "appclaw.cliPath": {
             "type": "string",
-            "default": "npx appclaw",
-            "description": "Path to appclaw CLI (or npx command)"
+            "default": "appclaw",
+            "description": "Path to the appclaw CLI executable"
           },
           "appclaw.mcpDebug": {
             "type": "boolean",

@@ -250,14 +250,15 @@ export function parseDeviceList(text: string, _platform: Platform): DeviceInfo[]
       line.match(/\(([A-F0-9]{8}-(?:[A-F0-9]{4}-){3}[A-F0-9]{12})\)/i) ||
       line.match(/([A-F0-9]{8}-(?:[A-F0-9]{4}-){3}[A-F0-9]{12})/i) ||
       line.match(/([0-9A-F]{40})/i) || // Real device UDIDs (40 hex chars)
-      line.match(/([0-9A-F]{8}-[0-9A-F]{16})/i); // Short iOS device UDIDs
+      line.match(/([0-9A-F]{8}-[0-9A-F]{16})/i) || // Short iOS device UDIDs
+      line.match(/^\s*\d+\.\s+([A-Za-z0-9][A-Za-z0-9._:-]+)\s*$/); // appium-mcp numbered list: "  1. R9ZX6059BHW"
 
     if (!udidMatch) continue;
 
     const udid = udidMatch[1];
 
-    // For Android emulators, the UDID is the display name too
-    let name = udid.startsWith('emulator-') ? udid : 'Unknown';
+    // Use UDID as default name so real devices (non-emulator) are not filtered out
+    let name = udid;
 
     if (!udid.startsWith('emulator-')) {
       const nameMatch =

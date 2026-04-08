@@ -9,6 +9,9 @@ const QUIET_TOOLS = new Set(['appium_get_page_source', 'appium_screenshot', 'app
 
 const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
 
+/** Request timeout in ms — default 120 s, override via MCP_TIMEOUT_MS env var */
+const MCP_TIMEOUT_MS = process.env.MCP_TIMEOUT_MS ? parseInt(process.env.MCP_TIMEOUT_MS, 10) : 120000;
+
 function logMCP(name: string, args: Record<string, unknown>, result: MCPToolResult): void {
   if (!mcpDebug) return;
   if (QUIET_TOOLS.has(name)) return;
@@ -45,7 +48,7 @@ async function connectClient(config: MCPConfig): Promise<Client> {
     const transport = new StdioClientTransport({
       command: 'npx',
       // --yes: auto-confirm installation without prompting (avoids consuming MCP stdin as "y/n" answer)
-      args: ['--yes', 'appium-mcp@1.44.0'],
+      args: ['--yes', 'appium-mcp@1.49.1'],
       env: {
         ...process.env,
         ANDROID_HOME: androidHome,
@@ -110,7 +113,7 @@ function wrapClient(client: Client): MCPClient {
   return {
     async callTool(name: string, args: Record<string, unknown>): Promise<MCPToolResult> {
       const t0 = mcpDebug ? performance.now() : 0;
-      const result = await client.callTool({ name, arguments: args });
+      const result = await client.callTool({ name, arguments: args }, undefined, { timeout: MCP_TIMEOUT_MS });
       const typed = result as MCPToolResult;
       if (mcpDebug) {
         const elapsed = Math.round(performance.now() - t0);
@@ -121,7 +124,7 @@ function wrapClient(client: Client): MCPClient {
     },
 
     async listTools(): Promise<MCPToolInfo[]> {
-      const { tools } = await client.listTools();
+      const { tools } = await client.listTools(undefined, { timeout: MCP_TIMEOUT_MS });
       return tools as MCPToolInfo[];
     },
 

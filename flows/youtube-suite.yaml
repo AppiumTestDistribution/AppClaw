@@ -1,4 +1,4 @@
-name: youtube_suite
+name: Paralle Suite
 platform: android
 parallel: 2
 flows:

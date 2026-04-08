@@ -1085,23 +1085,12 @@ async function executeMetaTool(
           await mcp.callTool('appium_clear_element', { elementUUID: activeUuid }).catch(() => {});
         }
 
-        if (platform === 'android') {
-          // Android: type via ADB keyboard input (sends key events to focused element)
-          const kbResult = await typeViaKeyboard(text, deviceUdid ?? undefined);
-          if (kbResult.success) {
-            return {
-              success: true,
-              message: `Typed "${text}" into "${selector.slice(0, 60)}" via keyboard input. NOTE: Check the screen — if autocomplete suggestions appeared, tap the correct one or press Enter to confirm before proceeding.`,
-            };
-          }
-        }
-
-        // iOS (primary) / Android (fallback): use appium_set_value on the active element
-        if (activeUuid) {
+        // Always use W3C Actions — works on local and cloud, Android and iOS
+        {
           const setResult = await mcp
             .callTool('appium_set_value', {
-              elementUUID: activeUuid,
               text,
+              w3cActions: true,
             })
             .catch(() => null);
           if (setResult && !isMCPError(setResult)) {

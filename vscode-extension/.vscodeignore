@@ -5,3 +5,4 @@ tsconfig.json
 **/*.ts
 **/*.map
 .gitignore
+media/icon.svg

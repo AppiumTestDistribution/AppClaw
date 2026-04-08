@@ -192,6 +192,15 @@ export function getEnvFromSettings(): Record<string, string> {
     mcpTransport: 'MCP_TRANSPORT',
     mcpHost: 'MCP_HOST',
     mcpPort: 'MCP_PORT',
+    // Cloud (credentials are set via .env, not VS Code settings)
+    cloudProvider: 'CLOUD_PROVIDER',
+    lambdatestDeviceName: 'LAMBDATEST_DEVICE_NAME',
+    lambdatestOsVersion: 'LAMBDATEST_OS_VERSION',
+    lambdatestBuildName: 'LAMBDATEST_BUILD_NAME',
+    lambdatestProjectName: 'LAMBDATEST_PROJECT_NAME',
+    lambdatestVideo: 'LAMBDATEST_VIDEO',
+    lambdatestNetwork: 'LAMBDATEST_NETWORK',
+    lambdatestApp: 'LAMBDATEST_APP',
     // Advanced
     mcpDebug: 'MCP_DEBUG',
   };
@@ -215,7 +224,7 @@ export function getEnvFromSettings(): Record<string, string> {
 export function getCliCommand(): { command: string; baseArgs: string[] } {
   const cliPath = vscode.workspace
     .getConfiguration('appclaw')
-    .get<string>('cliPath', 'npx tsx src/index.ts');
+    .get<string>('cliPath', 'appclaw');
 
   const parts = cliPath.split(/\s+/);
   return {
@@ -227,6 +236,8 @@ export function getCliCommand(): { command: string; baseArgs: string[] } {
 export class AppclawBridge extends EventEmitter {
   private proc: ChildProcess | null = null;
   private stderrBuffer: string[] = [];
+  /** Secret env vars (credentials from SecretStorage) — merged in at spawn time. */
+  extraEnv: Record<string, string> = {};
 
   get running(): boolean {
     return this.proc !== null && this.proc.exitCode === null;
@@ -287,6 +298,7 @@ export class AppclawBridge extends EventEmitter {
     const env = {
       ...process.env,
       ...getEnvFromSettings(),
+      ...this.extraEnv,
     };
 
     // Use workspace folder as cwd so the CLI can create logs/, load .env, etc.
@@ -297,7 +309,7 @@ export class AppclawBridge extends EventEmitter {
       env,
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true,
+      shell: false,
     });
 
     // Parse NDJSON from stdout

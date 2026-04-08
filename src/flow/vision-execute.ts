@@ -22,7 +22,7 @@ import { screenshot } from '../mcp/tools.js';
 import { getStarkVisionApiKey, getStarkVisionModel } from '../vision/locate-enabled.js';
 import { getScreenSizeForStark } from '../vision/window-size.js';
 import { tapAtCoordinates } from '../agent/element-finder.js';
-import { detectDeviceUdid, typeViaKeyboard } from '../mcp/keyboard.js';
+import { detectDeviceUdid, typeViaKeyboard, typeViaSetValue } from '../mcp/keyboard.js';
 import { Config } from '../config.js';
 import sharp from 'sharp';
 import { theme } from '../ui/terminal.js';
@@ -77,6 +77,72 @@ const {
 } = starkVision;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function parseJsonLenient(text: string): unknown {
+  const cleaned = text
+    .trim()
+    .replace(/^\uFEFF/, '')
+    .replace(/^```(?:json)?\s*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+    .trim();
+
+  // Fast path: valid JSON already.
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    /* continue */
+  }
+
+  // Lenient path: extract the first balanced JSON object/array substring.
+  const starts: number[] = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (ch === '{' || ch === '[') starts.push(i);
+  }
+
+  for (const start of starts) {
+    const open = cleaned[start];
+    const close = open === '{' ? '}' : ']';
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = start; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (ch === open) depth++;
+      if (ch === close) depth--;
+
+      if (depth === 0) {
+        const candidate = cleaned.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          break; // this start token isn't a valid JSON root
+        }
+      }
+    }
+  }
+
+  // Keep the original error surface area (callers decide what to log/show).
+  throw new Error('JSON parse failed');
+}
 
 /** Actions from combinedInstructionPrompt that map to tap/click. */
 const TAP_ACTIONS = new Set(['click', 'tap', 'touch', 'select', 'long press', 'longpress']);
@@ -228,7 +294,8 @@ export interface VisionExecuteResult {
 export async function visionExecute(
   mcp: MCPClient,
   instruction: string,
-  appResolver?: { resolve?: (query: string) => string | null }
+  appResolver?: { resolve?: (query: string) => string | null },
+  deviceUdid?: string
 ): Promise<VisionExecuteResult | null> {
   lastVisionScreenshot = null; // Clear before each call
   const apiKey = getStarkVisionApiKey();
@@ -353,7 +420,7 @@ export async function visionExecute(
 
   let actions: any[];
   try {
-    const parsed = JSON.parse(cleanedText);
+    const parsed = parseJsonLenient(cleanedText);
     actions = Array.isArray(parsed) ? parsed : [parsed];
   } catch {
     if (mcpDebug)
@@ -465,69 +532,30 @@ export async function visionExecute(
     if (coords && coords.length >= 2 && !(coords[0] === 0 && coords[1] === 0)) {
       const bbox = scaleCoordinates(coords as [number, number], screenSize);
       await tapAtCoordinates(mcp, bbox.center.x, bbox.center.y);
-      await sleep(300);
+      // Cloud devices need longer for focus/keyboard to settle than local.
+      await sleep(Config.CLOUD_PROVIDER ? 1200 : 600);
     }
 
-    // Strategy 1: ADB keyboard input (Android — fast and reliable)
-    const udid = await detectDeviceUdid();
-    if (udid) {
-      const kb = await typeViaKeyboard(value, udid);
-      if (kb.success) {
+    // Type via W3C Actions — works on local and cloud, Android and iOS
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const sv = await typeViaSetValue(mcp, value);
+      if (sv.success) {
         return {
           step,
           result: {
             success: true,
-            message: `Typed "${value}"${target ? ` in "${target}"` : ''} via keyboard`,
+            message: `Typed "${value}"${target ? ` in "${target}"` : ''}`,
           },
         };
       }
+      if (attempt < 2) await sleep(500);
     }
 
-    // Strategy 2: appium_send_keys (cross-platform — works on iOS and Android)
-    try {
-      const sendResult = await mcp.callTool('appium_send_keys', { text: value });
-      const sendText =
-        sendResult.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
-      if (!sendText.toLowerCase().includes('error') && !sendText.toLowerCase().includes('failed')) {
-        return {
-          step,
-          result: { success: true, message: `Typed "${value}"${target ? ` in "${target}"` : ''}` },
-        };
-      }
-    } catch {
-      /* try next strategy */
+    // Local only: fall back to executeStep → flowTypeText (ADB + DOM). Cloud sessions have no
+    // local ADB (placeholder UDID) and a second vision/DOM pass could double-tap — keep explicit failure.
+    if (!Config.CLOUD_PROVIDER) {
+      return { step, result: { success: false, message: '__needs_executeStep__' } };
     }
-
-    // Strategy 3: appium_set_value on active element
-    try {
-      const activeResult = await mcp.callTool('appium_get_active_element', {});
-      const activeText =
-        activeResult.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
-      const uuidMatch = activeText.match(
-        /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
-      );
-      if (uuidMatch) {
-        await mcp.callTool('appium_clear_element', { elementUUID: uuidMatch[1] }).catch(() => {});
-        const setResult = await mcp.callTool('appium_set_value', {
-          elementUUID: uuidMatch[1],
-          text: value,
-        });
-        const setText =
-          setResult.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
-        if (!setText.toLowerCase().includes('error') && !setText.toLowerCase().includes('failed')) {
-          return {
-            step,
-            result: {
-              success: true,
-              message: `Typed "${value}"${target ? ` in "${target}"` : ''}`,
-            },
-          };
-        }
-      }
-    } catch {
-      /* exhausted all strategies */
-    }
-
     return { step, result: { success: false, message: 'Could not type text' } };
   }
 

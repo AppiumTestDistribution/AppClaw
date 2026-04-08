@@ -37,6 +37,10 @@ export async function createPlatformSession(
   _deviceType?: DeviceType,
   extraCaps?: Record<string, unknown>
 ): Promise<SessionResult> {
+  if (config.CLOUD_PROVIDER === 'lambdatest') {
+    return createLambdaTestSession(mcp, config, platform);
+  }
+
   ui.startSpinner('Creating Appium session...');
 
   const args: Record<string, unknown> = { platform };
@@ -106,6 +110,69 @@ function buildAndroidCapabilities(config: AppClawConfig): Record<string, unknown
   }
 
   return caps;
+}
+
+/** Create a remote Appium session on LambdaTest cloud. */
+async function createLambdaTestSession(
+  mcp: MCPClient,
+  config: AppClawConfig,
+  platform: Platform
+): Promise<SessionResult> {
+  ui.startSpinner('Creating LambdaTest cloud session...');
+
+  const hubUrl = `https://${config.LAMBDATEST_USERNAME}:${config.LAMBDATEST_ACCESS_KEY}@mobile-hub.lambdatest.com/wd/hub`;
+
+  const ltOptions: Record<string, unknown> = {
+    video: config.LAMBDATEST_VIDEO === 'true',
+    network: config.LAMBDATEST_NETWORK === 'true',
+    isRealMobile: true,
+  };
+  if (config.LAMBDATEST_BUILD_NAME) ltOptions.build = config.LAMBDATEST_BUILD_NAME;
+  if (config.LAMBDATEST_PROJECT_NAME) ltOptions.project = config.LAMBDATEST_PROJECT_NAME;
+  if (config.LAMBDATEST_APP) ltOptions.app = config.LAMBDATEST_APP;
+
+  const capabilities: Record<string, unknown> = {
+    'appium:deviceName': config.LAMBDATEST_DEVICE_NAME,
+    'appium:platformVersion': config.LAMBDATEST_OS_VERSION,
+    'lt:options': ltOptions,
+  };
+
+  const args: Record<string, unknown> = {
+    platform,
+    remoteServerUrl: hubUrl,
+    capabilities,
+  };
+
+  try {
+    const sessionResult = await mcp.callTool('create_session', args);
+    const resultText = extractText(sessionResult);
+
+    if (resultText.toLowerCase().includes('error') || resultText.toLowerCase().includes('failed')) {
+      throw new Error(resultText);
+    }
+
+    ui.stopSpinner();
+    ui.printSetupOk(
+      `LambdaTest session created — ${config.LAMBDATEST_DEVICE_NAME} (iOS ${config.LAMBDATEST_OS_VERSION})`
+    );
+
+    const sessionIdMatch = resultText.match(/session created successfully with ID:\s*(\S+)/i);
+    const sessionId = sessionIdMatch?.[1] ?? 'session';
+
+    const scopedMcp = new SessionScopedMCPClient(mcp, sessionId);
+    setDevicePlatform(scopedMcp, platform);
+    await detectScreenSize(scopedMcp, platform);
+
+    return { platform, sessionText: resultText, sessionId, scopedMcp };
+  } catch (err: any) {
+    ui.stopSpinner();
+    const msg = err instanceof Error ? err.message : String(err);
+    ui.printSetupError(
+      `Failed to create LambdaTest session: ${msg}`,
+      'Check LAMBDATEST_USERNAME, LAMBDATEST_ACCESS_KEY, LAMBDATEST_DEVICE_NAME, and LAMBDATEST_OS_VERSION'
+    );
+    throw err;
+  }
 }
 
 /** Detect device screen size after session creation */

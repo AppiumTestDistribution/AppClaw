@@ -11,7 +11,7 @@
 import type { MCPClient } from '../mcp/types.js';
 import { getPageSource } from '../mcp/tools.js';
 import { activateAppWithFallback } from '../mcp/activate-app.js';
-import { detectDeviceUdid, typeViaKeyboard } from '../mcp/keyboard.js';
+import { detectDeviceUdid, typeViaKeyboard, typeViaSetValue } from '../mcp/keyboard.js';
 import { detectPlatform } from '../perception/screen.js';
 import { parseAndroidPageSource } from '../perception/android-parser.js';
 import { parseIOSPageSource } from '../perception/ios-parser.js';
@@ -330,7 +330,7 @@ async function flowTypeText(
     if (!tapResult.success) {
       return { success: false, message: `Could not find target field "${target}" to type into` };
     }
-    await sleep(300); // Let the field focus
+    await sleep(Config.CLOUD_PROVIDER ? 1200 : 300); // Cloud needs longer to settle focus
   }
 
   // ── Vision mode: locate input field via vision, then type via keyboard ──
@@ -347,16 +347,13 @@ async function flowTypeText(
         }
       }
     }
-    // Type via keyboard (preferred on Android)
-    const udid = deviceUdid ?? (await detectDeviceUdid());
-    if (udid) {
-      const kb = await typeViaKeyboard(text, udid);
-      if (kb.success) {
-        const msg = target ? `Typed "${text}" in "${target}" via keyboard input` : kb.message;
-        return { success: true, message: msg };
-      }
+    // Type via W3C Actions — works on local and cloud, Android and iOS
+    const sv = await typeViaSetValue(mcp, text);
+    if (sv.success) {
+      const msg = target ? `Typed "${text}" in "${target}"` : `Typed "${text}"`;
+      return { success: true, message: msg };
     }
-    // Fallback: try set_value if we have a vision-located element
+    // Fallback 3: appium_set_value on a vision-located element (no-target case only)
     if (!target) {
       const visionUuid = await findByVision(mcp, 'text input field, search box, or editable area');
       if (visionUuid && !isAIElement(visionUuid)) {
@@ -378,14 +375,6 @@ async function flowTypeText(
   const pageSource = await getPageSource(mcp);
   const platform = detectPlatform(pageSource);
 
-  if (platform === 'android') {
-    const udid = deviceUdid ?? (await detectDeviceUdid());
-    const kb = await typeViaKeyboard(text, udid ?? undefined);
-    if (kb.success) {
-      const msg = target ? `Typed "${text}" in "${target}" via keyboard input` : kb.message;
-      return { success: true, message: msg };
-    }
-  }
 
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
@@ -403,7 +392,10 @@ async function flowTypeText(
   }
   await mcp.callTool('appium_click', { elementUUID: uuid });
   await mcp.callTool('appium_clear_element', { elementUUID: uuid }).catch(() => {});
-  const setResult = await mcp.callTool('appium_set_value', { elementUUID: uuid, text });
+  const setResult = await mcp.callTool('appium_set_value', {
+    ...(Config.CLOUD_PROVIDER ? { w3cActions: true } : { elementUUID: uuid }),
+    text,
+  });
   const setText =
     setResult.content
       ?.map((c: { type: string; text?: string }) => (c.type === 'text' ? c.text : ''))
@@ -866,7 +858,7 @@ export async function executeStep(
     (step.kind === 'tap' || step.kind === 'type' || step.kind === 'assert')
   ) {
     const { visionExecute } = await import('./vision-execute.js');
-    const vr = await visionExecute(mcp, step.verbatim);
+    const vr = await visionExecute(mcp, step.verbatim, appResolver, deviceUdid);
     if (vr && vr.result.message !== '__needs_executeStep__') {
       return vr.result;
     }

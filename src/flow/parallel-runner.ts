@@ -152,6 +152,7 @@ async function runWorkerJob(
   platform: Platform
 ): Promise<WorkerFlowResult> {
   const label = chalk.cyan(`[worker:${workerIndex + 1}]`);
+  const isCloud = baseSetupArgs.config.CLOUD_PROVIDER === 'lambdatest';
 
   // setupDevice creates the Appium session and returns a session-scoped MCP
   // wrapper (scopedMcp). All subsequent tool calls go through scopedMcp so
@@ -160,11 +161,12 @@ async function runWorkerJob(
   // correct device regardless of appium-mcp's global select_device state.
   // Without this, concurrent workers race on the shared activeDevice global
   // in appium-mcp and both end up targeting the same physical device.
-  const { caps: workerCaps, mjpegUrl } = await buildWorkerCaps(platform);
+  // Cloud mode: skip local port allocation — LambdaTest allocates sessions dynamically.
+  const { caps: workerCaps, mjpegUrl } = isCloud ? { caps: {}, mjpegUrl: undefined } : await buildWorkerCaps(platform);
   const deviceResult = await setupDevice(sharedMcp, {
     ...baseSetupArgs,
-    cliUdid: device.udid,
-    extraCaps: { 'appium:udid': device.udid, ...workerCaps },
+    cliUdid: isCloud ? null : device.udid,
+    extraCaps: isCloud ? {} : { 'appium:udid': device.udid, ...workerCaps },
   });
 
   emitJson({
@@ -334,18 +336,29 @@ export async function runFlowOnDevices(
   const sharedMcp = await acquireSharedMCPClient(mcpConfig);
 
   try {
-    ui.printInfo(`Discovering ${platform} devices for ${parallelCount} parallel workers...`);
-    const devices = await discoverDevices(sharedMcp, platform, deviceType);
+    const isCloud = config.CLOUD_PROVIDER === 'lambdatest';
+    let selected: DiscoveredDevice[];
 
-    if (devices.length < parallelCount) {
-      throw new Error(
-        `parallel: ${parallelCount} requires ${parallelCount} ${platform} device(s), ` +
-          `but only ${devices.length} found. Available: ${devices.map((d) => d.name).join(', ')}`
-      );
+    if (isCloud) {
+      ui.printInfo(`Using LambdaTest cloud — ${parallelCount} parallel session(s) on ${config.LAMBDATEST_DEVICE_NAME}`);
+      selected = Array.from({ length: parallelCount }, (_, i) => ({
+        name: `${config.LAMBDATEST_DEVICE_NAME} [${i + 1}]`,
+        udid: `lambdatest-cloud-${i + 1}`,
+      }));
+    } else {
+      ui.printInfo(`Discovering ${platform} devices for ${parallelCount} parallel workers...`);
+      const devices = await discoverDevices(sharedMcp, platform, deviceType);
+
+      if (devices.length < parallelCount) {
+        throw new Error(
+          `parallel: ${parallelCount} requires ${parallelCount} ${platform} device(s), ` +
+            `but only ${devices.length} found. Available: ${devices.map((d) => d.name).join(', ')}`
+        );
+      }
+
+      selected = devices.slice(0, parallelCount);
+      ui.printInfo(`Workers: ${selected.map((d, i) => `[${i + 1}] ${d.name}`).join('  ')}`);
     }
-
-    const selected = devices.slice(0, parallelCount);
-    ui.printInfo(`Workers: ${selected.map((d, i) => `[${i + 1}] ${d.name}`).join('  ')}`);
 
     const suiteId = generateSuiteId();
     const suiteName =
@@ -420,16 +433,26 @@ export async function runSuite(
   try {
     ui.printInfo(`Suite: ${suite.flows.length} flows, ${parallelCount} worker(s) on ${platform}`);
 
-    const devices = await discoverDevices(sharedMcp, platform, deviceType);
-    if (devices.length < parallelCount) {
-      throw new Error(
-        `parallel: ${parallelCount} requires ${parallelCount} ${platform} device(s), ` +
-          `but only ${devices.length} found. Available: ${devices.map((d) => d.name).join(', ')}`
-      );
-    }
+    const isCloud = config.CLOUD_PROVIDER === 'lambdatest';
+    let selected: DiscoveredDevice[];
 
-    const selected = devices.slice(0, parallelCount);
-    ui.printInfo(`Workers: ${selected.map((d, i) => `[${i + 1}] ${d.name}`).join('  ')}`);
+    if (isCloud) {
+      ui.printInfo(`Using LambdaTest cloud — ${parallelCount} parallel session(s) on ${config.LAMBDATEST_DEVICE_NAME}`);
+      selected = Array.from({ length: parallelCount }, (_, i) => ({
+        name: `${config.LAMBDATEST_DEVICE_NAME} [${i + 1}]`,
+        udid: `lambdatest-cloud-${i + 1}`,
+      }));
+    } else {
+      const devices = await discoverDevices(sharedMcp, platform, deviceType);
+      if (devices.length < parallelCount) {
+        throw new Error(
+          `parallel: ${parallelCount} requires ${parallelCount} ${platform} device(s), ` +
+            `but only ${devices.length} found. Available: ${devices.map((d) => d.name).join(', ')}`
+        );
+      }
+      selected = devices.slice(0, parallelCount);
+      ui.printInfo(`Workers: ${selected.map((d, i) => `[${i + 1}] ${d.name}`).join('  ')}`);
+    }
 
     const suiteId = generateSuiteId();
     const suiteName = suite.meta.name;

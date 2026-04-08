@@ -88,12 +88,57 @@ const envSchema = z.object({
 
   /** Override path for episodic memory store. Empty = ~/.appclaw/trajectories.json */
   EPISODIC_MEMORY_PATH: z.string().default(''),
+
+  // ── Cloud provider ──────────────────────────────────────────────────────────
+
+  /** Cloud provider for remote device execution. Empty = local (default). */
+  CLOUD_PROVIDER: z.enum(['', 'lambdatest']).default(''),
+
+  /** LambdaTest account username (required when CLOUD_PROVIDER=lambdatest). */
+  LAMBDATEST_USERNAME: z.string().default(''),
+
+  /** LambdaTest access key (required when CLOUD_PROVIDER=lambdatest). */
+  LAMBDATEST_ACCESS_KEY: z.string().default(''),
+
+  /** Cloud device name, e.g. "iPhone 14" (required when CLOUD_PROVIDER=lambdatest). */
+  LAMBDATEST_DEVICE_NAME: z.string().default(''),
+
+  /** Cloud OS version, e.g. "16" (required when CLOUD_PROVIDER=lambdatest). */
+  LAMBDATEST_OS_VERSION: z.string().default(''),
+
+  /** LambdaTest build label shown in the dashboard. */
+  LAMBDATEST_BUILD_NAME: z.string().default(''),
+
+  /** LambdaTest project label shown in the dashboard. */
+  LAMBDATEST_PROJECT_NAME: z.string().default(''),
+
+  /** Record session video on LambdaTest. Default: true. */
+  LAMBDATEST_VIDEO: z.enum(['true', 'false']).default('true'),
+
+  /** Capture network logs on LambdaTest. Default: false. */
+  LAMBDATEST_NETWORK: z.enum(['true', 'false']).default('false'),
+
+  /** LambdaTest app ID (lt://APP...) — the app to install and test on the cloud device. */
+  LAMBDATEST_APP: z.string().default(''),
 });
 
 export type AppClawConfig = z.infer<typeof envSchema>;
 
 export function loadConfig(): AppClawConfig {
-  return envSchema.parse(process.env);
+  const config = envSchema.parse(process.env);
+  if (config.CLOUD_PROVIDER === 'lambdatest') {
+    if (!config.LAMBDATEST_USERNAME || !config.LAMBDATEST_ACCESS_KEY) {
+      throw new Error(
+        'LAMBDATEST_USERNAME and LAMBDATEST_ACCESS_KEY are required when CLOUD_PROVIDER=lambdatest'
+      );
+    }
+    if (!config.LAMBDATEST_DEVICE_NAME || !config.LAMBDATEST_OS_VERSION) {
+      throw new Error(
+        'LAMBDATEST_DEVICE_NAME and LAMBDATEST_OS_VERSION are required when CLOUD_PROVIDER=lambdatest'
+      );
+    }
+  }
+  return config;
 }
 
 export const Config = loadConfig();

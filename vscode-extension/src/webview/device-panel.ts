@@ -181,12 +181,13 @@ export class DevicePanel {
     mjpegPortAndroid: number;
     mjpegPortIos: number;
   }): string {
+    const nonce = require('crypto').randomBytes(16).toString('base64');
     return /*html*/ `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src http://127.0.0.1:* http://localhost:* data:; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src http://127.0.0.1:* http://localhost:* data:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <title>AppClaw Device</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -648,7 +649,7 @@ export class DevicePanel {
     </div>
   </div>
 
-  <script>
+  <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     let isRunning = false;
     let currentMode = "goal"; // "goal" or "playground"
