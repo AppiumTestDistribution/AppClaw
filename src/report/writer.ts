@@ -84,6 +84,8 @@ export interface StepCollectorEntry {
   deviceScreenSize?: { width: number; height: number };
   /** Screenshot dimensions at capture time */
   screenshotSize?: { width: number; height: number };
+  /** Ms from run start to step start — for accurate video timestamp sync */
+  videoOffsetMs?: number;
 }
 
 /**
@@ -95,6 +97,8 @@ export class RunArtifactCollector {
   readonly startedAt: string;
   private steps: StepCollectorEntry[] = [];
   private stepTimers = new Map<number, number>();
+  private videoBase64: string | undefined;
+  private videoFilePath: string | undefined;
 
   constructor(
     readonly flowFile: string,
@@ -117,7 +121,8 @@ export class RunArtifactCollector {
   addStep(entry: Omit<StepCollectorEntry, 'durationMs'> & { durationMs?: number }): void {
     const startTime = this.stepTimers.get(entry.index);
     const durationMs = entry.durationMs ?? (startTime ? Date.now() - startTime : 0);
-    this.steps.push({ ...entry, durationMs });
+    const videoOffsetMs = startTime ? startTime - new Date(this.startedAt).getTime() : undefined;
+    this.steps.push({ ...entry, durationMs, videoOffsetMs });
     this.stepTimers.delete(entry.index);
   }
 
@@ -132,6 +137,16 @@ export class RunArtifactCollector {
       step.screenshotBase64 = base64;
       if (dimensions) step.screenshotSize = dimensions;
     }
+  }
+
+  /** Attach the base64-encoded screen recording (MP4) for the whole run. */
+  attachVideo(base64: string): void {
+    this.videoBase64 = base64;
+  }
+
+  /** Attach a screen recording from a file path on disk (will be copied into the run dir). */
+  attachVideoFromPath(filePath: string): void {
+    this.videoFilePath = filePath;
   }
 
   /** Attach a "before" screenshot (taken before the action) to a step. */
@@ -189,7 +204,21 @@ export class RunArtifactCollector {
         tapCoordinates: step.tapCoordinates,
         deviceScreenSize: step.deviceScreenSize,
         screenshotSize: step.screenshotSize,
+        videoOffsetMs: step.videoOffsetMs,
       });
+    }
+
+    // Save screen recording if captured
+    let videoPath: string | undefined;
+    if (this.videoBase64) {
+      videoPath = 'recording.mp4';
+      await fsp.writeFile(
+        path.join(runDir, videoPath),
+        Buffer.from(this.videoBase64, 'base64')
+      );
+    } else if (this.videoFilePath) {
+      videoPath = 'recording.mp4';
+      await fsp.copyFile(this.videoFilePath, path.join(runDir, videoPath));
     }
 
     // Build manifest
@@ -210,6 +239,7 @@ export class RunArtifactCollector {
       failedPhase: result.failedPhase,
       phaseResults: result.phaseResults,
       steps: stepArtifacts,
+      videoPath,
     };
 
     // Write manifest

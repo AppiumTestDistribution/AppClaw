@@ -39,6 +39,8 @@ export interface StepArtifact {
   deviceScreenSize?: { width: number; height: number };
   /** Screenshot PNG pixel dimensions */
   screenshotSize?: { width: number; height: number };
+  /** Ms elapsed from run startedAt to when this step began executing — used to sync video playback */
+  videoOffsetMs?: number;
 }
 
 /* ─── Run manifest (per-run JSON) ────────────────────────── */
@@ -75,6 +77,8 @@ export interface RunManifest {
   phaseResults?: PhaseResultRecord[];
   /** Per-step artifacts with screenshots */
   steps: StepArtifact[];
+  /** Relative path to the screen recording (e.g. "recording.mp4") */
+  videoPath?: string;
 }
 
 export interface PhaseResultRecord {

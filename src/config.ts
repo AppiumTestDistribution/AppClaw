@@ -58,6 +58,20 @@ const envSchema = z.object({
    */
   STARK_VISION_MODEL: z.string().default(''),
 
+  /**
+   * Base URL for an OpenAI-compatible local vision server (e.g. LM Studio: http://127.0.0.1:1234).
+   * When set, StarkVisionClient routes all calls through the local server instead of Google GenAI.
+   * STARK_VISION_MODEL must also be set to the model name shown by the local server.
+   */
+  STARK_VISION_BASE_URL: z.string().default(''),
+
+  /**
+   * Coordinate order returned by the local vision model.
+   * 'yx' (default): model returns [y, x] as the prompt instructs (Gemma, most models).
+   * 'xy': model returns [x, y] despite the prompt (some Qwen variants).
+   */
+  STARK_VISION_COORDINATE_ORDER: z.enum(['yx', 'xy']).default('yx'),
+
   /** Agent interaction mode: "dom" uses DOM locators, "vision" uses AI vision as primary strategy */
   AGENT_MODE: z.enum(['dom', 'vision']).default('dom'),
 

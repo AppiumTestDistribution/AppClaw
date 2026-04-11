@@ -20,7 +20,7 @@ const {
   findSubstringWithBrackets,
   sanitizeOutput,
 } = starkVision;
-import { getStarkVisionApiKey, getStarkVisionModel } from './locate-enabled.js';
+import { getStarkVisionApiKey, getStarkVisionBaseUrl, getStarkVisionCoordinateOrder, getStarkVisionModel } from './locate-enabled.js';
 import { getScreenSizeForStark } from './window-size.js';
 
 /** Max edge for screenshots sent to Stark/Gemini — coordinates are normalized so resolution doesn't matter. */
@@ -103,8 +103,12 @@ export async function starkLocateTapTarget(
   existingScreenshot?: string | null
 ): Promise<StarkLocateResult & { syntheticUuid: string }> {
   const apiKey = getStarkVisionApiKey();
-  if (!apiKey) {
-    throw new Error('Stark vision requires LLM_API_KEY (Gemini)');
+  const baseUrl = getStarkVisionBaseUrl();
+  const coordinateOrder = getStarkVisionCoordinateOrder();
+  if (!apiKey && !baseUrl) {
+    throw new Error(
+      'Stark vision requires either a Gemini API key (GEMINI_API_KEY) or a local server (STARK_VISION_BASE_URL)'
+    );
   }
 
   const trimmed = instruction.trim();
@@ -125,9 +129,11 @@ export async function starkLocateTapTarget(
   const imageBase64 = await downscaleForVision(rawScreenshot);
 
   const client = new StarkVisionClient({
-    apiKey,
+    apiKey: apiKey || 'local',
     model: getStarkVisionModel(),
     disableThinking: true,
+    ...(baseUrl && { baseUrl }),
+    ...(baseUrl && { coordinateOrder }),
   });
 
   const locateT0 = performance.now();

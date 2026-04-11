@@ -1250,6 +1250,7 @@ export function renderRunPage(manifest: RunManifest): string {
     }
     .step-item:hover { background: var(--bg-hover); border-color: var(--border); }
     .step-item.selected { background: var(--bg-active); border-color: var(--accent-border); }
+    .step-item.video-active { background: var(--accent-dim); border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
     .step-item.failed-step { background: var(--failure-bg); border-color: var(--failure-border); }
     .step-item.failed-step:hover { background: rgba(248,113,113,0.1); }
     .step-item.failed-step.selected { background: var(--failure-dim); border-color: var(--failure-border); }
@@ -1461,6 +1462,59 @@ export function renderRunPage(manifest: RunManifest): string {
       100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); }
     }
 
+    /* Detail panel tabs */
+    .detail-tabs { display: flex; gap: 4px; }
+    .detail-tab {
+      padding: 4px 12px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: transparent; color: var(--text-secondary); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .detail-tab:hover { color: var(--text-primary); }
+    .detail-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Recording video panel */
+    .recording-panel {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px; gap: 12px; overflow-y: auto;
+      grid-column: 1 / -1;
+    }
+    #video-device-frame { width: 360px; }
+    .recording-panel .no-recording {
+      color: var(--text-tertiary); font-size: 13px; text-align: center;
+    }
+    .video-screen-frame {
+      position: relative; overflow: hidden; background: #000;
+      width: 100%; border-radius: 4px;
+    }
+    .device-frame.ios .video-screen-frame { border-radius: 30px; }
+    .video-screen-frame video {
+      width: 100%; display: block; background: #000;
+    }
+    .video-step-label {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 60%, transparent 100%);
+      padding: 24px 12px 10px;
+      display: flex; align-items: center; gap: 8px;
+      pointer-events: none;
+    }
+    .video-step-num {
+      flex-shrink: 0;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .video-step-text {
+      font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.95);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+    .video-step-kind {
+      font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.55);
+      white-space: nowrap;
+    }
+
     /* Step info sidebar */
     .step-info {
       padding: 18px;
@@ -1619,10 +1673,44 @@ export function renderRunPage(manifest: RunManifest): string {
       <!-- Detail Panel -->
       <div class="detail">
         <div class="detail-header">
-          <h3>Step Inspector</h3>
+          <div class="detail-tabs">
+            <button class="detail-tab active" id="tab-inspector" onclick="switchDetailTab('inspector')">Step Inspector</button>
+            <button class="detail-tab" id="tab-recording" onclick="switchDetailTab('recording')">Recording</button>
+          </div>
           <div class="screenshot-toggle" id="screenshot-toggle" style="display:none"></div>
         </div>
         <div class="detail-body">
+          <div id="recording-panel" class="recording-panel">
+            ${
+              manifest.videoPath
+                ? `<div class="device-frame ${escapeHtml(manifest.platform)}" id="video-device-frame">
+                    ${manifest.platform === 'ios'
+                      ? '<div class="device-notch"></div>'
+                      : '<div class="device-bezel-top"><div class="device-camera"></div><div class="device-speaker"></div></div>'
+                    }
+                    ${manifest.platform === 'android' ? '<div class="device-screen">' : ''}
+                    <div class="video-screen-frame">
+                      <video id="run-video" controls playsinline>
+                        <source src="/artifacts/${escapeHtml(manifest.runId)}/${escapeHtml(manifest.videoPath)}" type="video/mp4">
+                      </video>
+                      <div class="video-step-label" id="video-step-label" style="display:none">
+                        <div class="video-step-num" id="video-step-num">1</div>
+                        <div style="min-width:0">
+                          <div class="video-step-text" id="video-step-text"></div>
+                          <div class="video-step-kind" id="video-step-kind"></div>
+                        </div>
+                      </div>
+                    </div>
+                    ${manifest.platform === 'android' ? '</div>' : ''}
+                    ${manifest.platform === 'ios'
+                      ? '<div class="device-home"></div>'
+                      : '<div class="device-bezel-bottom"><div class="nav-pill"></div></div>'
+                    }
+                  </div>`
+                : `<div class="no-recording">No recording available for this run</div>`
+            }
+          </div>
+          <div id="inspector-panel" style="display:contents">
           <div class="screenshot-area" id="screenshot-area">
             ${
               manifest.steps.length > 0 && manifest.steps[0].screenshotPath
@@ -1645,6 +1733,7 @@ export function renderRunPage(manifest: RunManifest): string {
           <div class="step-info" id="step-info">
             ${manifest.steps.length > 0 ? renderStepDetailInfo(manifest.steps[0]) : ''}
           </div>
+          </div><!-- /inspector-panel -->
         </div>
       </div>
     </section>
@@ -1667,6 +1756,7 @@ export function renderRunPage(manifest: RunManifest): string {
         tapCoordinates: s.tapCoordinates || null,
         deviceScreenSize: s.deviceScreenSize || null,
         screenshotSize: s.screenshotSize || null,
+        videoOffsetMs: s.videoOffsetMs ?? null,
       }))
     ).replace(/</g, '\\u003c')};
     var runId = ${JSON.stringify(manifest.runId).replace(/</g, '\\u003c')};
@@ -1820,6 +1910,103 @@ export function renderRunPage(manifest: RunManifest): string {
       var map = {tap:'Tap',type:'Type',assert:'Assert',scrollAssert:'Scroll Assert',swipe:'Swipe',drag:'Drag',wait:'Wait',waitUntil:'Wait Until',openApp:'Launch',launchApp:'Launch',back:'Back',home:'Home',enter:'Enter',getInfo:'Get Info',done:'Done'};
       return map[kind] || kind;
     }
+
+    function switchDetailTab(tab) {
+      var inspector = document.getElementById('inspector-panel');
+      var recording = document.getElementById('recording-panel');
+      var tabInspector = document.getElementById('tab-inspector');
+      var tabRecording = document.getElementById('tab-recording');
+      if (tab === 'recording') {
+        inspector.style.display = 'none';
+        recording.style.display = 'flex';
+        tabInspector.classList.remove('active');
+        tabRecording.classList.add('active');
+      } else {
+        inspector.style.display = 'contents';
+        recording.style.display = 'none';
+        tabInspector.classList.add('active');
+        tabRecording.classList.remove('active');
+        // Remove video step highlights when switching back to inspector
+        document.querySelectorAll('.step-item').forEach(function(el) {
+          el.classList.remove('video-active');
+        });
+      }
+    }
+
+    // Video step label — sync overlay with video playback
+    (function() {
+      // Build step start offsets in seconds for video sync.
+      // Prefer videoOffsetMs (actual wall-clock offset from run start) when available.
+      // Fall back to cumulative durationMs for older manifests that lack videoOffsetMs.
+      var hasRealOffsets = steps.length > 0 && steps[0].videoOffsetMs !== null;
+      var stepOffsets = [];
+      if (hasRealOffsets) {
+        // Use the first step's videoOffsetMs as the base so the label appears
+        // at the right time relative to when the video recording actually started.
+        var baseOffset = steps[0].videoOffsetMs || 0;
+        for (var i = 0; i < steps.length; i++) {
+          var off = steps[i].videoOffsetMs !== null ? steps[i].videoOffsetMs : baseOffset;
+          stepOffsets.push((off - baseOffset) / 1000);
+        }
+      } else {
+        var cum = 0;
+        for (var i = 0; i < steps.length; i++) {
+          stepOffsets.push(cum / 1000);
+          cum += (steps[i].durationMs || 0);
+        }
+      }
+
+      var lastVideoActiveIdx = -1;
+
+      function updateVideoStepLabel(currentTime) {
+        if (!steps.length) return;
+        var label = document.getElementById('video-step-label');
+        var numEl = document.getElementById('video-step-num');
+        var textEl = document.getElementById('video-step-text');
+        var kindEl = document.getElementById('video-step-kind');
+        if (!label || !numEl || !textEl || !kindEl) return;
+
+        // Find the last step whose offset is <= currentTime
+        var activeIdx = 0;
+        for (var j = stepOffsets.length - 1; j >= 0; j--) {
+          if (currentTime >= stepOffsets[j]) { activeIdx = j; break; }
+        }
+        var s = steps[activeIdx];
+        var name = s.verbatim || s.target || kindLabel(s.kind);
+        numEl.textContent = String(s.index + 1);
+        textEl.textContent = name;
+        kindEl.textContent = kindLabel(s.kind);
+        label.style.display = 'flex';
+
+        // Highlight matching step in the left panel
+        if (activeIdx !== lastVideoActiveIdx) {
+          lastVideoActiveIdx = activeIdx;
+          document.querySelectorAll('.step-item').forEach(function(el) {
+            el.classList.remove('video-active');
+          });
+          var stepEl = document.querySelector('[data-step="' + s.index + '"]');
+          if (stepEl) {
+            stepEl.classList.add('video-active');
+            stepEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }
+      }
+
+      window.addEventListener('DOMContentLoaded', function() {
+        var video = document.getElementById('run-video');
+        if (!video) return;
+        video.addEventListener('timeupdate', function() {
+          updateVideoStepLabel(video.currentTime);
+        });
+        video.addEventListener('play', function() {
+          updateVideoStepLabel(video.currentTime);
+        });
+        // Show label immediately at time 0
+        video.addEventListener('loadedmetadata', function() {
+          updateVideoStepLabel(0);
+        });
+      });
+    })();
 
     // Auto-select first step
     if (steps.length > 0) {

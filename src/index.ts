@@ -70,6 +70,8 @@ interface CLIArgs {
   json: boolean;
   /** Environment name for variable/secret resolution (e.g. "dev", "staging") */
   env: string | null;
+  /** Strict YAML parsing — fail on unrecognized steps instead of LLM fallback */
+  strict: boolean;
 }
 
 function printHelp(): void {
@@ -108,6 +110,9 @@ function printHelp(): void {
   console.log(`  ${c.section('Modes')}`);
   console.log(
     `    ${c.flag('--flow')} ${c.arg('<file.yaml>')}           ${c.desc('Run declarative YAML steps (no LLM)')}`
+  );
+  console.log(
+    `    ${c.flag('--strict')}                       ${c.desc('Strict YAML parsing: fail on unrecognized steps instead of LLM fallback')}`
   );
   console.log(
     `    ${c.flag('--env')} ${c.arg('<name>')}                 ${c.desc('Environment for variables/secrets (e.g. dev, staging)')}`
@@ -223,6 +228,7 @@ function parseArgs(): CLIArgs {
   let deviceName: string | null = null;
   let json = false;
   let env: string | null = null;
+  let strict = false;
   const goalParts: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -274,6 +280,8 @@ function parseArgs(): CLIArgs {
       deviceName = args[++i] ?? null;
     } else if (args[i] === '--json') {
       json = true;
+    } else if (args[i] === '--strict') {
+      strict = true;
     } else {
       goalParts.push(args[i]);
     }
@@ -300,6 +308,7 @@ function parseArgs(): CLIArgs {
     deviceName,
     json,
     env,
+    strict,
   };
 }
 
@@ -560,7 +569,7 @@ async function main() {
     // ══════════════════════════════════════════════════════════════════
     let parsed;
     try {
-      parsed = await parseFlowYamlFile(cliArgs.flow, { ...(bindings ? { bindings } : {}), strict: true });
+      parsed = await parseFlowYamlFile(cliArgs.flow, { ...(bindings ? { bindings } : {}), strict: cliArgs.strict });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       emitJson({ event: 'error', data: { message: `Invalid flow YAML: ${msg}` } });
@@ -670,6 +679,15 @@ async function main() {
         flowPlatform
       );
 
+      // Start screen recording (best-effort — continue if appium doesn't support it)
+      let recordingStarted = false;
+      try {
+        await flowScopedMcp.callTool('appium_screen_recording', { action: 'start' });
+        recordingStarted = true;
+      } catch {
+        /* appium version or driver may not support recording — skip silently */
+      }
+
       const result = await runYamlFlow(
         flowScopedMcp,
         parsed.meta,
@@ -683,6 +701,20 @@ async function main() {
         },
         parsed.phases
       );
+
+      // Stop recording and attach to report
+      if (recordingStarted) {
+        try {
+          const stopResult = await flowScopedMcp.callTool('appium_screen_recording', { action: 'stop' });
+          // appium_screen_recording returns a file path like "Screen recording saved to: /path/to/file.mp4"
+          const textContent = stopResult.content?.find((c) => c.type === 'text');
+          const text = (textContent?.type === 'text' ? textContent.text : '')?.trim() ?? '';
+          const match = text.match(/saved to:\s*(.+\.mp4)/i);
+          if (match?.[1]) artifactCollector.attachVideoFromPath(match[1].trim());
+        } catch {
+          /* ignore — report will just not have a video */
+        }
+      }
 
       try {
         const runId = await artifactCollector.finalize(process.cwd(), result);

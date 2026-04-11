@@ -202,10 +202,11 @@ function printStepFail(stepNum: number, step: FlowStep, message: string): void {
  * Minimum matchScore (1-10) required to execute a tap in the playground.
  * Below this threshold, vision found a loose match — show suggestion but don't execute.
  */
-const MIN_MATCH_SCORE = 7;
+const MIN_MATCH_SCORE = 4;
 
 /**
  * Build a helpful suggestion when a tap is not found or matched loosely.
+ * Only used as a fallback when vResult.closestMatch is not available.
  */
 function buildVisionSuggestion(instruction: string, resolvedLabel: string): string | null {
   if (!resolvedLabel || resolvedLabel === instruction) return null;
@@ -972,8 +973,8 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
             state.steps.push(vResult.step);
           }
           const suggestion =
-            !vResult.result.success && vResult.step.kind === 'tap'
-              ? buildVisionSuggestion(line, vResult.step.label ?? '')
+            !vResult.result.success && vResult.step.kind === 'tap' && vResult.closestMatch
+              ? `Closest match: "${vResult.closestMatch}". Try: tap on ${vResult.closestMatch}`
               : null;
           emitJson({
             event: 'step',
@@ -1206,21 +1207,24 @@ async function handleGetInfo(query: string): Promise<string | null> {
       return null;
     }
 
-    const { getStarkVisionApiKey, getStarkVisionModel } =
+    const { getStarkVisionApiKey, getStarkVisionBaseUrl, getStarkVisionCoordinateOrder, getStarkVisionModel } =
       await import('../vision/locate-enabled.js');
     const apiKey = getStarkVisionApiKey();
-    if (!apiKey) {
+    const baseUrl = getStarkVisionBaseUrl();
+    if (!apiKey && !baseUrl) {
       ui.stopSpinner();
-      console.log(`  ${theme.error('✗')} getInfo requires LLM_API_KEY (Gemini)`);
+      console.log(`  ${theme.error('✗')} getInfo requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)`);
       return null;
     }
 
     const { default: starkVision } = await import('df-vision');
     const { StarkVisionClient } = starkVision;
     const client = new StarkVisionClient({
-      apiKey,
+      apiKey: apiKey || 'local',
       model: getStarkVisionModel(),
       disableThinking: true,
+      ...(baseUrl && { baseUrl }),
+      ...(baseUrl && { coordinateOrder: getStarkVisionCoordinateOrder() }),
     });
     const response = await client.getElementInfo(imageBase64, query, true);
 
@@ -1309,8 +1313,8 @@ async function processLine(line: string): Promise<void> {
           printStepSuccess(stepNum, vResult.step, vResult.result.message);
         } else {
           const suggestion =
-            vResult.step.kind === 'tap'
-              ? buildVisionSuggestion(line, vResult.step.label ?? '')
+            vResult.step.kind === 'tap' && vResult.closestMatch
+              ? `Closest match: "${vResult.closestMatch}". Try: tap on ${vResult.closestMatch}`
               : null;
           printStepFail(stepNum, vResult.step, vResult.result.message);
           if (suggestion) {

@@ -26,6 +26,8 @@ import {
 import {
   isVisionLocateEnabled,
   getStarkVisionApiKey,
+  getStarkVisionBaseUrl,
+  getStarkVisionCoordinateOrder,
   getStarkVisionModel,
 } from '../vision/locate-enabled.js';
 import { Config } from '../config.js';
@@ -538,16 +540,19 @@ const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'tru
 
 async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
   const apiKey = getStarkVisionApiKey();
-  if (!apiKey) {
-    if (mcpDebug) ui.printWarning('[vision-assert] No API key configured, skipping vision assert');
+  const baseUrl = getStarkVisionBaseUrl();
+  if (!apiKey && !baseUrl) {
+    if (mcpDebug) ui.printWarning('[vision-assert] No API key or local server configured, skipping vision assert');
     return false;
   }
 
   const { StarkVisionClient } = (await import('df-vision')).default;
   const client = new StarkVisionClient({
-    apiKey,
+    apiKey: apiKey || 'local',
     model: getStarkVisionModel(),
     disableThinking: true,
+    ...(baseUrl && { baseUrl }),
+    ...(baseUrl && { coordinateOrder: getStarkVisionCoordinateOrder() }),
   });
 
   const query = `Is "${text}" visible or present on this screen?`;
@@ -936,8 +941,9 @@ export async function executeStep(
     }
     case 'drag': {
       const dragApiKey = getStarkVisionApiKey();
-      if (!dragApiKey) {
-        return { success: false, message: 'drag step requires vision (LLM_API_KEY)' };
+      const dragBaseUrl = getStarkVisionBaseUrl();
+      if (!dragApiKey && !dragBaseUrl) {
+        return { success: false, message: 'drag step requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)' };
       }
       const dragImage = await screenshot(mcp);
       if (!dragImage) {
@@ -947,9 +953,11 @@ export async function executeStep(
         await import('df-vision')
       ).default;
       const dragClient = new DragClient({
-        apiKey: dragApiKey,
+        apiKey: dragApiKey || 'local',
         model: getStarkVisionModel(),
         disableThinking: true,
+        ...(dragBaseUrl && { baseUrl: dragBaseUrl }),
+        ...(dragBaseUrl && { coordinateOrder: getStarkVisionCoordinateOrder() }),
       });
       const dragScreenSize = await getScreenSizeForStark(mcp, dragImage);
       const dragInstruction = `drag ${step.from} to ${step.to}`;
@@ -1016,8 +1024,9 @@ export async function executeStep(
       return scrollUntilVisible(mcp, step.text, step.direction, step.maxScrolls, tapPoll);
     case 'getInfo': {
       const infoApiKey = getStarkVisionApiKey();
-      if (!infoApiKey) {
-        return { success: false, message: 'getInfo requires LLM_API_KEY (Gemini)' };
+      const infoBaseUrl = getStarkVisionBaseUrl();
+      if (!infoApiKey && !infoBaseUrl) {
+        return { success: false, message: 'getInfo requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)' };
       }
       const infoImage = await screenshot(mcp);
       if (!infoImage) {
@@ -1025,9 +1034,11 @@ export async function executeStep(
       }
       const { StarkVisionClient: InfoClient } = (await import('df-vision')).default;
       const infoClient = new InfoClient({
-        apiKey: infoApiKey,
+        apiKey: infoApiKey || 'local',
         model: getStarkVisionModel(),
         disableThinking: true,
+        ...(infoBaseUrl && { baseUrl: infoBaseUrl }),
+        ...(infoBaseUrl && { coordinateOrder: getStarkVisionCoordinateOrder() }),
       });
       const infoResponse = await infoClient.getElementInfo(infoImage, step.query, true);
       try {
