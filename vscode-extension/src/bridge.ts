@@ -222,9 +222,7 @@ export function getEnvFromSettings(): Record<string, string> {
 
 /** Get the CLI command from settings */
 export function getCliCommand(): { command: string; baseArgs: string[] } {
-  const cliPath = vscode.workspace
-    .getConfiguration('appclaw')
-    .get<string>('cliPath', 'appclaw');
+  const cliPath = vscode.workspace.getConfiguration('appclaw').get<string>('cliPath', 'appclaw');
 
   const parts = cliPath.split(/\s+/);
   return {

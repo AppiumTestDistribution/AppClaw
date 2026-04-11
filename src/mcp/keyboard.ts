@@ -100,10 +100,7 @@ export async function pressEnterKey(deviceUdid?: string): Promise<KeyboardResult
  * Works on Android and iOS, local and cloud.
  * Requires the target field to already be tapped/focused before calling.
  */
-export async function typeViaSetValue(
-  mcp: MCPClient,
-  text: string
-): Promise<KeyboardResult> {
+export async function typeViaSetValue(mcp: MCPClient, text: string): Promise<KeyboardResult> {
   try {
     const setResult = await mcp.callTool('appium_set_value', {
       text,

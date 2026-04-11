@@ -377,7 +377,6 @@ async function flowTypeText(
   const pageSource = await getPageSource(mcp);
   const platform = detectPlatform(pageSource);
 
-
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
   const editable = elements.find((e) => e.editable && e.enabled !== false);
@@ -542,7 +541,10 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
   const apiKey = getStarkVisionApiKey();
   const baseUrl = getStarkVisionBaseUrl();
   if (!apiKey && !baseUrl) {
-    if (mcpDebug) ui.printWarning('[vision-assert] No API key or local server configured, skipping vision assert');
+    if (mcpDebug)
+      ui.printWarning(
+        '[vision-assert] No API key or local server configured, skipping vision assert'
+      );
     return false;
   }
 
@@ -943,7 +945,10 @@ export async function executeStep(
       const dragApiKey = getStarkVisionApiKey();
       const dragBaseUrl = getStarkVisionBaseUrl();
       if (!dragApiKey && !dragBaseUrl) {
-        return { success: false, message: 'drag step requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)' };
+        return {
+          success: false,
+          message: 'drag step requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)',
+        };
       }
       const dragImage = await screenshot(mcp);
       if (!dragImage) {
@@ -1026,7 +1031,10 @@ export async function executeStep(
       const infoApiKey = getStarkVisionApiKey();
       const infoBaseUrl = getStarkVisionBaseUrl();
       if (!infoApiKey && !infoBaseUrl) {
-        return { success: false, message: 'getInfo requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)' };
+        return {
+          success: false,
+          message: 'getInfo requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)',
+        };
       }
       const infoImage = await screenshot(mcp);
       if (!infoImage) {

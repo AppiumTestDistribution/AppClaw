@@ -212,10 +212,7 @@ export class RunArtifactCollector {
     let videoPath: string | undefined;
     if (this.videoBase64) {
       videoPath = 'recording.mp4';
-      await fsp.writeFile(
-        path.join(runDir, videoPath),
-        Buffer.from(this.videoBase64, 'base64')
-      );
+      await fsp.writeFile(path.join(runDir, videoPath), Buffer.from(this.videoBase64, 'base64'));
     } else if (this.videoFilePath) {
       videoPath = 'recording.mp4';
       await fsp.copyFile(this.videoFilePath, path.join(runDir, videoPath));

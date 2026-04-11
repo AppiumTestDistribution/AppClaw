@@ -162,7 +162,9 @@ async function runWorkerJob(
   // Without this, concurrent workers race on the shared activeDevice global
   // in appium-mcp and both end up targeting the same physical device.
   // Cloud mode: skip local port allocation — LambdaTest allocates sessions dynamically.
-  const { caps: workerCaps, mjpegUrl } = isCloud ? { caps: {}, mjpegUrl: undefined } : await buildWorkerCaps(platform);
+  const { caps: workerCaps, mjpegUrl } = isCloud
+    ? { caps: {}, mjpegUrl: undefined }
+    : await buildWorkerCaps(platform);
   const deviceResult = await setupDevice(sharedMcp, {
     ...baseSetupArgs,
     cliUdid: isCloud ? null : device.udid,
@@ -340,7 +342,9 @@ export async function runFlowOnDevices(
     let selected: DiscoveredDevice[];
 
     if (isCloud) {
-      ui.printInfo(`Using LambdaTest cloud — ${parallelCount} parallel session(s) on ${config.LAMBDATEST_DEVICE_NAME}`);
+      ui.printInfo(
+        `Using LambdaTest cloud — ${parallelCount} parallel session(s) on ${config.LAMBDATEST_DEVICE_NAME}`
+      );
       selected = Array.from({ length: parallelCount }, (_, i) => ({
         name: `${config.LAMBDATEST_DEVICE_NAME} [${i + 1}]`,
         udid: `lambdatest-cloud-${i + 1}`,
@@ -437,7 +441,9 @@ export async function runSuite(
     let selected: DiscoveredDevice[];
 
     if (isCloud) {
-      ui.printInfo(`Using LambdaTest cloud — ${parallelCount} parallel session(s) on ${config.LAMBDATEST_DEVICE_NAME}`);
+      ui.printInfo(
+        `Using LambdaTest cloud — ${parallelCount} parallel session(s) on ${config.LAMBDATEST_DEVICE_NAME}`
+      );
       selected = Array.from({ length: parallelCount }, (_, i) => ({
         name: `${config.LAMBDATEST_DEVICE_NAME} [${i + 1}]`,
         udid: `lambdatest-cloud-${i + 1}`,

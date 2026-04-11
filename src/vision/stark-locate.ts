@@ -20,7 +20,12 @@ const {
   findSubstringWithBrackets,
   sanitizeOutput,
 } = starkVision;
-import { getStarkVisionApiKey, getStarkVisionBaseUrl, getStarkVisionCoordinateOrder, getStarkVisionModel } from './locate-enabled.js';
+import {
+  getStarkVisionApiKey,
+  getStarkVisionBaseUrl,
+  getStarkVisionCoordinateOrder,
+  getStarkVisionModel,
+} from './locate-enabled.js';
 import { getScreenSizeForStark } from './window-size.js';
 
 /** Max edge for screenshots sent to Stark/Gemini — coordinates are normalized so resolution doesn't matter. */

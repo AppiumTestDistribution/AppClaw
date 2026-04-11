@@ -569,7 +569,10 @@ async function main() {
     // ══════════════════════════════════════════════════════════════════
     let parsed;
     try {
-      parsed = await parseFlowYamlFile(cliArgs.flow, { ...(bindings ? { bindings } : {}), strict: cliArgs.strict });
+      parsed = await parseFlowYamlFile(cliArgs.flow, {
+        ...(bindings ? { bindings } : {}),
+        strict: cliArgs.strict,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       emitJson({ event: 'error', data: { message: `Invalid flow YAML: ${msg}` } });
@@ -705,7 +708,9 @@ async function main() {
       // Stop recording and attach to report
       if (recordingStarted) {
         try {
-          const stopResult = await flowScopedMcp.callTool('appium_screen_recording', { action: 'stop' });
+          const stopResult = await flowScopedMcp.callTool('appium_screen_recording', {
+            action: 'stop',
+          });
           // appium_screen_recording returns a file path like "Screen recording saved to: /path/to/file.mp4"
           const textContent = stopResult.content?.find((c) => c.type === 'text');
           const text = (textContent?.type === 'text' ? textContent.text : '')?.trim() ?? '';

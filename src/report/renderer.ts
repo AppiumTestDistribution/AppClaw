@@ -1684,9 +1684,10 @@ export function renderRunPage(manifest: RunManifest): string {
             ${
               manifest.videoPath
                 ? `<div class="device-frame ${escapeHtml(manifest.platform)}" id="video-device-frame">
-                    ${manifest.platform === 'ios'
-                      ? '<div class="device-notch"></div>'
-                      : '<div class="device-bezel-top"><div class="device-camera"></div><div class="device-speaker"></div></div>'
+                    ${
+                      manifest.platform === 'ios'
+                        ? '<div class="device-notch"></div>'
+                        : '<div class="device-bezel-top"><div class="device-camera"></div><div class="device-speaker"></div></div>'
                     }
                     ${manifest.platform === 'android' ? '<div class="device-screen">' : ''}
                     <div class="video-screen-frame">
@@ -1702,9 +1703,10 @@ export function renderRunPage(manifest: RunManifest): string {
                       </div>
                     </div>
                     ${manifest.platform === 'android' ? '</div>' : ''}
-                    ${manifest.platform === 'ios'
-                      ? '<div class="device-home"></div>'
-                      : '<div class="device-bezel-bottom"><div class="nav-pill"></div></div>'
+                    ${
+                      manifest.platform === 'ios'
+                        ? '<div class="device-home"></div>'
+                        : '<div class="device-bezel-bottom"><div class="nav-pill"></div></div>'
                     }
                   </div>`
                 : `<div class="no-recording">No recording available for this run</div>`

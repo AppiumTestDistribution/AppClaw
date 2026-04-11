@@ -935,7 +935,9 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
     // Vision mode execution
     if (state.mcp && Config.AGENT_MODE === 'vision') {
       try {
-        const vResult = await visionExecute(state.mcp, line, undefined, undefined, { minMatchScore: MIN_MATCH_SCORE });
+        const vResult = await visionExecute(state.mcp, line, undefined, undefined, {
+          minMatchScore: MIN_MATCH_SCORE,
+        });
         if (vResult) {
           if (vResult.isGetInfo) {
             emitJson({
@@ -1207,13 +1209,19 @@ async function handleGetInfo(query: string): Promise<string | null> {
       return null;
     }
 
-    const { getStarkVisionApiKey, getStarkVisionBaseUrl, getStarkVisionCoordinateOrder, getStarkVisionModel } =
-      await import('../vision/locate-enabled.js');
+    const {
+      getStarkVisionApiKey,
+      getStarkVisionBaseUrl,
+      getStarkVisionCoordinateOrder,
+      getStarkVisionModel,
+    } = await import('../vision/locate-enabled.js');
     const apiKey = getStarkVisionApiKey();
     const baseUrl = getStarkVisionBaseUrl();
     if (!apiKey && !baseUrl) {
       ui.stopSpinner();
-      console.log(`  ${theme.error('✗')} getInfo requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)`);
+      console.log(
+        `  ${theme.error('✗')} getInfo requires vision (GEMINI_API_KEY or STARK_VISION_BASE_URL)`
+      );
       return null;
     }
 
@@ -1277,7 +1285,9 @@ async function processLine(line: string): Promise<void> {
   if (state.mcp && Config.AGENT_MODE === 'vision') {
     try {
       ui.startSpinner('Executing', line);
-      const vResult = await visionExecute(state.mcp, line, undefined, undefined, { minMatchScore: MIN_MATCH_SCORE });
+      const vResult = await visionExecute(state.mcp, line, undefined, undefined, {
+        minMatchScore: MIN_MATCH_SCORE,
+      });
       ui.stopSpinner();
 
       if (vResult) {

@@ -10,7 +10,9 @@ const QUIET_TOOLS = new Set(['appium_get_page_source', 'appium_screenshot', 'app
 const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
 
 /** Request timeout in ms — default 120 s, override via MCP_TIMEOUT_MS env var */
-const MCP_TIMEOUT_MS = process.env.MCP_TIMEOUT_MS ? parseInt(process.env.MCP_TIMEOUT_MS, 10) : 120000;
+const MCP_TIMEOUT_MS = process.env.MCP_TIMEOUT_MS
+  ? parseInt(process.env.MCP_TIMEOUT_MS, 10)
+  : 120000;
 
 function logMCP(name: string, args: Record<string, unknown>, result: MCPToolResult): void {
   if (!mcpDebug) return;
@@ -113,7 +115,9 @@ function wrapClient(client: Client): MCPClient {
   return {
     async callTool(name: string, args: Record<string, unknown>): Promise<MCPToolResult> {
       const t0 = mcpDebug ? performance.now() : 0;
-      const result = await client.callTool({ name, arguments: args }, undefined, { timeout: MCP_TIMEOUT_MS });
+      const result = await client.callTool({ name, arguments: args }, undefined, {
+        timeout: MCP_TIMEOUT_MS,
+      });
       const typed = result as MCPToolResult;
       if (mcpDebug) {
         const elapsed = Math.round(performance.now() - t0);
