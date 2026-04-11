@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { ollama } from 'ollama-ai-provider';
+import { createOllama } from 'ai-sdk-ollama';
 
 import type { AppClawConfig } from '../config.js';
 import { isVisionLocateEnabledFromConfig } from '../vision/locate-enabled.js';
@@ -108,8 +108,13 @@ export function buildModel(config: AppClawConfig): any {
         baseURL: GROQ_API_BASE_URL,
       })(modelId);
 
-    case 'ollama':
-      return ollama(modelId);
+    case 'ollama': {
+      const ollamaProvider = createOllama({
+        ...(config.OLLAMA_BASE_URL ? { baseURL: config.OLLAMA_BASE_URL } : {}),
+        ...(config.OLLAMA_API_KEY ? { apiKey: config.OLLAMA_API_KEY } : {}),
+      });
+      return ollamaProvider(modelId);
+    }
 
     default:
       throw new Error(`Unknown LLM provider: ${config.LLM_PROVIDER}`);

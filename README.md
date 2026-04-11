@@ -284,8 +284,10 @@ All configuration is via `.env`:
 | `DEVICE_NAME`         | (auto)   | Device name — partial match (e.g. `iPhone 17 Pro`)                                |
 | **LLM**               |          |                                                                                   |
 | `LLM_PROVIDER`        | `gemini` | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`)                  |
-| `LLM_API_KEY`         | —        | API key for your provider                                                         |
+| `LLM_API_KEY`         | —        | API key for your provider (not used for local Ollama; see `OLLAMA_*` for cloud URL / auth) |
 | `LLM_MODEL`           | (auto)   | Model override (e.g. `gemini-3.1-flash-lite-preview`, `claude-sonnet-4-20250514`) |
+| `OLLAMA_BASE_URL`     | (default) | Ollama API base URL (e.g. remote or Docker). Empty = `http://127.0.0.1:11434` (`LLM_PROVIDER=ollama`) |
+| `OLLAMA_API_KEY`      | —        | Optional Bearer token for Ollama Cloud or authenticated endpoints (`LLM_PROVIDER=ollama`) |
 | `AGENT_MODE`          | `vision` | `dom` (XML locators) or `vision` (screenshot-first)                               |
 | **Agent**             |          |                                                                                   |
 | `MAX_STEPS`           | `30`     | Max steps per goal                                                                |

@@ -6,6 +6,11 @@ const envSchema = z.object({
   LLM_API_KEY: z.string().default(''),
   LLM_MODEL: z.string().default(''),
 
+  /** Ollama HTTP API base (default http://127.0.0.1:11434). Set for remote or Docker. */
+  OLLAMA_BASE_URL: z.string().default(''),
+  /** Bearer token for Ollama Cloud / authenticated endpoints (optional). */
+  OLLAMA_API_KEY: z.string().default(''),
+
   /** Target platform: "android" or "ios". Empty = prompt on macOS, default android elsewhere. */
   PLATFORM: z.enum(['android', 'ios', '']).default(''),
 
