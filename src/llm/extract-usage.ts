@@ -63,6 +63,23 @@ function fromProviderMetadata(meta: unknown): { input: number; output: number } 
   return null;
 }
 
+/** Extract cached token count from Gemini/Vertex provider metadata. */
+export function extractCachedTokensFromMetadata(providerMetadata: unknown): number {
+  if (!providerMetadata || typeof providerMetadata !== 'object') return 0;
+  const root = providerMetadata as Record<string, unknown>;
+  for (const key of ['google', 'vertex']) {
+    const block = root[key];
+    if (block && typeof block === 'object') {
+      const u = (block as Record<string, unknown>).usageMetadata;
+      if (u && typeof u === 'object') {
+        const cached = (u as Record<string, unknown>).cachedContentTokenCount;
+        if (typeof cached === 'number' && cached > 0) return cached;
+      }
+    }
+  }
+  return 0;
+}
+
 /**
  * Pick input/output token counts from a generateText result.
  */

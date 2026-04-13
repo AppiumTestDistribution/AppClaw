@@ -2,7 +2,7 @@
   "name": "appclaw",
   "displayName": "AppClaw",
   "description": "AI-powered mobile automation agent — control Android & iOS devices from VS Code",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "publisher": "atddevs",
   "engines": {
     "vscode": "^1.85.0"

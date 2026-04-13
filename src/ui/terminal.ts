@@ -799,11 +799,20 @@ export function printTimeout(): void {
 
 // ─── Token usage ─────────────────────────────────────────
 
-export function printStepTokens(inputTokens: number, outputTokens: number): void {
+export function printStepTokens(
+  inputTokens: number,
+  outputTokens: number,
+  cachedTokens?: number,
+  cost?: number,
+  label?: string
+): void {
   if (!Config.SHOW_TOKEN_USAGE) return;
   const total = inputTokens + outputTokens;
+  const cachedStr = cachedTokens && cachedTokens > 0 ? ` cached: ${cachedTokens}` : '';
+  const costStr = cost != null && cost > 0 ? `  ${chalk.green(`$${cost.toFixed(5)}`)}` : '';
+  const labelStr = label ? `${chalk.dim(label.padEnd(9))} ` : '';
   console.log(
-    `  ${' '.repeat(8)}${theme.dim(`⟠ ${total} tokens (in: ${inputTokens} out: ${outputTokens})`)}`
+    `  ${' '.repeat(8)}${theme.dim(`⟠ `)}${labelStr}${theme.dim(`${total} tokens (in: ${inputTokens} out: ${outputTokens}${cachedStr})`)}${costStr}`
   );
 }
 
@@ -811,15 +820,22 @@ export function printTokenSummary(
   totalInput: number,
   totalOutput: number,
   cost: number,
-  modelName: string
+  modelName: string,
+  totalCached?: number
 ): void {
   if (!Config.SHOW_TOKEN_USAGE) return;
   const total = totalInput + totalOutput;
-  const content = [
+  const lines = [
     `${chalk.hex('#9CA3AF')('Tokens')}  ${chalk.white.bold(total.toLocaleString())}  ${chalk.dim(`(in: ${totalInput.toLocaleString()}  out: ${totalOutput.toLocaleString()})`)}`,
     `${chalk.hex('#9CA3AF')('Cost')}    ${chalk.green.bold(`$${cost.toFixed(4)}`)}`,
     `${chalk.hex('#9CA3AF')('Model')}   ${chalk.dim(modelName)}`,
-  ].join('\n');
+  ];
+  if (totalCached && totalCached > 0) {
+    lines.push(
+      `${chalk.hex('#9CA3AF')('Cached')}  ${chalk.cyan.bold(totalCached.toLocaleString())}  ${chalk.dim('tokens from implicit cache (~75% off)')}`
+    );
+  }
+  const content = lines.join('\n');
   console.log();
   printBox(content, {
     padding: { left: 2, right: 2, top: 0, bottom: 0 },

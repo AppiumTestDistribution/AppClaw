@@ -29,7 +29,10 @@ import {
   VISION_MODE_EXCLUDED_TOOLS,
 } from '../mcp/tool-converter.js';
 import { prepareScreenshotForLlm } from '../vision/prepare-screenshot-for-llm.js';
-import { extractUsageFromGenerateTextResult } from './extract-usage.js';
+import {
+  extractUsageFromGenerateTextResult,
+  extractCachedTokensFromMetadata,
+} from './extract-usage.js';
 import { buildSystemPrompt, buildUserMessage } from './prompts.js';
 
 export interface AgentContext {
@@ -57,6 +60,8 @@ export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  /** Tokens served from Gemini implicit cache (reduces billed input cost by ~75%). */
+  cachedTokens?: number;
 }
 
 /** What the LLM decided to do — a tool call with name and arguments */
@@ -332,6 +337,11 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
   const metaTools = buildMetaTools(config.AGENT_MODE);
   const allTools = { ...dynamicTools, ...metaTools };
 
+  // ─── System prompt cache ────────────────────────────────
+  // Built lazily on first getDecision() call (platform not known at init time),
+  // then reused for every subsequent step — platform/mode never change mid-run.
+  let cachedSystemPrompt: string | undefined;
+
   // ─── Action history for context injection ──────────────
   // Instead of multi-turn messages (which break across providers),
   // we inject a compact action history into each user prompt.
@@ -347,13 +357,16 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
       context: AgentContext,
       callbacks?: StreamCallbacks
     ): Promise<ToolCallDecision> {
-      // Build prompt and prepare screenshot in parallel
-      const systemPrompt = buildSystemPrompt(
-        context.platform,
-        isVisionLocateEnabledFromConfig(config),
-        config.AGENT_MODE,
-        Object.keys(allTools).length
-      );
+      // Build system prompt once and cache it — platform/mode never change mid-run.
+      if (!cachedSystemPrompt) {
+        cachedSystemPrompt = buildSystemPrompt(
+          context.platform,
+          isVisionLocateEnabledFromConfig(config),
+          config.AGENT_MODE,
+          Object.keys(allTools).length
+        );
+      }
+      const systemPrompt = cachedSystemPrompt;
 
       let userMessage = buildUserMessage(context);
       if (actionHistory.length > 0) {
@@ -432,10 +445,12 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
           providerMetadata: providerMeta,
           response: { body: (response as any)?.body },
         });
+        const cachedTokens = extractCachedTokensFromMetadata(providerMeta);
         const usage: TokenUsage = {
           inputTokens: extracted.inputTokens,
           outputTokens: extracted.outputTokens,
           totalTokens: extracted.totalTokens,
+          cachedTokens: cachedTokens || undefined,
         };
 
         const toolCall = toolCalls?.[0];
@@ -472,10 +487,12 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
 
       // Prefer totalUsage + raw Gemini usageMetadata — some models omit fields the SDK maps to 0
       const extracted = extractUsageFromGenerateTextResult(result);
+      const cachedTokens = extractCachedTokensFromMetadata(result.providerMetadata);
       const usage: TokenUsage = {
         inputTokens: extracted.inputTokens,
         outputTokens: extracted.outputTokens,
         totalTokens: extracted.totalTokens,
+        cachedTokens: cachedTokens || undefined,
       };
 
       // Extract the first tool call

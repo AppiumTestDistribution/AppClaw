@@ -45,9 +45,7 @@ export const EXCLUDED_MCP_TOOLS = new Set([
   'selectSession',
   'select_platform',
   'select_device',
-  'setup_wda',
-  'install_wda',
-  'boot_simulator',
+  'prepare_ios_simulator',
   // AI code-gen tools — not relevant to device control
   'appium_generate_tests',
   'appium_generate_locators',

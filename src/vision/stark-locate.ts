@@ -26,6 +26,7 @@ import {
   getStarkVisionCoordinateOrder,
   getStarkVisionModel,
 } from './locate-enabled.js';
+import { trackVisionTokenUsage } from './vision-token-tracker.js';
 import { getScreenSizeForStark } from './window-size.js';
 
 /** Max edge for screenshots sent to Stark/Gemini — coordinates are normalized so resolution doesn't matter. */
@@ -132,6 +133,11 @@ export async function starkLocateTapTarget(
   // Use raw screenshot for coordinate scaling (needs true device pixels), compressed for Gemini
   const screenSize = await getScreenSizeForStark(mcp, rawScreenshot);
   const imageBase64 = await downscaleForVision(rawScreenshot);
+  if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
+    const rawKB = Math.round(rawScreenshot.length / 1024);
+    const newKB = Math.round(imageBase64.length / 1024);
+    console.log(`        [stark] screenshot ${rawKB}KB → ${newKB}KB`);
+  }
 
   const client = new StarkVisionClient({
     apiKey: apiKey || 'local',
@@ -139,6 +145,7 @@ export async function starkLocateTapTarget(
     disableThinking: true,
     ...(baseUrl && { baseUrl }),
     ...(baseUrl && { coordinateOrder }),
+    onTokenUsage: trackVisionTokenUsage,
   });
 
   const locateT0 = performance.now();

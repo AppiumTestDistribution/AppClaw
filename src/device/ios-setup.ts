@@ -13,110 +13,69 @@ import * as ui from '../ui/terminal.js';
 
 /**
  * Full simulator setup: boot + WDA download + WDA install.
- * Each step is idempotent (skips if already done).
+ * Uses the prepare_ios_simulator tool which handles all three steps in one call.
  */
 export async function setupSimulator(mcp: MCPClient, udid: string): Promise<void> {
-  // Step 1: Boot simulator
-  ui.startSpinner('Booting simulator...');
+  ui.startSpinner('Preparing iOS simulator...');
+  let result: any;
   try {
-    const bootResult = await mcp.callTool('boot_simulator', { udid });
-    const bootText = extractText(bootResult);
-
-    if (bootText.toLowerCase().includes('error') || bootText.toLowerCase().includes('failed')) {
-      throw new Error(bootText);
-    }
-
-    ui.stopSpinner();
-    if (
-      bootText.toLowerCase().includes('already booted') ||
-      bootText.toLowerCase().includes('already running')
-    ) {
-      ui.printSetupOk('Simulator already booted');
-    } else {
-      ui.printSetupOk('Simulator booted');
+    const mcpResult = await mcp.callTool('prepare_ios_simulator', { udid });
+    const text = extractText(mcpResult);
+    try {
+      result = JSON.parse(text);
+    } catch {
+      result = null;
     }
   } catch (err: any) {
     ui.stopSpinner();
     const msg = err instanceof Error ? err.message : String(err);
-    // "Already booted" is not an error
-    if (
-      msg.toLowerCase().includes('already booted') ||
-      msg.toLowerCase().includes('already running')
-    ) {
-      ui.printSetupOk('Simulator already booted');
-    } else {
-      ui.printSetupError(
-        `Failed to boot simulator: ${msg}`,
-        'Try closing other simulators or run: xcrun simctl boot <udid>'
-      );
-      throw err;
-    }
-  }
-
-  // Step 2: Download/setup WDA (cached in ~/.cache/appium-mcp/wda/)
-  ui.startSpinner('Setting up WebDriverAgent...');
-  try {
-    const wdaResult = await mcp.callTool('setup_wda', { platform: 'ios' });
-    const wdaText = extractText(wdaResult);
-
-    if (wdaText.toLowerCase().includes('error') || wdaText.toLowerCase().includes('failed')) {
-      throw new Error(wdaText);
-    }
-
-    ui.stopSpinner();
-    if (wdaText.toLowerCase().includes('cached') || wdaText.toLowerCase().includes('already')) {
-      ui.printSetupOk('WebDriverAgent ready (cached)');
-    } else {
-      ui.printSetupOk('WebDriverAgent downloaded');
-    }
-  } catch (err: any) {
-    ui.stopSpinner();
-    const msg = err instanceof Error ? err.message : String(err);
-    ui.printSetupError(
-      `Failed to setup WebDriverAgent: ${msg}`,
-      'Check network connection. WDA is downloaded from GitHub releases.'
-    );
+    ui.printSetupError(`Failed to prepare simulator: ${msg}`, 'Run: xcrun simctl boot <udid>');
     throw err;
   }
+  ui.stopSpinner();
 
-  // Step 3: Install WDA on the booted simulator
-  ui.startSpinner('Installing WebDriverAgent on simulator...');
-  try {
-    const installResult = await mcp.callTool('install_wda', { simulatorUdid: udid });
-    const installText = extractText(installResult);
+  if (!result) {
+    ui.printSetupOk('iOS simulator prepared');
+    return;
+  }
 
-    if (
-      installText.toLowerCase().includes('error') ||
-      installText.toLowerCase().includes('failed')
-    ) {
-      throw new Error(installText);
-    }
+  // Boot step
+  if (result.boot?.status === 'failed') {
+    ui.printSetupError(
+      `Failed to boot simulator: ${result.boot.detail}`,
+      'Run: xcrun simctl boot <udid>'
+    );
+    throw new Error(result.boot.detail);
+  } else if (result.boot?.status === 'skipped') {
+    ui.printSetupOk(`Simulator already booted`);
+  } else if (result.boot?.status === 'completed') {
+    ui.printSetupOk('Simulator booted');
+  }
 
-    ui.stopSpinner();
-    if (
-      installText.toLowerCase().includes('already installed') ||
-      installText.toLowerCase().includes('already running')
-    ) {
-      ui.printSetupOk('WebDriverAgent already installed');
-    } else {
-      ui.printSetupOk('WebDriverAgent installed on simulator');
-    }
-  } catch (err: any) {
-    ui.stopSpinner();
-    const msg = err instanceof Error ? err.message : String(err);
-    // "Already installed" is acceptable
-    if (
-      msg.toLowerCase().includes('already installed') ||
-      msg.toLowerCase().includes('already running')
-    ) {
-      ui.printSetupOk('WebDriverAgent already installed');
-    } else {
-      ui.printSetupError(
-        `Failed to install WebDriverAgent: ${msg}`,
-        'Try resetting the simulator: xcrun simctl erase <udid>'
-      );
-      throw err;
-    }
+  // WDA download step
+  if (result.wda_download?.status === 'failed') {
+    ui.printSetupError(
+      `Failed to download WDA: ${result.wda_download.detail}`,
+      'Check network connection. WDA is downloaded from GitHub releases.'
+    );
+    throw new Error(result.wda_download.detail);
+  } else if (result.wda_download?.status === 'completed') {
+    ui.printSetupOk('WebDriverAgent downloaded');
+  } else if (result.wda_download?.status === 'skipped') {
+    ui.printSetupOk('WebDriverAgent ready (cached)');
+  }
+
+  // WDA install step
+  if (result.wda_install?.status === 'failed') {
+    ui.printSetupError(
+      `Failed to install WDA: ${result.wda_install.detail}`,
+      'Try resetting the simulator: xcrun simctl erase <udid>'
+    );
+    throw new Error(result.wda_install.detail);
+  } else if (result.wda_install?.status === 'completed') {
+    ui.printSetupOk('WebDriverAgent installed on simulator');
+  } else if (result.wda_install?.status === 'skipped') {
+    ui.printSetupOk('WebDriverAgent already installed');
   }
 }
 

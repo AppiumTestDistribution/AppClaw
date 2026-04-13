@@ -21,6 +21,9 @@ import { AppResolver } from '../agent/app-resolver.js';
 import { tryParseNaturalFlowLine } from '../flow/natural-line.js';
 import { resolveNaturalStep } from '../flow/llm-parser.js';
 import { visionExecute } from '../flow/vision-execute.js';
+import { resetVisionTokens, getVisionTokens } from '../vision/vision-token-tracker.js';
+import { MODEL_PRICING, DEFAULT_MODELS } from '../constants.js';
+import { getStarkVisionModel } from '../vision/locate-enabled.js';
 import type { FlowStep, FlowMeta } from '../flow/types.js';
 import type { MCPClient } from '../mcp/types.js';
 import {
@@ -53,6 +56,22 @@ const state: PlaygroundState = {
   mcp: null,
   appResolver: null,
 };
+
+// ─── Cost helpers ───────────────────────────────────────
+
+function calcCost(inputTokens: number, outputTokens: number, modelName: string): number {
+  const pricing = MODEL_PRICING[modelName] ?? [0, 0];
+  return (inputTokens / 1_000_000) * pricing[0] + (outputTokens / 1_000_000) * pricing[1];
+}
+
+function visionCost(inputTokens: number, outputTokens: number): number {
+  return calcCost(inputTokens, outputTokens, getStarkVisionModel());
+}
+
+function llmCost(inputTokens: number, outputTokens: number): number {
+  const modelName = Config.LLM_MODEL || DEFAULT_MODELS[Config.LLM_PROVIDER] || '';
+  return calcCost(inputTokens, outputTokens, modelName);
+}
 
 // ─── Formatting helpers ─────────────────────────────────
 
@@ -1001,7 +1020,8 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
     // Two-call fallback: classify → execute
     let parsed: FlowStep;
     try {
-      parsed = await resolveNaturalStep(line);
+      const resolved = await resolveNaturalStep(line);
+      parsed = resolved.step;
     } catch (err: any) {
       emitJson({
         event: 'step',
@@ -1285,6 +1305,7 @@ async function processLine(line: string): Promise<void> {
   if (state.mcp && Config.AGENT_MODE === 'vision') {
     try {
       ui.startSpinner('Executing', line);
+      resetVisionTokens();
       const vResult = await visionExecute(state.mcp, line, undefined, undefined, {
         minMatchScore: MIN_MATCH_SCORE,
       });
@@ -1298,6 +1319,15 @@ async function processLine(line: string): Promise<void> {
             : ans;
           console.log();
           printPanel({ title: 'Answer', content: ansBody });
+          const vt = getVisionTokens();
+          if (vt.totalTokens > 0)
+            ui.printStepTokens(
+              vt.inputTokens,
+              vt.outputTokens,
+              vt.cachedTokens || undefined,
+              visionCost(vt.inputTokens, vt.outputTokens),
+              'vision'
+            );
           console.log();
           return;
         }
@@ -1314,6 +1344,15 @@ async function processLine(line: string): Promise<void> {
             printStepFail(stepNum, vResult.step, execResult.message);
             console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
           }
+          const vt = getVisionTokens();
+          if (vt.totalTokens > 0)
+            ui.printStepTokens(
+              vt.inputTokens,
+              vt.outputTokens,
+              vt.cachedTokens || undefined,
+              visionCost(vt.inputTokens, vt.outputTokens),
+              'vision'
+            );
           return;
         }
 
@@ -1332,6 +1371,15 @@ async function processLine(line: string): Promise<void> {
           }
           console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
         }
+        const vt = getVisionTokens();
+        if (vt.totalTokens > 0)
+          ui.printStepTokens(
+            vt.inputTokens,
+            vt.outputTokens,
+            vt.cachedTokens || undefined,
+            visionCost(vt.inputTokens, vt.outputTokens),
+            'vision'
+          );
         return;
       }
     } catch (err: any) {
@@ -1342,9 +1390,12 @@ async function processLine(line: string): Promise<void> {
 
   // ── Two-call fallback: classify via LLM → execute via step runner ──
   let parsed: FlowStep;
+  let classifyUsage: { inputTokens: number; outputTokens: number; totalTokens: number } | undefined;
   try {
     ui.startSpinner('Classifying', line);
-    parsed = await resolveNaturalStep(line);
+    const resolved = await resolveNaturalStep(line);
+    parsed = resolved.step;
+    classifyUsage = resolved.usage;
     ui.stopSpinner();
   } catch (err: any) {
     ui.stopSpinner();
@@ -1359,6 +1410,14 @@ async function processLine(line: string): Promise<void> {
 
   if (parsed.kind === 'getInfo') {
     await handleGetInfo(parsed.query);
+    if (classifyUsage && classifyUsage.totalTokens > 0)
+      ui.printStepTokens(
+        classifyUsage.inputTokens,
+        classifyUsage.outputTokens,
+        undefined,
+        llmCost(classifyUsage.inputTokens, classifyUsage.outputTokens),
+        'classify'
+      );
     return;
   }
 
@@ -1367,12 +1426,21 @@ async function processLine(line: string): Promise<void> {
   if (parsed.kind === 'done') {
     state.steps.push(parsed);
     printStepSuccess(stepNum, parsed, 'recorded');
+    if (classifyUsage && classifyUsage.totalTokens > 0)
+      ui.printStepTokens(
+        classifyUsage.inputTokens,
+        classifyUsage.outputTokens,
+        undefined,
+        llmCost(classifyUsage.inputTokens, classifyUsage.outputTokens),
+        'classify'
+      );
     return;
   }
 
   // Execute on device
   ui.startSpinner(`[${stepNum}] ${parsed.kind}`, spinnerDetail(parsed));
 
+  resetVisionTokens();
   try {
     const result = await runStepOnDevice(parsed);
     ui.stopSpinner();
@@ -1384,6 +1452,23 @@ async function processLine(line: string): Promise<void> {
       printStepFail(stepNum, parsed, result.message);
       console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
     }
+    if (classifyUsage && classifyUsage.totalTokens > 0)
+      ui.printStepTokens(
+        classifyUsage.inputTokens,
+        classifyUsage.outputTokens,
+        undefined,
+        llmCost(classifyUsage.inputTokens, classifyUsage.outputTokens),
+        'classify'
+      );
+    const vt = getVisionTokens();
+    if (vt.totalTokens > 0)
+      ui.printStepTokens(
+        vt.inputTokens,
+        vt.outputTokens,
+        vt.cachedTokens || undefined,
+        visionCost(vt.inputTokens, vt.outputTokens),
+        'vision'
+      );
   } catch (err: any) {
     ui.stopSpinner();
     printStepFail(stepNum, parsed, err?.message ?? String(err));

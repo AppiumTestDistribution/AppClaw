@@ -72,13 +72,18 @@ const SYSTEM_PROMPT =
   `- "done" → done\n` +
   `Extract the relevant parameters. Works with any language.`;
 
+export interface ResolvedStep {
+  step: FlowStep;
+  usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+}
+
 /**
  * Resolve a free-form natural language instruction into a concrete FlowStep via LLM.
  */
-export async function resolveNaturalStep(instruction: string): Promise<FlowStep> {
+export async function resolveNaturalStep(instruction: string): Promise<ResolvedStep> {
   const model = buildModel(Config);
 
-  const { object } = await generateObject({
+  const { object, usage } = await generateObject({
     model: model as any,
     schema: stepSchema,
     system: SYSTEM_PROMPT,
@@ -89,5 +94,12 @@ export async function resolveNaturalStep(instruction: string): Promise<FlowStep>
     },
   });
 
-  return { ...object, verbatim: instruction } as FlowStep;
+  return {
+    step: { ...object, verbatim: instruction } as FlowStep,
+    usage: {
+      inputTokens: usage.inputTokens ?? 0,
+      outputTokens: usage.outputTokens ?? 0,
+      totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+    },
+  };
 }

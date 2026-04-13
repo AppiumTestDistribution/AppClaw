@@ -15,6 +15,7 @@
  */
 
 import starkVision from 'df-vision';
+import { trackVisionTokenUsage } from '../vision/vision-token-tracker.js';
 import type { MCPClient } from '../mcp/types.js';
 import type { FlowStep } from './types.js';
 import type { ActionResult } from '../llm/schemas.js';
@@ -440,6 +441,7 @@ export async function visionExecute(
       disableThinking: true,
       ...(baseUrl && { baseUrl }),
       ...(baseUrl && { coordinateOrder }),
+      onTokenUsage: trackVisionTokenUsage,
     });
     const t0 = performance.now();
     const response = await client.getElementInfo(imageBase64, pre.getInfoQuery, true);
@@ -479,6 +481,7 @@ export async function visionExecute(
       disableThinking: true,
       ...(baseUrl && { baseUrl }),
       ...(baseUrl && { coordinateOrder }),
+      onTokenUsage: trackVisionTokenUsage,
     });
     const visQuery = pre.assertQuery;
     const t0 = performance.now();
@@ -528,6 +531,7 @@ export async function visionExecute(
     model: getStarkVisionModel(),
     disableThinking: true,
     ...(baseUrl && { baseUrl }),
+    onTokenUsage: trackVisionTokenUsage,
   });
 
   const t0 = performance.now();

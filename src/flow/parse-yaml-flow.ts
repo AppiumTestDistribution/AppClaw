@@ -227,7 +227,7 @@ async function parseRawSteps(rawSteps: unknown[], strict?: boolean): Promise<Flo
         );
       }
       const resolved = await resolveNaturalStep(instruction);
-      steps.push(resolved);
+      steps.push(resolved.step);
     }
   }
   return steps;

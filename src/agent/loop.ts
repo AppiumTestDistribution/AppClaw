@@ -127,6 +127,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   const history: StepRecord[] = [];
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let totalCachedTokens = 0;
   let prevDom = '';
   let lastResult = '';
   let detectedPlatform: 'android' | 'ios' = 'android';
@@ -259,7 +260,13 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
             const cost =
               (totalInputTokens / 1_000_000) * pricing[0] +
               (totalOutputTokens / 1_000_000) * pricing[1];
-            ui.printTokenSummary(totalInputTokens, totalOutputTokens, cost, modelName);
+            ui.printTokenSummary(
+              totalInputTokens,
+              totalOutputTokens,
+              cost,
+              modelName,
+              totalCachedTokens
+            );
             return {
               success: true,
               reason: evaluation.reason,
@@ -465,7 +472,12 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     if (decision.usage) {
       totalInputTokens += decision.usage.inputTokens;
       totalOutputTokens += decision.usage.outputTokens;
-      ui.printStepTokens(decision.usage.inputTokens, decision.usage.outputTokens);
+      totalCachedTokens += decision.usage.cachedTokens ?? 0;
+      ui.printStepTokens(
+        decision.usage.inputTokens,
+        decision.usage.outputTokens,
+        decision.usage.cachedTokens
+      );
     }
 
     // ─── 4c. TRACK TRIED SELECTORS ─────────────────────
@@ -516,6 +528,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
             if (verifyDecision.usage) {
               totalInputTokens += verifyDecision.usage.inputTokens;
               totalOutputTokens += verifyDecision.usage.outputTokens;
+              totalCachedTokens += verifyDecision.usage.cachedTokens ?? 0;
             }
 
             if (verifyDecision.toolName !== 'done') {
@@ -552,7 +565,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       const pricing = MODEL_PRICING[modelName] ?? [0, 0];
       const cost =
         (totalInputTokens / 1_000_000) * pricing[0] + (totalOutputTokens / 1_000_000) * pricing[1];
-      ui.printTokenSummary(totalInputTokens, totalOutputTokens, cost, modelName);
+      ui.printTokenSummary(totalInputTokens, totalOutputTokens, cost, modelName, totalCachedTokens);
       return {
         success: true,
         reason,

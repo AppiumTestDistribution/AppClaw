@@ -31,6 +31,7 @@ import {
   getStarkVisionModel,
 } from '../vision/locate-enabled.js';
 import { Config } from '../config.js';
+import { MODEL_PRICING } from '../constants.js';
 import { screenshot } from '../mcp/tools.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -46,6 +47,7 @@ import { pngDimensionsFromBase64 } from '../vision/png-dimensions.js';
 import { getCachedScreenSize, getScreenSizeForStark } from '../vision/window-size.js';
 import chalk from 'chalk';
 import * as ui from '../ui/terminal.js';
+import { resetVisionTokens, getVisionTokens } from '../vision/vision-token-tracker.js';
 
 /** Extract [x, y] coordinates from an action result message like 'Tapped "X" via vision at [320, 540]' */
 function extractCoordinates(message?: string): { x: number; y: number } | undefined {
@@ -1131,8 +1133,22 @@ async function executePhase(
     }
 
     onFlowStep?.(globalN, globalTotal, step.kind, label, 'running');
+    resetVisionTokens();
     const result = await executeStep(mcp, step, meta, appResolver, tapPoll, deviceUdid);
     ui.printFlowStep(globalN, globalTotal, label, result.success);
+    const vt = getVisionTokens();
+    if (vt.totalTokens > 0) {
+      const vtPricing = MODEL_PRICING[getStarkVisionModel()] ?? [0, 0];
+      const vtCost =
+        (vt.inputTokens / 1_000_000) * vtPricing[0] + (vt.outputTokens / 1_000_000) * vtPricing[1];
+      ui.printStepTokens(
+        vt.inputTokens,
+        vt.outputTokens,
+        vt.cachedTokens || undefined,
+        vtCost,
+        'vision'
+      );
+    }
     onFlowStep?.(
       globalN,
       globalTotal,
@@ -1347,8 +1363,22 @@ export async function runYamlFlow(
     }
 
     options.onFlowStep?.(n, total, step.kind, stepLabel(step), 'running');
+    resetVisionTokens();
     const result = await executeStep(mcp, step, meta, appResolver, tapPoll, options.deviceUdid);
     ui.printFlowStep(n, total, label, result.success);
+    const vt = getVisionTokens();
+    if (vt.totalTokens > 0) {
+      const vtPricing = MODEL_PRICING[getStarkVisionModel()] ?? [0, 0];
+      const vtCost =
+        (vt.inputTokens / 1_000_000) * vtPricing[0] + (vt.outputTokens / 1_000_000) * vtPricing[1];
+      ui.printStepTokens(
+        vt.inputTokens,
+        vt.outputTokens,
+        vt.cachedTokens || undefined,
+        vtCost,
+        'vision'
+      );
+    }
     options.onFlowStep?.(
       n,
       total,
