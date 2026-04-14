@@ -305,7 +305,7 @@ describe.skipIf(SKIP_GOAL)('SDK E2E — mixed runFlow() + runGoal()', () => {
 
 // ── Suite: teardown after use ─────────────────────────────────────────────────
 
-describe.only('SDK E2E — teardown after use', () => {
+describe('SDK E2E — teardown after use', () => {
   it('teardown() after runFlow() does not throw', async () => {
     const app = new AppClaw({
       provider: PROVIDER,

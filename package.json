@@ -30,9 +30,9 @@
     "lint": "npm run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run --exclude tests/e2e/**",
+    "test": "vitest run tests/flow tests/sdk",
     "test:e2e": "vitest run tests/e2e/",
-    "test:watch": "vitest --exclude tests/e2e/**",
+    "test:watch": "vitest tests/flow tests/sdk",
     "build:vsix": "cd vscode-extension && npm run build && npx vsce package",
     "deploy:landing": "npm run deploy --prefix landing"
   },
