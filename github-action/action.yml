@@ -1,0 +1,205 @@
+name: 'AppClaw Mobile Tests'
+description: 'Run mobile UI automation flows and AI-driven goals in CI — Android emulator or iOS simulator, zero boilerplate.'
+author: 'AppiumTestDistribution'
+
+branding:
+  icon: 'smartphone'
+  color: 'purple'
+
+# ── Inputs ────────────────────────────────────────────────────────────────────
+
+inputs:
+  flow:
+    description: 'Path to a YAML flow file (mutually exclusive with goal)'
+    required: false
+    default: ''
+  goal:
+    description: 'Natural language goal for the LLM agent (mutually exclusive with flow)'
+    required: false
+    default: ''
+  platform:
+    description: 'Target platform: android or ios'
+    required: false
+    default: 'android'
+  provider:
+    description: 'LLM provider: gemini, anthropic, openai, groq'
+    required: false
+    default: 'gemini'
+  api-key:
+    description: 'LLM API key (GEMINI_API_KEY, ANTHROPIC_API_KEY, etc.)'
+    required: true
+  agent-mode:
+    description: 'Interaction strategy: dom (default, uses locators) or vision (screenshot AI)'
+    required: false
+    default: 'dom'
+  android-api-level:
+    description: 'Android emulator API level. Default: 33 (Android 13)'
+    required: false
+    default: '33'
+  android-profile:
+    description: 'Android AVD hardware profile. Default: pixel_6'
+    required: false
+    default: 'pixel_6'
+  android-target:
+    description: 'Android emulator target: default or google_apis'
+    required: false
+    default: 'default'
+  max-steps:
+    description: 'Maximum agent steps before the run is marked failed. Default: 30'
+    required: false
+    default: '30'
+  step-delay:
+    description: 'Delay in milliseconds between steps. Default: 500'
+    required: false
+    default: '500'
+  report:
+    description: 'Upload HTML report as a workflow artifact after the run. Default: true'
+    required: false
+    default: 'true'
+  report-name:
+    description: 'Name of the uploaded artifact. Default: appclaw-report'
+    required: false
+    default: 'appclaw-report'
+  appclaw-version:
+    description: 'AppClaw npm package version to install. Default: latest'
+    required: false
+    default: 'latest'
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+
+outputs:
+  report-path:
+    description: 'Path to the generated .appclaw/runs/<id>/ report directory'
+    value: ${{ steps.report-path.outputs.path }}
+
+# ── Steps ─────────────────────────────────────────────────────────────────────
+
+runs:
+  using: composite
+  steps:
+
+    # ── Validate ──────────────────────────────────────────────────────────────
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.flow }}" ] && [ -z "${{ inputs.goal }}" ]; then
+          echo "::error title=Missing input::Provide either 'flow' (path to YAML) or 'goal' (natural language string)"
+          exit 1
+        fi
+        if [ -n "${{ inputs.flow }}" ] && [ -n "${{ inputs.goal }}" ]; then
+          echo "::error title=Conflicting inputs::Provide either 'flow' or 'goal', not both"
+          exit 1
+        fi
+        if [ "${{ inputs.platform }}" != "android" ] && [ "${{ inputs.platform }}" != "ios" ]; then
+          echo "::error title=Invalid platform::platform must be 'android' or 'ios', got '${{ inputs.platform }}'"
+          exit 1
+        fi
+
+    # ── Node + AppClaw ────────────────────────────────────────────────────────
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install AppClaw
+      shell: bash
+      run: |
+        echo "::group::Installing appclaw@${{ inputs.appclaw-version }}"
+        npm install -g appclaw@${{ inputs.appclaw-version }}
+        echo "::endgroup::"
+
+    # ── Android — enable KVM ──────────────────────────────────────────────────
+    - name: Enable KVM
+      if: inputs.platform == 'android'
+      shell: bash
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+          | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    # ── Android — YAML flow ───────────────────────────────────────────────────
+    - name: Run YAML flow on Android emulator
+      if: inputs.platform == 'android' && inputs.flow != ''
+      uses: reactivecircus/android-emulator-runner@v2
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: android
+      with:
+        api-level: ${{ inputs.android-api-level }}
+        profile: ${{ inputs.android-profile }}
+        target: ${{ inputs.android-target }}
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+        disable-animations: true
+        script: appclaw --flow "${{ inputs.flow }}" --platform android
+
+    # ── Android — natural language goal ───────────────────────────────────────
+    - name: Run goal on Android emulator
+      if: inputs.platform == 'android' && inputs.goal != ''
+      uses: reactivecircus/android-emulator-runner@v2
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: android
+      with:
+        api-level: ${{ inputs.android-api-level }}
+        profile: ${{ inputs.android-profile }}
+        target: ${{ inputs.android-target }}
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+        disable-animations: true
+        script: appclaw "${{ inputs.goal }}" --platform android
+
+    # ── iOS — YAML flow ───────────────────────────────────────────────────────
+    - name: Run YAML flow on iOS simulator
+      if: inputs.platform == 'ios' && inputs.flow != ''
+      shell: bash
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: ios
+        DEVICE_TYPE: simulator
+      run: appclaw --flow "${{ inputs.flow }}" --platform ios
+
+    # ── iOS — natural language goal ───────────────────────────────────────────
+    - name: Run goal on iOS simulator
+      if: inputs.platform == 'ios' && inputs.goal != ''
+      shell: bash
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: ios
+        DEVICE_TYPE: simulator
+      run: appclaw "${{ inputs.goal }}" --platform ios
+
+    # ── Report ────────────────────────────────────────────────────────────────
+    - name: Find report path
+      id: report-path
+      if: always()
+      shell: bash
+      run: |
+        DIR=$(ls -td .appclaw/runs/*/ 2>/dev/null | head -1 || echo "")
+        echo "path=${DIR}" >> $GITHUB_OUTPUT
+        if [ -n "$DIR" ]; then
+          echo "::notice title=AppClaw Report::Report written to ${DIR}"
+        fi
+
+    - name: Upload report artifact
+      if: inputs.report == 'true' && always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.report-name }}
+        path: .appclaw/runs/
+        if-no-files-found: warn

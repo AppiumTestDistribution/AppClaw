@@ -1,0 +1,30 @@
+name: AppClaw — Parallel Matrix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.flow }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false   # run all flows even if one fails
+      matrix:
+        flow:
+          - flows/login.yaml
+          - flows/search.yaml
+          - flows/checkout.yaml
+          - flows/profile.yaml
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+        with:
+          flow: ${{ matrix.flow }}
+          platform: android
+          api-key: ${{ secrets.GEMINI_API_KEY }}
+          # Give each job a unique artifact name so they don't collide
+          report-name: report-${{ strategy.job-index }}-${{ github.run_id }}

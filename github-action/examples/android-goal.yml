@@ -1,0 +1,26 @@
+name: AppClaw — Android Goal (LLM Agent)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: appclaw-goal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Android Natural Language Goal
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+        with:
+          goal: 'Open YouTube, search for Appium 3.0, tap the first result, scroll down, verify a video by TestMu AI is visible'
+          platform: android
+          provider: gemini
+          api-key: ${{ secrets.GEMINI_API_KEY }}
+          max-steps: 20

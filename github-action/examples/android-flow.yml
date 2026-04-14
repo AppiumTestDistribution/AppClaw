@@ -1,0 +1,25 @@
+name: AppClaw — Android Flow
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: appclaw-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Android YAML Flow
+    runs-on: ubuntu-latest   # Android emulator requires Ubuntu (KVM)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+        with:
+          flow: flows/youtube.yaml
+          platform: android
+          provider: gemini
+          api-key: ${{ secrets.GEMINI_API_KEY }}

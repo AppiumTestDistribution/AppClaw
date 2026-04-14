@@ -1,0 +1,85 @@
+name: AppClaw — Full CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 2 * * *'   # nightly at 2 AM UTC
+
+concurrency:
+  group: appclaw-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Lint & build the flow files ──────────────────────────────────────────
+  validate:
+    name: Validate flows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - name: Verify YAML flow parsing
+        run: npx tsx tests/verify-parsing.ts
+
+  # ── 2. Smoke test — fast single flow ────────────────────────────────────────
+  smoke:
+    name: Smoke test
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+        id: smoke
+        with:
+          flow: flows/youtube.yaml
+          platform: android
+          api-key: ${{ secrets.GEMINI_API_KEY }}
+          max-steps: 15
+          report-name: smoke-report-${{ github.run_id }}
+
+      - name: Report path
+        run: echo "Report at ${{ steps.smoke.outputs.report-path }}"
+
+  # ── 3. Full regression — parallel flows (only on main / nightly) ────────────
+  regression:
+    name: Regression / ${{ matrix.flow }}
+    needs: smoke
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        flow:
+          - flows/login.yaml
+          - flows/search.yaml
+          - flows/checkout.yaml
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+        with:
+          flow: ${{ matrix.flow }}
+          platform: android
+          api-key: ${{ secrets.GEMINI_API_KEY }}
+          report-name: regression-${{ strategy.job-index }}-${{ github.run_id }}
+
+  # ── 4. iOS smoke (only on main) ──────────────────────────────────────────────
+  ios-smoke:
+    name: iOS smoke test
+    needs: smoke
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+        with:
+          flow: flows/ios-smoke.yaml
+          platform: ios
+          api-key: ${{ secrets.GEMINI_API_KEY }}
+          report-name: ios-smoke-${{ github.run_id }}
