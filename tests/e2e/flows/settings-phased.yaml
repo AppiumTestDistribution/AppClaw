@@ -1,0 +1,14 @@
+# E2E fixture: phased flow against Android Settings.
+# Tests setup / steps / assertions phase execution via the SDK.
+appId: com.android.settings
+name: E2E — Settings Phased
+---
+setup:
+  - launchApp
+  - wait: 2
+
+steps:
+  - assert: Settings
+
+assertions:
+  - assert: Settings

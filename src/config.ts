@@ -143,8 +143,9 @@ const envSchema = z.object({
 
 export type AppClawConfig = z.infer<typeof envSchema>;
 
-export function loadConfig(): AppClawConfig {
-  const config = envSchema.parse(process.env);
+export function loadConfig(overrides?: Record<string, string | undefined>): AppClawConfig {
+  const env = overrides ? { ...process.env, ...overrides } : process.env;
+  const config = envSchema.parse(env);
   if (config.CLOUD_PROVIDER === 'lambdatest') {
     if (!config.LAMBDATEST_USERNAME || !config.LAMBDATEST_ACCESS_KEY) {
       throw new Error(

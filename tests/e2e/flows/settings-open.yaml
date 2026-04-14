@@ -1,0 +1,9 @@
+# E2E fixture: open Android Settings and immediately exit.
+# No assertions — this is purely a connectivity / runFlow smoke test.
+# Always succeeds on any Android device.
+appId: com.android.settings
+name: E2E — Open Settings
+---
+- launchApp
+- wait: 2
+- done: Settings opened

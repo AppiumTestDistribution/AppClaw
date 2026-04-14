@@ -3,7 +3,17 @@
   "version": "0.1.6",
   "description": "Agentic AI layer for mobile automation via appium-mcp",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/sdk/index.js",
+  "types": "dist/sdk/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/sdk/index.js",
+      "types": "./dist/sdk/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/index.js"
+    }
+  },
   "bin": {
     "appclaw": "bin/appclaw.js"
   },
@@ -20,8 +30,9 @@
     "lint": "npm run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run --exclude tests/e2e/**",
+    "test:e2e": "vitest run tests/e2e/",
+    "test:watch": "vitest --exclude tests/e2e/**",
     "build:vsix": "cd vscode-extension && npm run build && npx vsce package",
     "deploy:landing": "npm run deploy --prefix landing"
   },

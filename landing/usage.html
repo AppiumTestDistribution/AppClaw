@@ -6,7 +6,7 @@
     <title>Usage Guide — AppClaw</title>
     <meta
       name="description"
-      content="Complete usage guide for AppClaw — CLI commands, YAML flow syntax, natural language instructions, variables, vision modes, and configuration."
+      content="Complete usage guide for AppClaw — CLI commands, YAML flow syntax, natural language instructions, variables, vision modes, configuration, and the Node.js / TypeScript SDK."
     />
     <meta name="theme-color" content="#ffffff" />
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
@@ -209,45 +209,43 @@
         color: var(--text);
       }
 
-      /* ===== PAGE HEADER ===== */
+      /* ===== PAGE HEADER (compact title bar) ===== */
       .page-header {
-        padding: 120px 0 60px;
-        text-align: center;
-        position: relative;
-        overflow: hidden;
-      }
-
-      .page-header-orb {
-        position: absolute;
-        border-radius: 50%;
-        filter: blur(100px);
-        opacity: 0.1;
-        pointer-events: none;
-      }
-      .page-header-orb-1 {
-        width: 500px;
-        height: 500px;
-        background: var(--accent);
-        top: -200px;
-        left: -100px;
-      }
-      .page-header-orb-2 {
-        width: 400px;
-        height: 400px;
-        background: var(--teal);
-        top: -100px;
-        right: -150px;
+        position: fixed;
+        top: 64px;
+        left: 0;
+        right: 0;
+        z-index: 90;
+        height: 48px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 32px;
+        gap: 12px;
       }
 
       .page-header h1 {
-        font-size: clamp(2rem, 4vw, 3rem);
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        line-height: 1.15;
-        margin-bottom: 16px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        letter-spacing: -0.01em;
+        margin: 0;
+      }
+
+      .page-header .page-header-sep {
+        color: var(--text-tertiary);
+        font-size: 14px;
+      }
+
+      .page-header .page-header-section {
+        font-size: 14px;
+        color: var(--text-secondary);
+        font-weight: 400;
       }
 
       .page-header p {
+        display: none;
         font-size: 18px;
         color: var(--text-secondary);
         max-width: 640px;
@@ -256,19 +254,38 @@
 
       /* ===== DOCS LAYOUT ===== */
       .docs-layout {
-        display: grid;
-        grid-template-columns: 220px 1fr;
-        gap: 64px;
-        padding: 60px 0 120px;
+        display: flex;
+        gap: 0;
+        padding: 0;
+        height: calc(100vh - 112px);
+        margin-top: 112px;
+        position: relative;
       }
 
       /* Sidebar */
       .docs-sidebar {
+        width: 240px;
+        flex-shrink: 0;
         position: sticky;
-        top: 96px;
-        align-self: start;
-        max-height: calc(100vh - 120px);
+        top: 112px;
+        height: calc(100vh - 112px);
         overflow-y: auto;
+        background: var(--bg-alt);
+        border-right: 1px solid var(--border);
+        padding: 20px 0 40px;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(15, 23, 42, 0.1) transparent;
+      }
+
+      .docs-sidebar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .docs-sidebar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .docs-sidebar::-webkit-scrollbar-thumb {
+        background: rgba(15, 23, 42, 0.1);
+        border-radius: 2px;
       }
 
       .docs-sidebar ul {
@@ -276,47 +293,162 @@
       }
 
       .docs-sidebar li {
-        margin-bottom: 4px;
+        margin-bottom: 2px;
       }
 
       .docs-sidebar a {
         display: block;
-        padding: 6px 12px;
+        padding: 5px 16px 5px 28px;
         font-size: 13px;
-        font-weight: 500;
+        font-weight: 400;
         color: var(--text-secondary);
         text-decoration: none;
-        border-radius: 6px;
-        transition: all 0.15s;
+        border-radius: 0;
+        transition: all 0.12s;
+        border-left: 2px solid transparent;
       }
       .docs-sidebar a:hover {
         color: var(--text);
-        background: var(--bg-alt);
+        background: rgba(15, 23, 42, 0.04);
+        border-left-color: rgba(249, 115, 22, 0.3);
       }
       .docs-sidebar a.active {
         color: var(--accent);
         background: rgba(249, 115, 22, 0.08);
+        border-left-color: var(--accent);
+        font-weight: 500;
       }
 
-      .docs-sidebar .sidebar-heading {
+      /* Accordion groups */
+      .sidebar-group {
+        margin-bottom: 4px;
+      }
+
+      .sidebar-heading {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 12px 7px 16px;
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: var(--text-tertiary);
-        padding: 16px 12px 6px;
+        color: var(--text);
+        background: none;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        transition:
+          background 0.15s,
+          color 0.15s;
+        margin: 4px 8px 2px;
+        width: calc(100% - 16px);
       }
-      .docs-sidebar .sidebar-heading:first-child {
-        padding-top: 0;
+      .sidebar-heading:hover {
+        background: rgba(15, 23, 42, 0.05);
+        color: var(--text);
+      }
+
+      .sidebar-chevron {
+        width: 13px;
+        height: 13px;
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+        color: var(--text-secondary);
+        opacity: 0.6;
+      }
+      .sidebar-group:not(.open) .sidebar-chevron {
+        transform: rotate(-90deg);
+      }
+
+      /* Accordion body */
+      .sidebar-group ul {
+        overflow: hidden;
+        max-height: 600px;
+        transition:
+          max-height 0.25s ease,
+          opacity 0.2s ease;
+        opacity: 1;
+      }
+      .sidebar-group:not(.open) ul {
+        max-height: 0;
+        opacity: 0;
       }
 
       /* Content */
       .docs-content {
+        flex: 1;
         min-width: 0;
+        overflow-y: auto;
+        height: calc(100vh - 112px);
+        padding: 0;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(15, 23, 42, 0.15) transparent;
+      }
+
+      .docs-content::-webkit-scrollbar {
+        width: 6px;
+      }
+      .docs-content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .docs-content::-webkit-scrollbar-thumb {
+        background: rgba(15, 23, 42, 0.15);
+        border-radius: 3px;
       }
 
       .docs-content section {
-        margin-bottom: 64px;
+        display: none;
+        max-width: 820px;
+        padding: 48px 64px 80px;
+        margin: 0;
+      }
+
+      /* CLI Options — wider to support 2-column table layout */
+      #cli-options {
+        max-width: 1100px;
+      }
+
+      .cli-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+        margin-bottom: 8px;
+      }
+      .cli-grid .cli-col h3 {
+        margin-top: 0;
+      }
+      .cli-full {
+        margin-top: 0;
+      }
+
+      @media (max-width: 860px) {
+        .cli-grid {
+          grid-template-columns: 1fr;
+          gap: 0;
+        }
+        #cli-options {
+          max-width: 820px;
+        }
+      }
+
+      .docs-content section.active {
+        display: block;
+        animation: panelIn 0.18s ease-out;
+      }
+
+      @keyframes panelIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
 
       .docs-content h2 {
@@ -631,26 +763,39 @@
       /* ===== RESPONSIVE ===== */
       @media (max-width: 1024px) {
         .docs-layout {
-          grid-template-columns: 1fr;
-          gap: 0;
+          flex-direction: column;
+          height: auto;
         }
         .docs-sidebar {
           position: relative;
           top: 0;
-          max-height: none;
+          width: 100%;
+          height: auto;
           display: flex;
           flex-wrap: wrap;
-          gap: 4px;
-          padding-bottom: 32px;
-          border-bottom: 1px solid var(--border);
-          margin-bottom: 40px;
+          gap: 2px;
+          padding: 16px 16px 20px;
+          border-right: none;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
         .docs-sidebar .sidebar-heading {
           width: 100%;
-          padding: 12px 0 4px;
+          padding: 10px 4px 4px;
         }
         .docs-sidebar li {
           margin-bottom: 0;
+        }
+        .docs-sidebar a {
+          padding: 4px 10px;
+          border-radius: 5px;
+          border-left: none;
+        }
+        .docs-content {
+          height: auto;
+          overflow-y: visible;
+        }
+        .docs-content section {
+          padding: 32px 24px 60px;
         }
       }
 
@@ -684,6 +829,99 @@
         .page-header p {
           font-size: 16px;
         }
+      }
+
+      /* ===== SECTION NAV (prev / next) ===== */
+      .section-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 48px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+        gap: 16px;
+      }
+
+      .section-nav-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.15s;
+        font-family: inherit;
+      }
+      .section-nav-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(249, 115, 22, 0.04);
+      }
+      .section-nav-btn.prev {
+        margin-right: auto;
+      }
+      .section-nav-btn.next {
+        margin-left: auto;
+      }
+      .section-nav-btn svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+
+      /* ===== SECTION HEADER breadcrumb ===== */
+      .section-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-tertiary);
+        margin-bottom: 24px;
+        font-family: 'JetBrains Mono', monospace;
+        letter-spacing: 0.01em;
+      }
+      .section-breadcrumb span {
+        color: var(--accent);
+      }
+
+      /* ===== DOCS SEARCH ===== */
+      .sidebar-search {
+        padding: 12px 12px 8px;
+      }
+      .sidebar-search input {
+        width: 100%;
+        padding: 7px 10px 7px 30px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-size: 12px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.15s;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: 10px center;
+      }
+      .sidebar-search input::placeholder {
+        color: var(--text-tertiary);
+      }
+      .sidebar-search input:focus {
+        border-color: rgba(249, 115, 22, 0.4);
+        color: var(--text);
+      }
+      .sidebar-search input::-webkit-search-cancel-button {
+        display: none;
+      }
+
+      .docs-sidebar li.hidden {
+        display: none;
       }
     </style>
   </head>
@@ -729,38 +967,75 @@
       </div>
     </nav>
 
-    <!-- PAGE HEADER -->
-    <section class="page-header">
-      <div class="page-header-orb page-header-orb-1"></div>
-      <div class="page-header-orb page-header-orb-2"></div>
-      <div class="container">
-        <h1 class="reveal">Usage Guide</h1>
-        <p class="reveal">
-          Everything you need to automate mobile apps with AppClaw &mdash; CLI commands, YAML flow
-          syntax, natural language instructions, and configuration.
-        </p>
-      </div>
-    </section>
+    <!-- PAGE HEADER (compact title bar) -->
+    <div class="page-header">
+      <h1>Usage Guide</h1>
+      <span class="page-header-sep">/</span>
+      <span class="page-header-section" id="page-header-section">Quick Start</span>
+    </div>
 
     <!-- DOCS -->
-    <div class="container">
-      <div class="docs-layout">
-        <!-- SIDEBAR -->
-        <aside class="docs-sidebar">
-          <div class="sidebar-heading">Getting Started</div>
+    <div class="docs-layout">
+      <!-- SIDEBAR -->
+      <aside class="docs-sidebar">
+        <div class="sidebar-search">
+          <input type="search" id="sidebar-search" placeholder="Search docs…" autocomplete="off" />
+        </div>
+
+        <div class="sidebar-group open">
+          <button class="sidebar-heading" aria-expanded="true">
+            Getting Started
+            <svg
+              class="sidebar-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
           <ul>
             <li><a href="#quick-start">Quick Start</a></li>
             <li><a href="#cli-options">CLI Options</a></li>
             <li><a href="#execution-modes">Execution Modes</a></li>
           </ul>
-          <div class="sidebar-heading">YAML Flows</div>
+        </div>
+
+        <div class="sidebar-group open">
+          <button class="sidebar-heading" aria-expanded="true">
+            YAML Flows
+            <svg
+              class="sidebar-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
           <ul>
             <li><a href="#yaml-overview">Overview</a></li>
             <li><a href="#flat-format">Flat Format</a></li>
             <li><a href="#phased-format">Phased Format</a></li>
             <li><a href="#variables">Variables &amp; Secrets</a></li>
           </ul>
-          <div class="sidebar-heading">Commands</div>
+        </div>
+
+        <div class="sidebar-group open">
+          <button class="sidebar-heading" aria-expanded="true">
+            Commands
+            <svg
+              class="sidebar-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
           <ul>
             <li><a href="#tap-click">Tap / Click</a></li>
             <li><a href="#type-text">Type Text</a></li>
@@ -772,28 +1047,87 @@
             <li><a href="#navigation">Navigation</a></li>
             <li><a href="#all-commands">Full Reference</a></li>
           </ul>
-          <div class="sidebar-heading">Configuration</div>
+        </div>
+
+        <div class="sidebar-group open">
+          <button class="sidebar-heading" aria-expanded="true">
+            Configuration
+            <svg
+              class="sidebar-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
           <ul>
             <li><a href="#vision-modes">Vision Modes</a></li>
             <li><a href="#env-vars">Environment Variables</a></li>
           </ul>
-        </aside>
+        </div>
 
-        <!-- CONTENT -->
-        <main class="docs-content">
-          <!-- ============================================ -->
-          <!-- GETTING STARTED                              -->
-          <!-- ============================================ -->
-          <section id="quick-start" class="reveal">
-            <h2>Quick Start</h2>
-            <p>Install AppClaw globally and start automating in seconds.</p>
+        <div class="sidebar-group open">
+          <button class="sidebar-heading" aria-expanded="true">
+            LambdaTest Cloud
+            <svg
+              class="sidebar-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <ul>
+            <li><a href="#lambdatest">Overview</a></li>
+          </ul>
+        </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Terminal</span>
-              </div>
-              <pre><span class="c"># Install</span>
+        <div class="sidebar-group open">
+          <button class="sidebar-heading" aria-expanded="true">
+            Node.js SDK
+            <svg
+              class="sidebar-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <ul>
+            <li><a href="#sdk-overview">Overview</a></li>
+            <li><a href="#sdk-install">Installation</a></li>
+            <li><a href="#sdk-run-flow">runFlow()</a></li>
+            <li><a href="#sdk-run-goal">runGoal()</a></li>
+            <li><a href="#sdk-run">run()</a></li>
+            <li><a href="#sdk-reports">Reports</a></li>
+            <li><a href="#sdk-vitest">Vitest / Jest</a></li>
+            <li><a href="#sdk-ci">CI Scripts</a></li>
+            <li><a href="#sdk-options">Options Reference</a></li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- CONTENT -->
+      <main class="docs-content">
+        <!-- ============================================ -->
+        <!-- GETTING STARTED                              -->
+        <!-- ============================================ -->
+        <section id="quick-start" class="reveal">
+          <h2>Quick Start</h2>
+          <p>Install AppClaw globally and start automating in seconds.</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="c"># Install</span>
 <span class="k">npm</span> install -g appclaw
 
 <span class="c"># Run with a natural language goal</span>
@@ -804,81 +1138,87 @@
 
 <span class="c"># Interactive playground</span>
 <span class="k">appclaw</span> <span class="fl">--playground</span></pre>
+          </div>
+        </section>
+
+        <section id="cli-options" class="reveal">
+          <h2>CLI Options</h2>
+          <p>All the flags you can pass to <code>appclaw</code>.</p>
+
+          <div class="cli-grid">
+            <div class="cli-col">
+              <h3>Platform &amp; Device</h3>
+              <table class="cmd-table">
+                <thead>
+                  <tr>
+                    <th>Flag</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>--platform &lt;os&gt;</td>
+                    <td>Target platform: <code>android</code> or <code>ios</code></td>
+                  </tr>
+                  <tr>
+                    <td>--device-type &lt;type&gt;</td>
+                    <td>iOS only: <code>simulator</code> or <code>real</code></td>
+                  </tr>
+                  <tr>
+                    <td>--device &lt;name&gt;</td>
+                    <td>Device name (partial match, e.g. "iPhone 17 Pro")</td>
+                  </tr>
+                  <tr>
+                    <td>--udid &lt;udid&gt;</td>
+                    <td>Device UDID (skips the device picker)</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          </section>
+            <div class="cli-col">
+              <h3>Execution</h3>
+              <table class="cmd-table">
+                <thead>
+                  <tr>
+                    <th>Flag</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>--flow &lt;file&gt;</td>
+                    <td>Run a declarative YAML flow file</td>
+                  </tr>
+                  <tr>
+                    <td>--env &lt;name&gt;</td>
+                    <td>Environment for variable/secret resolution</td>
+                  </tr>
+                  <tr>
+                    <td>--playground</td>
+                    <td>Launch the interactive REPL for building flows</td>
+                  </tr>
+                  <tr>
+                    <td>--record</td>
+                    <td>Record a goal execution for later replay</td>
+                  </tr>
+                  <tr>
+                    <td>--replay &lt;file&gt;</td>
+                    <td>Replay a previously recorded session</td>
+                  </tr>
+                  <tr>
+                    <td>--plan</td>
+                    <td>Decompose a complex goal into sub-goals</td>
+                  </tr>
+                  <tr>
+                    <td>--json</td>
+                    <td>JSON output mode (for IDE extensions)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-          <section id="cli-options" class="reveal">
-            <h2>CLI Options</h2>
-            <p>All the flags you can pass to <code>appclaw</code>.</p>
-
-            <h3>Platform &amp; Device</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Flag</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>--platform &lt;os&gt;</td>
-                  <td>Target platform: <code>android</code> or <code>ios</code></td>
-                </tr>
-                <tr>
-                  <td>--device-type &lt;type&gt;</td>
-                  <td>iOS only: <code>simulator</code> or <code>real</code></td>
-                </tr>
-                <tr>
-                  <td>--device &lt;name&gt;</td>
-                  <td>Device name (partial match, e.g. "iPhone 17 Pro")</td>
-                </tr>
-                <tr>
-                  <td>--udid &lt;udid&gt;</td>
-                  <td>Device UDID (skips the device picker)</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <h3>Execution</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Flag</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>--flow &lt;file&gt;</td>
-                  <td>Run a declarative YAML flow file</td>
-                </tr>
-                <tr>
-                  <td>--env &lt;name&gt;</td>
-                  <td>Environment for variable/secret resolution</td>
-                </tr>
-                <tr>
-                  <td>--playground</td>
-                  <td>Launch the interactive REPL for building flows</td>
-                </tr>
-                <tr>
-                  <td>--record</td>
-                  <td>Record a goal execution for later replay</td>
-                </tr>
-                <tr>
-                  <td>--replay &lt;file&gt;</td>
-                  <td>Replay a previously recorded session</td>
-                </tr>
-                <tr>
-                  <td>--plan</td>
-                  <td>Decompose a complex goal into sub-goals</td>
-                </tr>
-                <tr>
-                  <td>--json</td>
-                  <td>JSON output mode (for IDE extensions)</td>
-                </tr>
-              </tbody>
-            </table>
-
+          <div class="cli-full">
             <h3>Explorer (Test Generation)</h3>
             <table class="cmd-table">
               <thead>
@@ -914,87 +1254,88 @@
                 </tr>
               </tbody>
             </table>
-          </section>
+          </div>
+        </section>
 
-          <section id="execution-modes" class="reveal">
-            <h2>Execution Modes</h2>
-            <p>AppClaw has three distinct ways to automate mobile apps.</p>
+        <section id="execution-modes" class="reveal">
+          <h2>Execution Modes</h2>
+          <p>AppClaw has three distinct ways to automate mobile apps.</p>
 
-            <h3><span class="badge badge-orange">Agent Mode</span></h3>
-            <p>
-              Give AppClaw a goal in plain English. The AI agent takes a screenshot, reasons about
-              what it sees, and decides what to tap, type, or swipe &mdash; step by step until the
-              goal is complete.
-            </p>
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Agent Mode</span>
-              </div>
-              <pre><span class="k">appclaw</span> <span class="s">"Search for 'Appium 3.0' on YouTube and find the TestMu AI video"</span></pre>
+          <h3><span class="badge badge-orange">Agent Mode</span></h3>
+          <p>
+            Give AppClaw a goal in plain English. The AI agent takes a screenshot, reasons about
+            what it sees, and decides what to tap, type, or swipe &mdash; step by step until the
+            goal is complete.
+          </p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Agent Mode</span>
             </div>
+            <pre><span class="k">appclaw</span> <span class="s">"Search for 'Appium 3.0' on YouTube and find the TestMu AI video"</span></pre>
+          </div>
 
-            <h3><span class="badge badge-teal">YAML Flows</span></h3>
-            <p>
-              Define repeatable, version-controlled test flows in YAML. Each step is a natural
-              language instruction &mdash; no element selectors, no brittle locators.
-            </p>
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">YAML Flow</span>
-              </div>
-              <pre><span class="k">appclaw</span> <span class="fl">--flow</span> tests/youtube-search.yaml <span class="fl">--env</span> dev</pre>
+          <h3><span class="badge badge-teal">YAML Flows</span></h3>
+          <p>
+            Define repeatable, version-controlled test flows in YAML. Each step is a natural
+            language instruction &mdash; no element selectors, no brittle locators.
+          </p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">YAML Flow</span>
             </div>
+            <pre><span class="k">appclaw</span> <span class="fl">--flow</span> tests/youtube-search.yaml <span class="fl">--env</span> dev</pre>
+          </div>
 
-            <h3><span class="badge badge-purple">Playground</span></h3>
-            <p>
-              An interactive REPL where you type one instruction at a time and see it execute
-              immediately. Great for exploring an app and building flows interactively.
-            </p>
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Playground</span>
-              </div>
-              <pre><span class="k">appclaw</span> <span class="fl">--playground</span> <span class="fl">--platform</span> ios <span class="fl">--device-type</span> simulator</pre>
+          <h3><span class="badge badge-purple">Playground</span></h3>
+          <p>
+            An interactive REPL where you type one instruction at a time and see it execute
+            immediately. Great for exploring an app and building flows interactively.
+          </p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Playground</span>
             </div>
-          </section>
+            <pre><span class="k">appclaw</span> <span class="fl">--playground</span> <span class="fl">--platform</span> ios <span class="fl">--device-type</span> simulator</pre>
+          </div>
+        </section>
 
-          <!-- ============================================ -->
-          <!-- YAML FLOWS                                   -->
-          <!-- ============================================ -->
-          <section id="yaml-overview" class="reveal">
-            <h2>Designing YAML Flows</h2>
+        <!-- ============================================ -->
+        <!-- YAML FLOWS                                   -->
+        <!-- ============================================ -->
+        <section id="yaml-overview" class="reveal">
+          <h2>Designing YAML Flows</h2>
+          <p>
+            YAML flows are the heart of AppClaw's repeatable automation. Write your test steps in
+            plain English &mdash; AppClaw figures out how to execute them on the device. No XPath,
+            no accessibility IDs, no brittle selectors.
+          </p>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Key Idea</div>
             <p>
-              YAML flows are the heart of AppClaw's repeatable automation. Write your test steps in
-              plain English &mdash; AppClaw figures out how to execute them on the device. No XPath,
-              no accessibility IDs, no brittle selectors.
+              Each step is a natural language instruction like <code>tap Login</code> or
+              <code>wait for the home screen to be visible</code>. AppClaw uses AI to find the right
+              elements on screen.
             </p>
+          </div>
+        </section>
 
-            <div class="callout callout-tip">
-              <div class="callout-title">Key Idea</div>
-              <p>
-                Each step is a natural language instruction like <code>tap Login</code> or
-                <code>wait for the home screen to be visible</code>. AppClaw uses AI to find the
-                right elements on screen.
-              </p>
+        <section id="flat-format" class="reveal">
+          <h2>Flat Format</h2>
+          <p>
+            The simplest YAML structure &mdash; a metadata header separated by
+            <code>---</code> from a flat list of steps.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">settings-wifi.yaml</span>
             </div>
-          </section>
-
-          <section id="flat-format" class="reveal">
-            <h2>Flat Format</h2>
-            <p>
-              The simplest YAML structure &mdash; a metadata header separated by
-              <code>---</code> from a flat list of steps.
-            </p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">settings-wifi.yaml</span>
-              </div>
-              <pre><span class="k">name</span><span class="p">:</span> <span class="s">Turn on Wi-Fi</span>
+            <pre><span class="k">name</span><span class="p">:</span> <span class="s">Turn on Wi-Fi</span>
 <span class="k">platform</span><span class="p">:</span> <span class="s">android</span>
 <span class="p">---</span>
 <span class="p">-</span> open Settings app
@@ -1003,61 +1344,61 @@
 <span class="p">-</span> tap Wi-Fi
 <span class="p">-</span> verify Wi-Fi is visible
 <span class="p">-</span> done</pre>
+          </div>
+
+          <h3>Metadata Fields</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>name</td>
+                <td>Display name for the flow</td>
+              </tr>
+              <tr>
+                <td>description</td>
+                <td>Optional description of what the flow does</td>
+              </tr>
+              <tr>
+                <td>platform</td>
+                <td>
+                  <code>android</code> or <code>ios</code> &mdash; fallback if no
+                  <code>--platform</code> CLI flag
+                </td>
+              </tr>
+              <tr>
+                <td>appId</td>
+                <td>App bundle/package ID for <code>launchApp</code> steps</td>
+              </tr>
+              <tr>
+                <td>env</td>
+                <td>
+                  Environment name &mdash; resolves variables from
+                  <code>.appclaw/env/&lt;name&gt;.yaml</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="phased-format" class="reveal">
+          <h2>Phased Format</h2>
+          <p>
+            For structured tests, organize your steps into three phases: <strong>setup</strong>,
+            <strong>steps</strong>, and <strong>assertions</strong>. This gives clearer reporting
+            and separates initialization from the actual test logic.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">youtube-search.yaml</span>
             </div>
-
-            <h3>Metadata Fields</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>name</td>
-                  <td>Display name for the flow</td>
-                </tr>
-                <tr>
-                  <td>description</td>
-                  <td>Optional description of what the flow does</td>
-                </tr>
-                <tr>
-                  <td>platform</td>
-                  <td>
-                    <code>android</code> or <code>ios</code> &mdash; fallback if no
-                    <code>--platform</code> CLI flag
-                  </td>
-                </tr>
-                <tr>
-                  <td>appId</td>
-                  <td>App bundle/package ID for <code>launchApp</code> steps</td>
-                </tr>
-                <tr>
-                  <td>env</td>
-                  <td>
-                    Environment name &mdash; resolves variables from
-                    <code>.appclaw/env/&lt;name&gt;.yaml</code>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
-
-          <section id="phased-format" class="reveal">
-            <h2>Phased Format</h2>
-            <p>
-              For structured tests, organize your steps into three phases: <strong>setup</strong>,
-              <strong>steps</strong>, and <strong>assertions</strong>. This gives clearer reporting
-              and separates initialization from the actual test logic.
-            </p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">youtube-search.yaml</span>
-              </div>
-              <pre><span class="k">name</span><span class="p">:</span> <span class="s">YouTube Search</span>
+            <pre><span class="k">name</span><span class="p">:</span> <span class="s">YouTube Search</span>
 <span class="k">description</span><span class="p">:</span> <span class="s">Searches YouTube and verifies video results</span>
 <span class="k">platform</span><span class="p">:</span> <span class="s">android</span>
 <span class="k">env</span><span class="p">:</span> <span class="s">dev</span>
@@ -1076,81 +1417,81 @@
 
 <span class="k">assertions</span><span class="p">:</span>
   <span class="p">-</span> verify <span class="v">${variables.expected_channel}</span> is visible</pre>
+          </div>
+
+          <h3>Phases Explained</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>setup</td>
+                <td>
+                  Initialization &mdash; launch the app, navigate to starting screen, dismiss
+                  popups. Failures here skip the test.
+                </td>
+              </tr>
+              <tr>
+                <td>steps</td>
+                <td>The main test actions &mdash; the interactions you're actually testing.</td>
+              </tr>
+              <tr>
+                <td>assertions</td>
+                <td>
+                  Verification checks &mdash; confirm the expected outcome. You can also mix in
+                  actions here if needed.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="variables" class="reveal">
+          <h2>Variables &amp; Secrets</h2>
+          <p>Keep your flows flexible and secure with variable interpolation.</p>
+
+          <h3>Variables <code>${variables.X}</code></h3>
+          <p>Loaded from environment files. Values appear in logs.</p>
+
+          <h3>Secrets <code>${secrets.X}</code></h3>
+          <p>
+            Resolved from shell environment variables at runtime. Always shown as
+            <code>***</code> in logs.
+          </p>
+
+          <h3>Environment File</h3>
+          <p>Create <code>.appclaw/env/&lt;name&gt;.yaml</code> in your project root:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">.appclaw/env/dev.yaml</span>
             </div>
-
-            <h3>Phases Explained</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Phase</th>
-                  <th>Purpose</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>setup</td>
-                  <td>
-                    Initialization &mdash; launch the app, navigate to starting screen, dismiss
-                    popups. Failures here skip the test.
-                  </td>
-                </tr>
-                <tr>
-                  <td>steps</td>
-                  <td>The main test actions &mdash; the interactions you're actually testing.</td>
-                </tr>
-                <tr>
-                  <td>assertions</td>
-                  <td>
-                    Verification checks &mdash; confirm the expected outcome. You can also mix in
-                    actions here if needed.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
-
-          <section id="variables" class="reveal">
-            <h2>Variables &amp; Secrets</h2>
-            <p>Keep your flows flexible and secure with variable interpolation.</p>
-
-            <h3>Variables <code>${variables.X}</code></h3>
-            <p>Loaded from environment files. Values appear in logs.</p>
-
-            <h3>Secrets <code>${secrets.X}</code></h3>
-            <p>
-              Resolved from shell environment variables at runtime. Always shown as
-              <code>***</code> in logs.
-            </p>
-
-            <h3>Environment File</h3>
-            <p>Create <code>.appclaw/env/&lt;name&gt;.yaml</code> in your project root:</p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">.appclaw/env/dev.yaml</span>
-              </div>
-              <pre><span class="k">variables</span><span class="p">:</span>
+            <pre><span class="k">variables</span><span class="p">:</span>
   <span class="k">app_name</span><span class="p">:</span> <span class="s">youtube</span>
   <span class="k">expected_channel</span><span class="p">:</span> <span class="s">TestMu AI</span>
   <span class="k">timeout</span><span class="p">:</span> <span class="n">30</span>
   <span class="k">locale</span><span class="p">:</span> <span class="s">en-US</span></pre>
+          </div>
+
+          <p>
+            Then reference it in your YAML header with <code>env: dev</code>, or pass
+            <code>--env dev</code> on the CLI.
+          </p>
+
+          <h3>Inline Variables</h3>
+          <p>For self-contained flows, embed variables directly in the YAML header:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Inline env block</span>
             </div>
-
-            <p>
-              Then reference it in your YAML header with <code>env: dev</code>, or pass
-              <code>--env dev</code> on the CLI.
-            </p>
-
-            <h3>Inline Variables</h3>
-            <p>For self-contained flows, embed variables directly in the YAML header:</p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Inline env block</span>
-              </div>
-              <pre><span class="k">name</span><span class="p">:</span> <span class="s">Self-contained flow</span>
+            <pre><span class="k">name</span><span class="p">:</span> <span class="s">Self-contained flow</span>
 <span class="k">env</span><span class="p">:</span>
   <span class="k">variables</span><span class="p">:</span>
     <span class="k">app_name</span><span class="p">:</span> <span class="s">youtube</span>
@@ -1158,34 +1499,34 @@
 <span class="p">---</span>
 <span class="p">-</span> open <span class="v">${variables.app_name}</span> app
 <span class="p">-</span> type <span class="v">${variables.search_term}</span></pre>
-            </div>
+          </div>
 
-            <div class="callout callout-warn">
-              <div class="callout-title">Resolution Order</div>
-              <p>
-                <code>--env</code> CLI flag wins over the YAML <code>env:</code> field, which wins
-                over inline <code>env:</code> blocks. Secrets always come from shell environment
-                variables.
-              </p>
-            </div>
-          </section>
-
-          <!-- ============================================ -->
-          <!-- COMMANDS                                     -->
-          <!-- ============================================ -->
-          <section id="tap-click" class="reveal">
-            <h2>Tap / Click</h2>
+          <div class="callout callout-warn">
+            <div class="callout-title">Resolution Order</div>
             <p>
-              Tap on an element by describing its label. AppClaw matches it against visible text and
-              elements on screen.
+              <code>--env</code> CLI flag wins over the YAML <code>env:</code> field, which wins
+              over inline <code>env:</code> blocks. Secrets always come from shell environment
+              variables.
             </p>
+          </div>
+        </section>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Natural language</span>
-              </div>
-              <pre><span class="p">-</span> tap Login
+        <!-- ============================================ -->
+        <!-- COMMANDS                                     -->
+        <!-- ============================================ -->
+        <section id="tap-click" class="reveal">
+          <h2>Tap / Click</h2>
+          <p>
+            Tap on an element by describing its label. AppClaw matches it against visible text and
+            elements on screen.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Natural language</span>
+            </div>
+            <pre><span class="p">-</span> tap Login
 <span class="p">-</span> click on the search icon
 <span class="p">-</span> press Submit
 <span class="p">-</span> select the first item
@@ -1196,32 +1537,32 @@
 <span class="p">-</span> enable Notifications
 <span class="p">-</span> close the popup
 <span class="p">-</span> dismiss the dialog</pre>
+          </div>
+
+          <p>
+            All of these are equivalent &mdash; they find the element and tap it. Use whichever
+            reads most naturally.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Structured YAML</span>
             </div>
+            <pre><span class="p">-</span> <span class="k">tap</span><span class="p">:</span> <span class="s">"Login Button"</span></pre>
+          </div>
+        </section>
 
-            <p>
-              All of these are equivalent &mdash; they find the element and tap it. Use whichever
-              reads most naturally.
-            </p>
+        <section id="type-text" class="reveal">
+          <h2>Type Text</h2>
+          <p>Type text into the currently focused field, or specify a target field.</p>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Structured YAML</span>
-              </div>
-              <pre><span class="p">-</span> <span class="k">tap</span><span class="p">:</span> <span class="s">"Login Button"</span></pre>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Natural language</span>
             </div>
-          </section>
-
-          <section id="type-text" class="reveal">
-            <h2>Type Text</h2>
-            <p>Type text into the currently focused field, or specify a target field.</p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Natural language</span>
-              </div>
-              <pre><span class="c"># Type into focused field</span>
+            <pre><span class="c"># Type into focused field</span>
 <span class="p">-</span> type <span class="s">"hello world"</span>
 <span class="p">-</span> enter text <span class="s">"user@example.com"</span>
 
@@ -1232,89 +1573,89 @@
 <span class="c"># Search (types the text)</span>
 <span class="p">-</span> search for <span class="s">"Appium 3.0"</span>
 <span class="p">-</span> look for <span class="s">"restaurants nearby"</span></pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Structured YAML</span>
             </div>
+            <pre><span class="p">-</span> <span class="k">type</span><span class="p">:</span> <span class="s">"hello world"</span></pre>
+          </div>
+        </section>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Structured YAML</span>
-              </div>
-              <pre><span class="p">-</span> <span class="k">type</span><span class="p">:</span> <span class="s">"hello world"</span></pre>
+        <section id="wait" class="reveal">
+          <h2>Wait / Pause</h2>
+          <p>Pause execution for a fixed duration.</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Natural language</span>
             </div>
-          </section>
-
-          <section id="wait" class="reveal">
-            <h2>Wait / Pause</h2>
-            <p>Pause execution for a fixed duration.</p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Natural language</span>
-              </div>
-              <pre><span class="p">-</span> wait 3s
+            <pre><span class="p">-</span> wait 3s
 <span class="p">-</span> wait 1.5 seconds
 <span class="p">-</span> sleep 500ms
 <span class="p">-</span> pause 2 sec
 <span class="p">-</span> wait               <span class="c"># defaults to 2 seconds</span>
 <span class="p">-</span> wait a moment      <span class="c"># defaults to 2 seconds</span></pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Structured YAML</span>
             </div>
+            <pre><span class="p">-</span> <span class="k">wait</span><span class="p">:</span> <span class="n">3</span>          <span class="c"># seconds</span></pre>
+          </div>
+        </section>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Structured YAML</span>
-              </div>
-              <pre><span class="p">-</span> <span class="k">wait</span><span class="p">:</span> <span class="n">3</span>          <span class="c"># seconds</span></pre>
+        <section id="wait-until" class="reveal">
+          <h2>Wait Until</h2>
+          <p>
+            Wait dynamically until a condition is met. Polls the screen every 500ms up to a timeout
+            (default 10s). Uses AI vision to understand the screen &mdash; you can describe what you
+            expect to see in plain English.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Wait for something to appear</span>
             </div>
-          </section>
-
-          <section id="wait-until" class="reveal">
-            <h2>Wait Until</h2>
-            <p>
-              Wait dynamically until a condition is met. Polls the screen every 500ms up to a
-              timeout (default 10s). Uses AI vision to understand the screen &mdash; you can
-              describe what you expect to see in plain English.
-            </p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Wait for something to appear</span>
-              </div>
-              <pre><span class="p">-</span> wait until search icon is visible
+            <pre><span class="p">-</span> wait until search icon is visible
 <span class="p">-</span> wait for the search results to be visible
 <span class="p">-</span> wait for the home screen to be loaded
 <span class="p">-</span> wait until <span class="s">"Welcome back"</span> appears
 <span class="p">-</span> wait 15s until login button is visible  <span class="c"># custom timeout</span></pre>
-            </div>
+          </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Wait for something to disappear</span>
-              </div>
-              <pre><span class="p">-</span> wait until loading spinner is gone
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Wait for something to disappear</span>
+            </div>
+            <pre><span class="p">-</span> wait until loading spinner is gone
 <span class="p">-</span> wait for the popup to be hidden
 <span class="p">-</span> wait until progress bar disappeared</pre>
-            </div>
+          </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Wait for screen to stabilize</span>
-              </div>
-              <pre><span class="p">-</span> wait until screen is loaded
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Wait for screen to stabilize</span>
+            </div>
+            <pre><span class="p">-</span> wait until screen is loaded
 <span class="p">-</span> wait until screen is stable
 <span class="p">-</span> wait 5s until screen is ready</pre>
-            </div>
+          </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Structured YAML</span>
-              </div>
-              <pre><span class="c"># With custom timeout</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Structured YAML</span>
+            </div>
+            <pre><span class="c"># With custom timeout</span>
 <span class="p">-</span> <span class="k">waitUntil</span><span class="p">:</span> <span class="s">"Login button"</span>
   <span class="k">timeout</span><span class="p">:</span> <span class="n">15</span>
 
@@ -1324,145 +1665,145 @@
 
 <span class="c"># Screen loaded (DOM stability check)</span>
 <span class="p">-</span> <span class="k">waitUntil</span><span class="p">:</span> <span class="s">"screen loaded"</span></pre>
-            </div>
+          </div>
 
-            <div class="callout callout-tip">
-              <div class="callout-title">Smart Vision</div>
-              <p>
-                When you write something descriptive like
-                <code>wait for the search results to be visible</code>, AppClaw uses AI vision to
-                understand the screen holistically &mdash; it checks whether results are actually
-                shown, not just whether the literal words "search results" appear. You can describe
-                what you expect to see naturally.
-              </p>
-            </div>
-          </section>
-
-          <section id="scroll-swipe" class="reveal">
-            <h2>Scroll / Swipe</h2>
+          <div class="callout callout-tip">
+            <div class="callout-title">Smart Vision</div>
             <p>
-              Scroll or swipe in any direction, optionally repeating multiple times or scrolling
-              until an element is found.
+              When you write something descriptive like
+              <code>wait for the search results to be visible</code>, AppClaw uses AI vision to
+              understand the screen holistically &mdash; it checks whether results are actually
+              shown, not just whether the literal words "search results" appear. You can describe
+              what you expect to see naturally.
             </p>
+          </div>
+        </section>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Basic scroll / swipe</span>
-              </div>
-              <pre><span class="p">-</span> scroll down
+        <section id="scroll-swipe" class="reveal">
+          <h2>Scroll / Swipe</h2>
+          <p>
+            Scroll or swipe in any direction, optionally repeating multiple times or scrolling until
+            an element is found.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Basic scroll / swipe</span>
+            </div>
+            <pre><span class="p">-</span> scroll down
 <span class="p">-</span> scroll up 3 times
 <span class="p">-</span> swipe left
 <span class="p">-</span> swipe right 2 times</pre>
-            </div>
+          </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Scroll until found</span>
-              </div>
-              <pre><span class="c"># Scroll until an element appears</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Scroll until found</span>
+            </div>
+            <pre><span class="c"># Scroll until an element appears</span>
 <span class="p">-</span> scroll down until <span class="s">"Terms &amp; Conditions"</span> is visible
 <span class="p">-</span> scroll down 5 times to find <span class="s">"Accept"</span>
 <span class="p">-</span> scroll down to see <span class="s">"Load More"</span></pre>
-            </div>
+          </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Structured YAML</span>
-              </div>
-              <pre><span class="p">-</span> <span class="k">scrollAssert</span><span class="p">:</span> <span class="s">"Terms &amp; Conditions"</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Structured YAML</span>
+            </div>
+            <pre><span class="p">-</span> <span class="k">scrollAssert</span><span class="p">:</span> <span class="s">"Terms &amp; Conditions"</span>
   <span class="k">direction</span><span class="p">:</span> <span class="s">down</span>
   <span class="k">maxScrolls</span><span class="p">:</span> <span class="n">5</span></pre>
+          </div>
+        </section>
+
+        <section id="drag" class="reveal">
+          <h2>Drag / Slider</h2>
+          <p>
+            Drag one element to another — sliders, carousels, reorderable lists, and any
+            drag-and-drop interaction. Requires vision mode (<code>AGENT_MODE=vision</code>).
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Natural language</span>
             </div>
-          </section>
-
-          <section id="drag" class="reveal">
-            <h2>Drag / Slider</h2>
-            <p>
-              Drag one element to another — sliders, carousels, reorderable lists, and any
-              drag-and-drop interaction. Requires vision mode (<code>AGENT_MODE=vision</code>).
-            </p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Natural language</span>
-              </div>
-              <pre><span class="p">-</span> drag the green circle slider to the +100 mark
+            <pre><span class="p">-</span> drag the green circle slider to the +100 mark
 <span class="p">-</span> slide the price handle to +80
 <span class="p">-</span> move the volume knob to maximum</pre>
-            </div>
+          </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Structured YAML — shorthand</span>
-              </div>
-              <pre><span class="c"># "drag: from to to"</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Structured YAML — shorthand</span>
+            </div>
+            <pre><span class="c"># "drag: from to to"</span>
 <span class="p">-</span> <span class="k">drag</span><span class="p">:</span> <span class="s">"green circle slider to +100 mark"</span></pre>
-            </div>
+          </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Structured YAML — explicit from/to</span>
-              </div>
-              <pre><span class="p">-</span> <span class="k">drag</span><span class="p">:</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Structured YAML — explicit from/to</span>
+            </div>
+            <pre><span class="p">-</span> <span class="k">drag</span><span class="p">:</span>
     <span class="k">from</span><span class="p">:</span> <span class="s">green circle slider</span>
     <span class="k">to</span><span class="p">:</span>   <span class="s">+100 mark</span></pre>
-            </div>
+          </div>
 
-            <div class="callout callout-tip">
-              <div class="callout-title">Vision required</div>
-              <p>
-                Drag uses AI vision to locate both the source and target by visual description. Set
-                <code>AGENT_MODE=vision</code> and <code>VISION_LOCATE_PROVIDER=stark</code> with a
-                valid <code>LLM_API_KEY</code>.
-              </p>
-            </div>
-          </section>
-
-          <section id="assert" class="reveal">
-            <h2>Assert / Verify</h2>
+          <div class="callout callout-tip">
+            <div class="callout-title">Vision required</div>
             <p>
-              Verify that something is visible on screen. Works with both literal text and
-              visual/semantic descriptions via AI vision.
+              Drag uses AI vision to locate both the source and target by visual description. Set
+              <code>AGENT_MODE=vision</code> and <code>VISION_LOCATE_PROVIDER=stark</code> with a
+              valid <code>LLM_API_KEY</code>.
             </p>
+          </div>
+        </section>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Natural language</span>
-              </div>
-              <pre><span class="p">-</span> verify <span class="s">"Welcome back"</span> is visible
+        <section id="assert" class="reveal">
+          <h2>Assert / Verify</h2>
+          <p>
+            Verify that something is visible on screen. Works with both literal text and
+            visual/semantic descriptions via AI vision.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Natural language</span>
+            </div>
+            <pre><span class="p">-</span> verify <span class="s">"Welcome back"</span> is visible
 <span class="p">-</span> assert Dashboard is visible
 <span class="p">-</span> check that the login button is on the screen
 <span class="p">-</span> verify TestMu AI is visible</pre>
-            </div>
+          </div>
 
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Structured YAML</span>
-              </div>
-              <pre><span class="p">-</span> <span class="k">assert</span><span class="p">:</span> <span class="s">"Welcome back"</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Structured YAML</span>
+            </div>
+            <pre><span class="p">-</span> <span class="k">assert</span><span class="p">:</span> <span class="s">"Welcome back"</span>
 <span class="p">-</span> <span class="k">verify</span><span class="p">:</span> <span class="s">"Dashboard"</span>    <span class="c"># alias for assert</span>
 <span class="p">-</span> <span class="k">check</span><span class="p">:</span>  <span class="s">"Login button"</span>  <span class="c"># alias for assert</span></pre>
+          </div>
+        </section>
+
+        <section id="navigation" class="reveal">
+          <h2>Navigation &amp; Control</h2>
+          <p>App launch, back, home, enter, and flow completion.</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Natural language</span>
             </div>
-          </section>
-
-          <section id="navigation" class="reveal">
-            <h2>Navigation &amp; Control</h2>
-            <p>App launch, back, home, enter, and flow completion.</p>
-
-            <div class="code-block">
-              <div class="code-block-header">
-                <div class="code-block-dots"><span></span><span></span><span></span></div>
-                <span class="code-block-label">Natural language</span>
-              </div>
-              <pre><span class="c"># Launch / open</span>
+            <pre><span class="c"># Launch / open</span>
 <span class="p">-</span> open YouTube app
 <span class="p">-</span> launch Settings
 <span class="p">-</span> start Chrome
@@ -1481,311 +1822,1065 @@
 <span class="c"># Flow completion</span>
 <span class="p">-</span> done
 <span class="p">-</span> done: <span class="s">"Login was successful"</span></pre>
+          </div>
+        </section>
+
+        <section id="all-commands" class="reveal">
+          <h2>Full Command Reference</h2>
+          <p>Every supported step kind at a glance.</p>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Kind</th>
+                <th>Parameters</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>openApp</td>
+                <td>query</td>
+                <td>Open an app by name</td>
+              </tr>
+              <tr>
+                <td>launchApp</td>
+                <td>&mdash;</td>
+                <td>Launch app defined in <code>appId</code> metadata</td>
+              </tr>
+              <tr>
+                <td>tap</td>
+                <td>label</td>
+                <td>Tap element by visible text/label</td>
+              </tr>
+              <tr>
+                <td>type</td>
+                <td>text, target?</td>
+                <td>Type text, optionally into a named field</td>
+              </tr>
+              <tr>
+                <td>enter</td>
+                <td>&mdash;</td>
+                <td>Press Enter / Return key</td>
+              </tr>
+              <tr>
+                <td>back</td>
+                <td>&mdash;</td>
+                <td>Press the Back button</td>
+              </tr>
+              <tr>
+                <td>home</td>
+                <td>&mdash;</td>
+                <td>Press the Home button</td>
+              </tr>
+              <tr>
+                <td>wait</td>
+                <td>seconds</td>
+                <td>Pause for a fixed duration</td>
+              </tr>
+              <tr>
+                <td>waitUntil</td>
+                <td>condition, text?, timeout</td>
+                <td>Poll until visible/gone/screenLoaded</td>
+              </tr>
+              <tr>
+                <td>swipe</td>
+                <td>direction, repeat?</td>
+                <td>Swipe up/down/left/right</td>
+              </tr>
+              <tr>
+                <td>drag</td>
+                <td>from, to</td>
+                <td>Drag from one element to another (vision mode)</td>
+              </tr>
+              <tr>
+                <td>assert</td>
+                <td>text</td>
+                <td>Verify text or description is visible</td>
+              </tr>
+              <tr>
+                <td>scrollAssert</td>
+                <td>text, direction, maxScrolls</td>
+                <td>Scroll until text found</td>
+              </tr>
+              <tr>
+                <td>getInfo</td>
+                <td>query</td>
+                <td>Ask the AI a question about the screen</td>
+              </tr>
+              <tr>
+                <td>done</td>
+                <td>message?</td>
+                <td>Signal flow completion</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- CONFIGURATION                                -->
+        <!-- ============================================ -->
+        <section id="vision-modes" class="reveal">
+          <h2>Vision Modes</h2>
+          <p>Control how AppClaw locates elements on screen.</p>
+
+          <h3>Agent Mode <code>AGENT_MODE</code></h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Value</th>
+                <th>Behavior</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>dom</td>
+                <td>Default. Uses the app's DOM/accessibility tree to find elements.</td>
+              </tr>
+              <tr>
+                <td>vision</td>
+                <td>
+                  Uses AI vision (screenshots + LLM) as the primary strategy for all interactions.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Vision Mode <code>VISION_MODE</code></h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Value</th>
+                <th>Behavior</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>fallback</td>
+                <td>Default. Try DOM first, fall back to vision if no match found.</td>
+              </tr>
+              <tr>
+                <td>always</td>
+                <td>Skip DOM entirely, use vision for every interaction.</td>
+              </tr>
+              <tr>
+                <td>never</td>
+                <td>DOM only. No vision fallback.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="env-vars" class="reveal">
+          <h2>Environment Variables</h2>
+          <p>
+            All environment variables recognized by AppClaw. These are especially useful for CI/CD
+            pipelines.
+          </p>
+
+          <h3>LLM Configuration</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>LLM_PROVIDER</td>
+                <td>
+                  LLM provider: <code>anthropic</code>, <code>openai</code>, <code>gemini</code>,
+                  <code>groq</code>, <code>ollama</code>
+                </td>
+              </tr>
+              <tr>
+                <td>LLM_API_KEY</td>
+                <td>API key for the chosen provider</td>
+              </tr>
+              <tr>
+                <td>LLM_MODEL</td>
+                <td>Specific model name to use</td>
+              </tr>
+              <tr>
+                <td>LLM_THINKING</td>
+                <td>Extended thinking: <code>on</code> or <code>off</code> (default: on)</td>
+              </tr>
+              <tr>
+                <td>LLM_THINKING_BUDGET</td>
+                <td>Max thinking tokens: 1&ndash;10000 (default: 128)</td>
+              </tr>
+              <tr>
+                <td>LLM_SCREENSHOT_MAX_EDGE_PX</td>
+                <td>Downscale screenshots to this max edge (0 = disabled)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Device &amp; Platform</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>PLATFORM</td>
+                <td>Same as <code>--platform</code> flag</td>
+              </tr>
+              <tr>
+                <td>DEVICE_TYPE</td>
+                <td>Same as <code>--device-type</code> flag</td>
+              </tr>
+              <tr>
+                <td>DEVICE_UDID</td>
+                <td>Same as <code>--udid</code> flag</td>
+              </tr>
+              <tr>
+                <td>DEVICE_NAME</td>
+                <td>Same as <code>--device</code> flag</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Vision</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>VISION_MODE</td>
+                <td><code>always</code>, <code>fallback</code>, or <code>never</code></td>
+              </tr>
+              <tr>
+                <td>AGENT_MODE</td>
+                <td><code>dom</code> or <code>vision</code></td>
+              </tr>
+              <tr>
+                <td>GEMINI_API_KEY</td>
+                <td>
+                  Gemini API key for Stark vision — only needed when <code>LLM_PROVIDER</code> is
+                  not <code>gemini</code> and <code>AGENT_MODE=vision</code>. If provider is already
+                  Gemini, <code>LLM_API_KEY</code> is reused automatically.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Execution Tuning</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>MAX_STEPS</td>
+                <td>Max steps per goal (default: 30)</td>
+              </tr>
+              <tr>
+                <td>STEP_DELAY</td>
+                <td>Delay between steps in ms (default: 500)</td>
+              </tr>
+              <tr>
+                <td>MAX_ELEMENTS</td>
+                <td>Max DOM elements to parse (default: 40)</td>
+              </tr>
+              <tr>
+                <td>MAX_HISTORY_STEPS</td>
+                <td>Max action history retained (default: 10)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>MCP Connection</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>MCP_TRANSPORT</td>
+                <td><code>stdio</code> or <code>sse</code> (default: stdio)</td>
+              </tr>
+              <tr>
+                <td>MCP_HOST</td>
+                <td>MCP server host (default: localhost)</td>
+              </tr>
+              <tr>
+                <td>MCP_PORT</td>
+                <td>MCP server port (default: 8080)</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+        <!-- ============================================ -->
+        <!-- LAMBDATEST                                   -->
+        <!-- ============================================ -->
+
+        <section id="lambdatest" class="reveal">
+          <h2>LambdaTest Cloud</h2>
+          <p>
+            Run AppClaw tests on real iOS and Android devices in the cloud — no local device or
+            emulator required. AppClaw integrates with
+            <a href="https://www.lambdatest.com/" target="_blank">LambdaTest</a>'s real device cloud
+            via its Appium-compatible hub.
+          </p>
+
+          <h3>Setup</h3>
+          <p>Add your LambdaTest credentials and target device to <code>.env</code>:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">.env</span>
             </div>
-          </section>
+            <pre><span class="c"># Enable LambdaTest cloud</span>
+CLOUD_PROVIDER=lambdatest
 
-          <section id="all-commands" class="reveal">
-            <h2>Full Command Reference</h2>
-            <p>Every supported step kind at a glance.</p>
+<span class="c"># LambdaTest credentials (from app.lambdatest.com → Profile → Access Key)</span>
+LAMBDATEST_USERNAME=your_username
+LAMBDATEST_ACCESS_KEY=your_access_key
 
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Kind</th>
-                  <th>Parameters</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>openApp</td>
-                  <td>query</td>
-                  <td>Open an app by name</td>
-                </tr>
-                <tr>
-                  <td>launchApp</td>
-                  <td>&mdash;</td>
-                  <td>Launch app defined in <code>appId</code> metadata</td>
-                </tr>
-                <tr>
-                  <td>tap</td>
-                  <td>label</td>
-                  <td>Tap element by visible text/label</td>
-                </tr>
-                <tr>
-                  <td>type</td>
-                  <td>text, target?</td>
-                  <td>Type text, optionally into a named field</td>
-                </tr>
-                <tr>
-                  <td>enter</td>
-                  <td>&mdash;</td>
-                  <td>Press Enter / Return key</td>
-                </tr>
-                <tr>
-                  <td>back</td>
-                  <td>&mdash;</td>
-                  <td>Press the Back button</td>
-                </tr>
-                <tr>
-                  <td>home</td>
-                  <td>&mdash;</td>
-                  <td>Press the Home button</td>
-                </tr>
-                <tr>
-                  <td>wait</td>
-                  <td>seconds</td>
-                  <td>Pause for a fixed duration</td>
-                </tr>
-                <tr>
-                  <td>waitUntil</td>
-                  <td>condition, text?, timeout</td>
-                  <td>Poll until visible/gone/screenLoaded</td>
-                </tr>
-                <tr>
-                  <td>swipe</td>
-                  <td>direction, repeat?</td>
-                  <td>Swipe up/down/left/right</td>
-                </tr>
-                <tr>
-                  <td>drag</td>
-                  <td>from, to</td>
-                  <td>Drag from one element to another (vision mode)</td>
-                </tr>
-                <tr>
-                  <td>assert</td>
-                  <td>text</td>
-                  <td>Verify text or description is visible</td>
-                </tr>
-                <tr>
-                  <td>scrollAssert</td>
-                  <td>text, direction, maxScrolls</td>
-                  <td>Scroll until text found</td>
-                </tr>
-                <tr>
-                  <td>getInfo</td>
-                  <td>query</td>
-                  <td>Ask the AI a question about the screen</td>
-                </tr>
-                <tr>
-                  <td>done</td>
-                  <td>message?</td>
-                  <td>Signal flow completion</td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
+<span class="c"># Target device</span>
+LAMBDATEST_DEVICE_NAME=iPhone 14
+LAMBDATEST_OS_VERSION=16
+PLATFORM=ios
 
-          <!-- ============================================ -->
-          <!-- CONFIGURATION                                -->
-          <!-- ============================================ -->
-          <section id="vision-modes" class="reveal">
-            <h2>Vision Modes</h2>
-            <p>Control how AppClaw locates elements on screen.</p>
+<span class="c"># Your app (upload via LambdaTest portal, copy the lt:// ID)</span>
+LAMBDATEST_APP=lt://APP10xxxxxxxxxxxxxxxx
 
-            <h3>Agent Mode <code>AGENT_MODE</code></h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Value</th>
-                  <th>Behavior</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>dom</td>
-                  <td>Default. Uses the app's DOM/accessibility tree to find elements.</td>
-                </tr>
-                <tr>
-                  <td>vision</td>
-                  <td>
-                    Uses AI vision (screenshots + LLM) as the primary strategy for all interactions.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+<span class="c"># LLM for AI-powered automation</span>
+LLM_PROVIDER=gemini
+LLM_API_KEY=your_gemini_api_key</pre>
+          </div>
 
-            <h3>Vision Mode <code>VISION_MODE</code></h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Value</th>
-                  <th>Behavior</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>fallback</td>
-                  <td>Default. Try DOM first, fall back to vision if no match found.</td>
-                </tr>
-                <tr>
-                  <td>always</td>
-                  <td>Skip DOM entirely, use vision for every interaction.</td>
-                </tr>
-                <tr>
-                  <td>never</td>
-                  <td>DOM only. No vision fallback.</td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
+          <h3>CLI Usage</h3>
+          <p>Once <code>.env</code> is configured, run AppClaw exactly as you would locally:</p>
 
-          <section id="env-vars" class="reveal">
-            <h2>Environment Variables</h2>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="c"># Run a natural-language goal on a cloud device</span>
+appclaw "Open the app and navigate to the checkout screen"
+
+<span class="c"># Run a YAML flow on a cloud device</span>
+appclaw --flow flows/checkout.yaml</pre>
+          </div>
+
+          <h3>SDK Usage</h3>
+          <p>
+            No SDK changes needed — when <code>CLOUD_PROVIDER=lambdatest</code> is set in
+            <code>.env</code>, the SDK automatically routes the session through LambdaTest:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">import</span> <span class="p">{</span> AppClaw <span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span>
+
+<span class="c">// CLOUD_PROVIDER=lambdatest is read from .env automatically</span>
+<span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  provider<span class="p">:</span>    <span class="s">'gemini'</span><span class="p">,</span>
+  apiKey<span class="p">:</span>      process<span class="p">.</span>env<span class="p">.</span>LLM_API_KEY<span class="p">,</span>
+  reportName<span class="p">:</span>  <span class="s">'Checkout — LambdaTest'</span><span class="p">,</span>
+<span class="p">});</span>
+
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'open the app'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap Add to Cart'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap Checkout'</span><span class="p">);</span>
+
+<span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span>  <span class="c">// report saved to .appclaw/runs/</span></pre>
+          </div>
+
+          <h3>Environment Variables</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Required</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>CLOUD_PROVIDER</td>
+                <td>Yes</td>
+                <td>Set to <code>lambdatest</code> to enable cloud execution</td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_USERNAME</td>
+                <td>Yes</td>
+                <td>Your LambdaTest account username</td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_ACCESS_KEY</td>
+                <td>Yes</td>
+                <td>Your LambdaTest access key (from Profile → Access Key)</td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_DEVICE_NAME</td>
+                <td>Yes</td>
+                <td>Cloud device to use, e.g. <code>iPhone 14</code>, <code>Galaxy S23</code></td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_OS_VERSION</td>
+                <td>Yes</td>
+                <td>OS version, e.g. <code>16</code> (iOS) or <code>13</code> (Android)</td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_APP</td>
+                <td>No</td>
+                <td>App ID from the LambdaTest portal (format: <code>lt://APP…</code>)</td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_BUILD_NAME</td>
+                <td>No</td>
+                <td>Build label shown in the LambdaTest dashboard</td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_PROJECT_NAME</td>
+                <td>No</td>
+                <td>Project label shown in the LambdaTest dashboard</td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_VIDEO</td>
+                <td>No</td>
+                <td>Record session video. Default: <code>true</code></td>
+              </tr>
+              <tr>
+                <td>LAMBDATEST_NETWORK</td>
+                <td>No</td>
+                <td>Capture network logs. Default: <code>false</code></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">No code changes required</div>
             <p>
-              All environment variables recognized by AppClaw. These are especially useful for CI/CD
-              pipelines.
+              Switching between local and cloud execution is purely config — set
+              <code>CLOUD_PROVIDER=lambdatest</code> in your CI environment and remove it for local
+              runs. Your YAML flows and SDK tests stay identical.
             </p>
+          </div>
+        </section>
 
-            <h3>LLM Configuration</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Variable</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>LLM_PROVIDER</td>
-                  <td>
-                    LLM provider: <code>anthropic</code>, <code>openai</code>, <code>gemini</code>,
-                    <code>groq</code>, <code>ollama</code>
-                  </td>
-                </tr>
-                <tr>
-                  <td>LLM_API_KEY</td>
-                  <td>API key for the chosen provider</td>
-                </tr>
-                <tr>
-                  <td>LLM_MODEL</td>
-                  <td>Specific model name to use</td>
-                </tr>
-                <tr>
-                  <td>LLM_THINKING</td>
-                  <td>Extended thinking: <code>on</code> or <code>off</code> (default: on)</td>
-                </tr>
-                <tr>
-                  <td>LLM_THINKING_BUDGET</td>
-                  <td>Max thinking tokens: 1&ndash;10000 (default: 128)</td>
-                </tr>
-                <tr>
-                  <td>LLM_SCREENSHOT_MAX_EDGE_PX</td>
-                  <td>Downscale screenshots to this max edge (0 = disabled)</td>
-                </tr>
-              </tbody>
-            </table>
+        <!-- ============================================ -->
+        <!-- NODE.JS SDK                                  -->
+        <!-- ============================================ -->
 
-            <h3>Device &amp; Platform</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Variable</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>PLATFORM</td>
-                  <td>Same as <code>--platform</code> flag</td>
-                </tr>
-                <tr>
-                  <td>DEVICE_TYPE</td>
-                  <td>Same as <code>--device-type</code> flag</td>
-                </tr>
-                <tr>
-                  <td>DEVICE_UDID</td>
-                  <td>Same as <code>--udid</code> flag</td>
-                </tr>
-                <tr>
-                  <td>DEVICE_NAME</td>
-                  <td>Same as <code>--device</code> flag</td>
-                </tr>
-              </tbody>
-            </table>
+        <section id="sdk-overview" class="reveal">
+          <h2>Node.js / TypeScript SDK</h2>
+          <p>
+            AppClaw ships a first-class programmatic API so you can drive mobile automation directly
+            from Node.js or TypeScript — no CLI required. The SDK is the natural fit for QA
+            automation inside test runners (Vitest, Jest, Mocha), CI pipelines, and any script that
+            needs to control a device programmatically.
+          </p>
 
-            <h3>Vision</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Variable</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>VISION_MODE</td>
-                  <td><code>always</code>, <code>fallback</code>, or <code>never</code></td>
-                </tr>
-                <tr>
-                  <td>AGENT_MODE</td>
-                  <td><code>dom</code> or <code>vision</code></td>
-                </tr>
-                <tr>
-                  <td>GEMINI_API_KEY</td>
-                  <td>
-                    Gemini API key for Stark vision — only needed when <code>LLM_PROVIDER</code> is
-                    not <code>gemini</code> and <code>AGENT_MODE=vision</code>. If provider is
-                    already Gemini, <code>LLM_API_KEY</code> is reused automatically.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="callout callout-tip">
+            <div class="callout-title">When to use the SDK vs the CLI</div>
+            <p>
+              Use the <strong>CLI</strong> for one-off tasks and interactive exploration. Use the
+              <strong>SDK</strong> when you want to run flows inside a test suite, assert on
+              results, share a device connection across multiple flows, or integrate AppClaw into a
+              larger automation pipeline.
+            </p>
+          </div>
 
-            <h3>Execution Tuning</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Variable</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>MAX_STEPS</td>
-                  <td>Max steps per goal (default: 30)</td>
-                </tr>
-                <tr>
-                  <td>STEP_DELAY</td>
-                  <td>Delay between steps in ms (default: 500)</td>
-                </tr>
-                <tr>
-                  <td>MAX_ELEMENTS</td>
-                  <td>Max DOM elements to parse (default: 40)</td>
-                </tr>
-                <tr>
-                  <td>MAX_HISTORY_STEPS</td>
-                  <td>Max action history retained (default: 10)</td>
-                </tr>
-              </tbody>
-            </table>
+          <h3>Architecture</h3>
+          <p>
+            The SDK exposes a single <code>AppClaw</code> class that manages the full lifecycle:
+          </p>
+          <ul>
+            <li>
+              <strong>Lazy MCP connect</strong> — the Appium connection is opened on the first
+              <code>runFlow()</code> or <code>runGoal()</code> call, not on construction.
+            </li>
+            <li>
+              <strong>Connection reuse</strong> — subsequent calls share the same underlying
+              connection, so you pay the startup cost once per test suite.
+            </li>
+            <li>
+              <strong>Explicit teardown</strong> — call <code>teardown()</code> in your
+              <code>afterAll</code> hook to close the connection cleanly.
+            </li>
+            <li>
+              <strong>Silent by default</strong> — spinners and terminal colours are suppressed
+              automatically, keeping CI logs clean.
+            </li>
+          </ul>
+        </section>
 
-            <h3>MCP Connection</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Variable</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>MCP_TRANSPORT</td>
-                  <td><code>stdio</code> or <code>sse</code> (default: stdio)</td>
-                </tr>
-                <tr>
-                  <td>MCP_HOST</td>
-                  <td>MCP server host (default: localhost)</td>
-                </tr>
-                <tr>
-                  <td>MCP_PORT</td>
-                  <td>MCP server port (default: 8080)</td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
-        </main>
-      </div>
+        <section id="sdk-install" class="reveal">
+          <h2>Installation</h2>
+          <p>AppClaw is a single package — the SDK is built in, nothing extra to install.</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">npm</span> install appclaw</pre>
+          </div>
+
+          <p>
+            Create a <code>.env</code> file in your project root (or pass options directly to the
+            constructor — see <a href="#sdk-options">Options Reference</a>).
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">.env</span>
+            </div>
+            <pre><span class="k">LLM_PROVIDER</span>=anthropic
+<span class="k">LLM_API_KEY</span>=sk-ant-...
+<span class="k">PLATFORM</span>=android</pre>
+          </div>
+        </section>
+
+        <section id="sdk-run-flow" class="reveal">
+          <h2>runFlow()</h2>
+          <p>
+            Parse and execute a YAML flow file against a connected device. Returns a
+            <code>FlowResult</code> you can assert on.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">import</span> <span class="p">{</span> AppClaw <span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span>
+
+<span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  provider<span class="p">:</span> <span class="s">'anthropic'</span><span class="p">,</span>
+  apiKey<span class="p">:</span>   process<span class="p">.</span>env<span class="p">.</span>ANTHROPIC_API_KEY<span class="p">,</span>
+  platform<span class="p">:</span> <span class="s">'android'</span><span class="p">,</span>
+<span class="p">});</span>
+
+<span class="k">const</span> result <span class="p">=</span> <span class="k">await</span> app<span class="p">.</span>runFlow<span class="p">(</span><span class="s">'./flows/checkout.yaml'</span><span class="p">);</span>
+
+console<span class="p">.</span>log<span class="p">(</span>result<span class="p">.</span>success<span class="p">);</span>    <span class="c">// true</span>
+console<span class="p">.</span>log<span class="p">(</span>result<span class="p">.</span>stepsUsed<span class="p">);</span>  <span class="c">// 6</span>
+console<span class="p">.</span>log<span class="p">(</span>result<span class="p">.</span>stepsTotal<span class="p">);</span> <span class="c">// 6</span>
+
+<span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span></pre>
+          </div>
+
+          <h3>FlowResult shape</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>success</td>
+                <td>boolean</td>
+                <td>Whether all steps completed successfully</td>
+              </tr>
+              <tr>
+                <td>stepsUsed</td>
+                <td>number</td>
+                <td>Steps executed before completion or failure</td>
+              </tr>
+              <tr>
+                <td>stepsTotal</td>
+                <td>number</td>
+                <td>Total steps in the flow (including unexecuted)</td>
+              </tr>
+              <tr>
+                <td>failedStep</td>
+                <td>number?</td>
+                <td>1-based index of the step that failed</td>
+              </tr>
+              <tr>
+                <td>failedPhase</td>
+                <td>string?</td>
+                <td><code>setup</code> | <code>test</code> | <code>assertion</code></td>
+              </tr>
+              <tr>
+                <td>error</td>
+                <td>string?</td>
+                <td>Human-readable failure reason</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="sdk-run-goal" class="reveal">
+          <h2>runGoal()</h2>
+          <p>
+            Execute a plain-English goal using the agent loop — same as passing a goal string to the
+            CLI. Returns an <code>AgentResult</code>.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">import</span> <span class="p">{</span> AppClaw <span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span>
+
+<span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span> provider<span class="p">:</span> <span class="s">'anthropic'</span><span class="p">,</span> apiKey<span class="p">:</span> process<span class="p">.</span>env<span class="p">.</span>ANTHROPIC_API_KEY <span class="p">});</span>
+
+<span class="k">const</span> result <span class="p">=</span> <span class="k">await</span> app<span class="p">.</span>runGoal<span class="p">(</span>
+  <span class="s">'Log in with email qa@company.com and password Test1234'</span>
+<span class="p">);</span>
+
+console<span class="p">.</span>log<span class="p">(</span>result<span class="p">.</span>success<span class="p">);</span>   <span class="c">// true</span>
+console<span class="p">.</span>log<span class="p">(</span>result<span class="p">.</span>stepsUsed<span class="p">);</span> <span class="c">// 4</span>
+console<span class="p">.</span>log<span class="p">(</span>result<span class="p">.</span>reason<span class="p">);</span>    <span class="c">// "Logged in successfully"</span>
+
+<span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span></pre>
+          </div>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Flow vs Goal</div>
+            <p>
+              Use <strong>runFlow()</strong> for repeatable QA scenarios — structured,
+              deterministic, zero LLM cost. Use <strong>runGoal()</strong> for exploratory tasks or
+              when you need the agent to adapt to dynamic screen states.
+            </p>
+          </div>
+        </section>
+
+        <section id="sdk-run" class="reveal">
+          <h2>run()</h2>
+          <p>
+            Execute a single natural-language instruction directly on the device — the programmatic
+            equivalent of typing a command in the playground REPL. Each call is one atomic action:
+            parse the instruction, execute it, return the result.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">import</span> <span class="p">{</span> AppClaw <span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span>
+
+<span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span> provider<span class="p">:</span> <span class="s">'gemini'</span><span class="p">,</span> apiKey<span class="p">:</span> process<span class="p">.</span>env<span class="p">.</span>GEMINI_API_KEY<span class="p">,</span> platform<span class="p">:</span> <span class="s">'android'</span> <span class="p">});</span>
+
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'open YouTube app'</span><span class="p">);</span>       <span class="c">// regex match — no LLM call</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap Search'</span><span class="p">);</span>             <span class="c">// regex match — no LLM call</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'type Appium 3.0'</span><span class="p">);</span>        <span class="c">// regex match — no LLM call</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap the search button'</span><span class="p">);</span>  <span class="c">// LLM fallback → tap</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'wait 2 seconds'</span><span class="p">);</span>         <span class="c">// regex match — no LLM call</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'scroll down'</span><span class="p">);</span>            <span class="c">// regex match — no LLM call</span>
+
+<span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span>  <span class="c">// report written to .appclaw/runs/</span></pre>
+          </div>
+
+          <h3>How instructions are resolved</h3>
+          <ol>
+            <li>
+              <strong>Regex match</strong> — common patterns (<code>open X</code>,
+              <code>tap X</code>, <code>type X</code>, <code>wait N seconds</code>,
+              <code>scroll down</code>, …) are resolved instantly with zero LLM cost.
+            </li>
+            <li>
+              <strong>LLM fallback</strong> — anything that doesn't match a regex is sent to the
+              configured LLM, which classifies it into a structured action (<code>tap</code>,
+              <code>type</code>, <code>swipe</code>, etc.).
+            </li>
+          </ol>
+
+          <h3>RunResult shape</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>success</td>
+                <td>boolean</td>
+                <td>Whether the action completed successfully</td>
+              </tr>
+              <tr>
+                <td>action</td>
+                <td>string</td>
+                <td>
+                  Resolved step kind: <code>tap</code> | <code>type</code> | <code>openApp</code> |
+                  <code>wait</code> | <code>swipe</code> | …
+                </td>
+              </tr>
+              <tr>
+                <td>message</td>
+                <td>string</td>
+                <td>Human-readable description of what happened</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">run() vs runGoal() vs runFlow()</div>
+            <p>
+              Use <strong>run()</strong> when you want full control — one deterministic step at a
+              time, easy to integrate with any test framework. Use <strong>runGoal()</strong> when
+              you want the agent to figure out the steps itself. Use <strong>runFlow()</strong> for
+              declarative YAML test cases you want to version-control.
+            </p>
+          </div>
+        </section>
+
+        <section id="sdk-reports" class="reveal">
+          <h2>Reports</h2>
+          <p>
+            Reports are <strong>enabled by default</strong> when using the SDK. After
+            <code>teardown()</code> is called, AppClaw writes an HTML report to
+            <code>.appclaw/runs/</code> — one screenshot per step, plus a full execution summary. No
+            extra configuration needed.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  provider<span class="p">:</span>   <span class="s">'gemini'</span><span class="p">,</span>
+  apiKey<span class="p">:</span>     process<span class="p">.</span>env<span class="p">.</span>GEMINI_API_KEY<span class="p">,</span>
+  platform<span class="p">:</span>   <span class="s">'android'</span><span class="p">,</span>
+  reportName<span class="p">:</span> <span class="s">'YouTube Search'</span><span class="p">,</span>  <span class="c">// shown in the report viewer</span>
+<span class="p">});</span>
+
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'open YouTube app'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap Search'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'type Appium 3.0'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap the search button'</span><span class="p">);</span>
+
+<span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span>
+<span class="c">// ↑ writes report to .appclaw/runs/&lt;runId&gt;/</span></pre>
+          </div>
+
+          <h3>Viewing the report</h3>
+          <p>Run the built-in report server after your tests complete:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Shell</span>
+            </div>
+            <pre>npx appclaw --report</pre>
+          </div>
+
+          <p>
+            This starts a local server and opens the report in your browser. Every run is listed
+            with its steps, screenshots, pass/fail status, and timing.
+          </p>
+
+          <h3>Report file layout</h3>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">File tree</span>
+            </div>
+            <pre>.appclaw/
+  runs/
+    runs.json              <span class="c"># global run index</span>
+    &lt;runId&gt;/
+      manifest.json        <span class="c"># full run data (steps, timing, success)</span>
+      steps/
+        step-000.png       <span class="c"># screenshot after step 1</span>
+        step-001.png       <span class="c"># screenshot after step 2</span>
+        step-002.png</pre>
+          </div>
+
+          <h3>Disabling reports</h3>
+          <p>
+            Set <code>report: false</code> to skip report generation (e.g. in performance-sensitive
+            CI pipelines):
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  provider<span class="p">:</span> <span class="s">'gemini'</span><span class="p">,</span>
+  apiKey<span class="p">:</span>   process<span class="p">.</span>env<span class="p">.</span>GEMINI_API_KEY<span class="p">,</span>
+  report<span class="p">:</span>   <span class="k">false</span><span class="p">,</span>   <span class="c">// disable report generation</span>
+<span class="p">});</span></pre>
+          </div>
+        </section>
+
+        <section id="sdk-vitest" class="reveal">
+          <h2>Using with Vitest / Jest</h2>
+          <p>
+            Create one <code>AppClaw</code> instance per test file, connect once in
+            <code>beforeAll</code>, and tear down in <code>afterAll</code>. Individual tests call
+            <code>runFlow()</code> or <code>runGoal()</code> and assert on the result.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">tests/checkout.test.ts</span>
+            </div>
+            <pre><span class="k">import</span> <span class="p">{</span> describe<span class="p">,</span> it<span class="p">,</span> expect<span class="p">,</span> afterAll <span class="p">}</span> <span class="k">from</span> <span class="s">'vitest'</span><span class="p">;</span>
+<span class="k">import</span> <span class="p">{</span> AppClaw <span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span>
+
+<span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  provider<span class="p">:</span> <span class="s">'anthropic'</span><span class="p">,</span>
+  apiKey<span class="p">:</span>   process<span class="p">.</span>env<span class="p">.</span>ANTHROPIC_API_KEY<span class="p">,</span>
+  platform<span class="p">:</span> <span class="s">'android'</span><span class="p">,</span>
+  maxSteps<span class="p">:</span> <span class="n">20</span><span class="p">,</span>
+<span class="p">});</span>
+
+afterAll<span class="p">(()</span> <span class="p">=&gt;</span> app<span class="p">.</span>teardown<span class="p">());</span>
+
+describe<span class="p">(</span><span class="s">'Checkout flow'</span><span class="p">,</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="p">{</span>
+  it<span class="p">(</span><span class="s">'completes purchase as a logged-in user'</span><span class="p">,</span> <span class="k">async</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="p">{</span>
+    <span class="k">const</span> result <span class="p">=</span> <span class="k">await</span> app<span class="p">.</span>runFlow<span class="p">(</span><span class="s">'./flows/checkout.yaml'</span><span class="p">);</span>
+    expect<span class="p">(</span>result<span class="p">.</span>success<span class="p">).</span>toBe<span class="p">(</span><span class="k">true</span><span class="p">);</span>
+  <span class="p">});</span>
+
+  it<span class="p">(</span><span class="s">'handles empty cart gracefully'</span><span class="p">,</span> <span class="k">async</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="p">{</span>
+    <span class="k">const</span> result <span class="p">=</span> <span class="k">await</span> app<span class="p">.</span>runFlow<span class="p">(</span><span class="s">'./flows/checkout-empty-cart.yaml'</span><span class="p">);</span>
+    expect<span class="p">(</span>result<span class="p">.</span>success<span class="p">).</span>toBe<span class="p">(</span><span class="k">true</span><span class="p">);</span>
+  <span class="p">});</span>
+
+  it<span class="p">(</span><span class="s">'completes in under 15 steps'</span><span class="p">,</span> <span class="k">async</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="p">{</span>
+    <span class="k">const</span> result <span class="p">=</span> <span class="k">await</span> app<span class="p">.</span>runFlow<span class="p">(</span><span class="s">'./flows/checkout.yaml'</span><span class="p">);</span>
+    expect<span class="p">(</span>result<span class="p">.</span>stepsUsed<span class="p">).</span>toBeLessThan<span class="p">(</span><span class="n">15</span><span class="p">);</span>
+  <span class="p">});</span>
+<span class="p">});</span></pre>
+          </div>
+
+          <h3>Phased flows &amp; assertion results</h3>
+          <p>
+            For flows that use <code>setup</code> / <code>steps</code> /
+            <code>assertions</code> sections, the <code>failedPhase</code> field tells you exactly
+            where execution broke down:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">const</span> result <span class="p">=</span> <span class="k">await</span> app<span class="p">.</span>runFlow<span class="p">(</span><span class="s">'./flows/login-phased.yaml'</span><span class="p">);</span>
+
+<span class="k">if</span> <span class="p">(!</span>result<span class="p">.</span>success<span class="p">)</span> <span class="p">{</span>
+  <span class="c">// failedPhase: 'setup' | 'test' | 'assertion'</span>
+  console<span class="p">.</span>error<span class="p">(</span><span class="s">`Failed in</span> <span class="v">${result.failedPhase}</span> <span class="s">phase`</span><span class="p">);</span>
+  console<span class="p">.</span>error<span class="p">(</span><span class="s">`Step</span> <span class="v">${result.failedStep}</span><span class="s">:</span> <span class="v">${result.error}</span><span class="s">`</span><span class="p">);</span>
+<span class="p">}</span></pre>
+          </div>
+        </section>
+
+        <section id="sdk-ci" class="reveal">
+          <h2>CI Scripts</h2>
+          <p>
+            For CI pipelines that don't use a test framework, run flows sequentially and exit
+            non-zero on failure. The SDK's <code>silent: true</code> default keeps logs clean.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">scripts/smoke-test.ts</span>
+            </div>
+            <pre><span class="k">import</span> <span class="p">{</span> AppClaw <span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span>
+
+<span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  provider<span class="p">:</span> <span class="s">'google'</span><span class="p">,</span>
+  apiKey<span class="p">:</span>   process<span class="p">.</span>env<span class="p">.</span>GEMINI_API_KEY<span class="p">,</span>
+  platform<span class="p">:</span> <span class="s">'android'</span><span class="p">,</span>
+  silent<span class="p">:</span>   <span class="k">true</span><span class="p">,</span>  <span class="c">// no spinners in CI</span>
+<span class="p">});</span>
+
+<span class="k">const</span> flows <span class="p">= [</span>
+  <span class="s">'./flows/login.yaml'</span><span class="p">,</span>
+  <span class="s">'./flows/checkout.yaml'</span><span class="p">,</span>
+  <span class="s">'./flows/search.yaml'</span><span class="p">,</span>
+<span class="p">];</span>
+
+<span class="k">for</span> <span class="p">(</span><span class="k">const</span> flow <span class="k">of</span> flows<span class="p">)</span> <span class="p">{</span>
+  <span class="k">const</span> result <span class="p">=</span> <span class="k">await</span> app<span class="p">.</span>runFlow<span class="p">(</span>flow<span class="p">);</span>
+
+  <span class="k">if</span> <span class="p">(!</span>result<span class="p">.</span>success<span class="p">)</span> <span class="p">{</span>
+    console<span class="p">.</span>error<span class="p">(</span><span class="s">`FAILED: </span><span class="v">${flow}</span> <span class="s">— </span><span class="v">${result.error}</span><span class="s">`</span><span class="p">);</span>
+    <span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span>
+    process<span class="p">.</span>exit<span class="p">(</span><span class="n">1</span><span class="p">);</span>
+  <span class="p">}</span>
+
+  console<span class="p">.</span>log<span class="p">(</span><span class="s">`PASSED: </span><span class="v">${flow}</span> <span class="s">(</span><span class="v">${result.stepsUsed}</span><span class="s"> steps)`</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span>
+console<span class="p">.</span>log<span class="p">(</span><span class="s">'All flows passed.'</span><span class="p">);</span></pre>
+          </div>
+
+          <p>Run it with <code>tsx</code> (no compilation step needed):</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">npx</span> tsx scripts/smoke-test.ts</pre>
+          </div>
+        </section>
+
+        <section id="sdk-options" class="reveal">
+          <h2>Options Reference</h2>
+          <p>
+            All fields passed to <code>new AppClaw(options)</code>. Every field is optional — unset
+            fields fall back to <code>.env</code> values or built-in defaults, matching CLI
+            behaviour exactly.
+          </p>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Option</th>
+                <th>Type</th>
+                <th>Default</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>provider</td>
+                <td>string</td>
+                <td><code>'gemini'</code></td>
+                <td>
+                  <code>'anthropic'</code> | <code>'openai'</code> | <code>'gemini'</code> |
+                  <code>'groq'</code> | <code>'ollama'</code>
+                </td>
+              </tr>
+              <tr>
+                <td>apiKey</td>
+                <td>string</td>
+                <td>—</td>
+                <td>API key for the chosen LLM provider</td>
+              </tr>
+              <tr>
+                <td>model</td>
+                <td>string</td>
+                <td>Provider default</td>
+                <td>Model ID override (e.g. <code>'claude-opus-4-6'</code>)</td>
+              </tr>
+              <tr>
+                <td>platform</td>
+                <td>string</td>
+                <td>—</td>
+                <td><code>'android'</code> | <code>'ios'</code></td>
+              </tr>
+              <tr>
+                <td>agentMode</td>
+                <td>string</td>
+                <td><code>'dom'</code></td>
+                <td>
+                  <code>'dom'</code> uses accessibility tree; <code>'vision'</code> uses AI vision
+                </td>
+              </tr>
+              <tr>
+                <td>maxSteps</td>
+                <td>number</td>
+                <td><code>30</code></td>
+                <td>Maximum agent steps before giving up (applies to <code>runGoal</code>)</td>
+              </tr>
+              <tr>
+                <td>stepDelay</td>
+                <td>number</td>
+                <td><code>500</code></td>
+                <td>Delay between steps in milliseconds</td>
+              </tr>
+              <tr>
+                <td>silent</td>
+                <td>boolean</td>
+                <td><code>true</code></td>
+                <td>
+                  Suppress spinners and terminal colour output. Set <code>false</code> to debug
+                  locally.
+                </td>
+              </tr>
+              <tr>
+                <td>report</td>
+                <td>boolean</td>
+                <td><code>true</code></td>
+                <td>
+                  Auto-generate an HTML report to <code>.appclaw/runs/</code> on
+                  <code>teardown()</code>. Set <code>false</code> to disable.
+                </td>
+              </tr>
+              <tr>
+                <td>reportName</td>
+                <td>string</td>
+                <td><code>'AppClaw SDK Run'</code></td>
+                <td>Name shown in the report viewer.</td>
+              </tr>
+              <tr>
+                <td>mcpTransport</td>
+                <td>string</td>
+                <td><code>'stdio'</code></td>
+                <td>
+                  <code>'stdio'</code> (local appium-mcp) | <code>'sse'</code> (remote server)
+                </td>
+              </tr>
+              <tr>
+                <td>mcpHost</td>
+                <td>string</td>
+                <td><code>'localhost'</code></td>
+                <td>appium-mcp host when transport is <code>'sse'</code></td>
+              </tr>
+              <tr>
+                <td>mcpPort</td>
+                <td>number</td>
+                <td><code>8080</code></td>
+                <td>appium-mcp port when transport is <code>'sse'</code></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>TypeScript types</h3>
+          <p>All public types are exported from the top-level <code>'appclaw'</code> import:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">import</span> <span class="p">{</span>
+  AppClaw<span class="p">,</span>
+  <span class="k">type</span> AppClawOptions<span class="p">,</span>   <span class="c">// constructor options</span>
+  <span class="k">type</span> FlowResult<span class="p">,</span>       <span class="c">// returned by runFlow()</span>
+  <span class="k">type</span> RunResult<span class="p">,</span>        <span class="c">// returned by run()</span>
+  <span class="k">type</span> AgentResult<span class="p">,</span>      <span class="c">// returned by runGoal()</span>
+  <span class="k">type</span> RunYamlFlowOptions <span class="c">// second arg to runFlow()</span>
+<span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span></pre>
+          </div>
+        </section>
+      </main>
     </div>
 
     <!-- FOOTER -->
@@ -1876,52 +2971,185 @@
     </footer>
 
     <script>
-      // Navbar scroll effect
+      // ── Navbar scroll effect ──────────────────────────────────────────────
       const navbar = document.getElementById('navbar');
-      window.addEventListener('scroll', () => {
-        navbar.classList.toggle('scrolled', window.scrollY > 20);
+      window.addEventListener(
+        'scroll',
+        () => {
+          navbar.classList.toggle('scrolled', window.scrollY > 10);
+        },
+        { passive: true }
+      );
+
+      // ── Panel navigation ─────────────────────────────────────────────────
+      const sections = Array.from(document.querySelectorAll('.docs-content section[id]'));
+      const sideLinks = Array.from(document.querySelectorAll('.docs-sidebar a[href^="#"]'));
+      const content = document.querySelector('.docs-content');
+
+      // Build ordered list from sidebar links
+      const orderedIds = sideLinks.map((l) => l.getAttribute('href').slice(1));
+
+      // Category map: sectionId → category heading text
+      const categoryMap = {};
+      document.querySelectorAll('.docs-sidebar .sidebar-heading').forEach((heading) => {
+        let next = heading.nextElementSibling;
+        while (next && next.tagName === 'UL') {
+          next.querySelectorAll('a').forEach((a) => {
+            categoryMap[a.getAttribute('href').slice(1)] = heading.textContent.trim();
+          });
+          next = next.nextElementSibling;
+        }
       });
 
-      // Intersection Observer for reveal animations
-      const revealObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('visible');
+      function addPrevNext(sectionEl, id) {
+        // Remove existing nav if any
+        const old = sectionEl.querySelector('.section-nav');
+        if (old) old.remove();
+
+        const idx = orderedIds.indexOf(id);
+        const prevId = idx > 0 ? orderedIds[idx - 1] : null;
+        const nextId = idx < orderedIds.length - 1 ? orderedIds[idx + 1] : null;
+
+        const prevLink = sideLinks.find((l) => l.getAttribute('href') === `#${prevId}`);
+        const nextLink = sideLinks.find((l) => l.getAttribute('href') === `#${nextId}`);
+
+        if (!prevId && !nextId) return;
+
+        const nav = document.createElement('div');
+        nav.className = 'section-nav';
+
+        if (prevId && prevLink) {
+          const btn = document.createElement('button');
+          btn.className = 'section-nav-btn prev';
+          btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>${prevLink.textContent.trim()}`;
+          btn.addEventListener('click', () => showSection(prevId));
+          nav.appendChild(btn);
+        }
+
+        if (nextId && nextLink) {
+          const btn = document.createElement('button');
+          btn.className = 'section-nav-btn next';
+          btn.innerHTML = `${nextLink.textContent.trim()}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>`;
+          btn.addEventListener('click', () => showSection(nextId));
+          nav.appendChild(btn);
+        }
+
+        sectionEl.appendChild(nav);
+      }
+
+      function showSection(id) {
+        const target = document.getElementById(id);
+        if (!target) return;
+
+        // Hide all, show target
+        sections.forEach((s) => s.classList.remove('active'));
+        target.classList.add('active');
+
+        // Reveal the section itself and any .reveal children (replaces scroll observer)
+        target.classList.add('visible');
+        target.querySelectorAll('.reveal').forEach((el) => el.classList.add('visible'));
+
+        // Update sidebar active state
+        sideLinks.forEach((l) => l.classList.remove('active'));
+        const activeLink = document.querySelector(`.docs-sidebar a[href="#${id}"]`);
+        if (activeLink) {
+          activeLink.classList.add('active');
+          // Scroll sidebar to keep active link visible
+          activeLink.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+
+        // Add prev/next
+        addPrevNext(target, id);
+
+        // Scroll content to top
+        if (content) content.scrollTop = 0;
+
+        // Update URL
+        history.replaceState(null, '', `#${id}`);
+
+        // Auto-expand the accordion group containing the active link
+        if (activeLink) {
+          const group = activeLink.closest('.sidebar-group');
+          if (group && !group.classList.contains('open')) {
+            group.classList.add('open');
+            const groupBtn = group.querySelector('.sidebar-heading');
+            if (groupBtn) groupBtn.setAttribute('aria-expanded', 'true');
+          }
+        }
+
+        // Update breadcrumb
+        const sectionLabel = document.getElementById('page-header-section');
+        if (sectionLabel && activeLink) {
+          sectionLabel.textContent = activeLink.textContent.trim();
+        }
+      }
+
+      // Sidebar link clicks
+      sideLinks.forEach((link) => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          showSection(link.getAttribute('href').slice(1));
+        });
+      });
+
+      // Keyboard navigation (← → or j/k)
+      document.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+        const activeSection = document.querySelector('.docs-content section.active');
+        if (!activeSection) return;
+        const idx = orderedIds.indexOf(activeSection.id);
+        if ((e.key === 'ArrowRight' || e.key === 'l') && idx < orderedIds.length - 1) {
+          showSection(orderedIds[idx + 1]);
+        } else if ((e.key === 'ArrowLeft' || e.key === 'h') && idx > 0) {
+          showSection(orderedIds[idx - 1]);
+        }
+      });
+
+      // Accordion toggle
+      document.querySelectorAll('.sidebar-heading').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const group = btn.closest('.sidebar-group');
+          const isOpen = group.classList.toggle('open');
+          btn.setAttribute('aria-expanded', String(isOpen));
+        });
+      });
+
+      // Sidebar search
+      const searchInput = document.getElementById('sidebar-search');
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          const q = searchInput.value.toLowerCase().trim();
+          sideLinks.forEach((link) => {
+            const li = link.parentElement;
+            if (!q) {
+              li.classList.remove('hidden');
+            } else {
+              li.classList.toggle('hidden', !link.textContent.toLowerCase().includes(q));
             }
           });
-        },
-        {
-          threshold: 0.1,
-          rootMargin: '0px 0px -60px 0px',
-        }
-      );
-
-      document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
-
-      // Sidebar active link tracking
-      const sections = document.querySelectorAll('.docs-content section[id]');
-      const sidebarLinks = document.querySelectorAll('.docs-sidebar a');
-
-      const sectionObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              sidebarLinks.forEach((link) => link.classList.remove('active'));
-              const activeLink = document.querySelector(
-                `.docs-sidebar a[href="#${entry.target.id}"]`
-              );
-              if (activeLink) activeLink.classList.add('active');
+          // Show/hide sidebar groups if all their items are hidden
+          document.querySelectorAll('.sidebar-group').forEach((group) => {
+            if (!q) {
+              group.style.display = '';
+              return;
+            }
+            const allHidden = Array.from(group.querySelectorAll('li')).every((li) =>
+              li.classList.contains('hidden')
+            );
+            group.style.display = allHidden ? 'none' : '';
+            // Auto-expand groups that have matching results
+            if (!allHidden) {
+              group.classList.add('open');
+              const btn = group.querySelector('.sidebar-heading');
+              if (btn) btn.setAttribute('aria-expanded', 'true');
             }
           });
-        },
-        {
-          threshold: 0.2,
-          rootMargin: '-80px 0px -60% 0px',
-        }
-      );
+        });
+      }
 
-      sections.forEach((section) => sectionObserver.observe(section));
+      // Initial load: show section from hash or first section
+      const initialId = location.hash.slice(1) || orderedIds[0];
+      showSection(initialId);
     </script>
   </body>
 </html>

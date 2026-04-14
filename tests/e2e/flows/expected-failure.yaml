@@ -1,0 +1,10 @@
+# E2E fixture: a flow that is EXPECTED TO FAIL.
+# Tries to assert something that will never be visible on any Settings screen.
+# Used to verify that runFlow() returns success=false rather than throwing.
+appId: com.android.settings
+name: E2E — Expected Failure
+---
+- launchApp
+- wait: 1
+- assert: ThisTextWillNeverAppearOnAnyScreen_XYZ_12345
+- done

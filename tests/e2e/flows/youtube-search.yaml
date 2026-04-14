@@ -1,0 +1,11 @@
+# E2E fixture: search YouTube for a known video.
+# Used to test a multi-step natural-language flow via the SDK.
+# Requires: YouTube app installed on the device.
+name: E2E — YouTube Search
+---
+- open YouTube app
+- wait until search icon is visible
+- tap Search
+- type Appium 3.0
+- wait: 3
+- done: Search results loaded
