@@ -12,7 +12,7 @@ concurrency:
 jobs:
   test:
     name: Android YAML Flow
-    runs-on: ubuntu-latest   # Android emulator requires Ubuntu (KVM)
+    runs-on: ubuntu-latest # Android emulator requires Ubuntu (KVM)
 
     steps:
       - uses: actions/checkout@v4
@@ -22,4 +22,4 @@ jobs:
           flow: flows/youtube.yaml
           platform: android
           provider: gemini
-          api-key: ${{ secrets.GEMINI_API_KEY }}
+          api-key: ${{ secrets.LLM_API_KEY }}

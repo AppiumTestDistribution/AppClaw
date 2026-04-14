@@ -12,7 +12,7 @@ concurrency:
 jobs:
   test:
     name: iOS Simulator YAML Flow
-    runs-on: macos-14   # iOS simulator requires macOS (Apple Silicon)
+    runs-on: macos-14 # iOS simulator requires macOS (Apple Silicon)
 
     steps:
       - uses: actions/checkout@v4
@@ -22,4 +22,4 @@ jobs:
           flow: flows/ios-smoke.yaml
           platform: ios
           provider: gemini
-          api-key: ${{ secrets.GEMINI_API_KEY }}
+          api-key: ${{ secrets.LLM_API_KEY }}

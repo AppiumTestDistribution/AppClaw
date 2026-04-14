@@ -10,7 +10,7 @@ jobs:
     name: ${{ matrix.flow }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false   # run all flows even if one fails
+      fail-fast: false # run all flows even if one fails
       matrix:
         flow:
           - flows/login.yaml
@@ -25,6 +25,6 @@ jobs:
         with:
           flow: ${{ matrix.flow }}
           platform: android
-          api-key: ${{ secrets.GEMINI_API_KEY }}
+          api-key: ${{ secrets.LLM_API_KEY }}
           # Give each job a unique artifact name so they don't collide
           report-name: report-${{ strategy.job-index }}-${{ github.run_id }}
