@@ -11,6 +11,7 @@
  */
 
 import { resolve } from 'path';
+import { VERSION } from './version.js';
 import { loadConfig } from './config.js';
 import { createMCPClient } from './mcp/client.js';
 import { createLLMProvider, buildModel, buildThinkingOptions } from './llm/provider.js';
@@ -205,7 +206,7 @@ function parseArgs(): CLIArgs {
   }
 
   if (args.includes('--version') || args.includes('-v')) {
-    console.log('0.1.0');
+    console.log(VERSION);
     process.exit(0);
   }
 
@@ -323,7 +324,7 @@ async function main() {
 
   // ─── Report mode (serve execution reports) ──────────────
   if (cliArgs.report) {
-    ui.printHeader();
+    ui.printHeader(VERSION);
     const reportProjectRoot = process.cwd();
     startReportServer({
       port: cliArgs.reportPort,
@@ -352,7 +353,7 @@ async function main() {
 
   // ─── Replay mode ──────────────────────────────────────
   if (cliArgs.replay) {
-    ui.printHeader();
+    ui.printHeader(VERSION);
     ui.printReplayHeader(cliArgs.replay);
     const recording = loadRecording(cliArgs.replay);
 
@@ -409,7 +410,7 @@ async function main() {
       process.exit(1);
     }
 
-    ui.printHeader();
+    ui.printHeader(VERSION);
     ui.printExplorerHeader();
 
     const explorerConfig: ExplorerConfig = {
@@ -466,7 +467,7 @@ async function main() {
 
   // ─── YAML flow / suite mode ────────────────────────────
   if (cliArgs.flow) {
-    ui.printHeader();
+    ui.printHeader(VERSION);
     ui.printYamlFlowHeader(cliArgs.flow);
 
     // ── Resolve variable bindings (flow mode only; suites inherit per-flow env) ──
@@ -795,7 +796,7 @@ async function main() {
     process.exit(1);
   }
 
-  ui.printHeader();
+  ui.printHeader(VERSION);
   ui.startSpinner(`Connecting to appium-mcp (${config.MCP_TRANSPORT})...`);
 
   const mcpClient = await createMCPClient({

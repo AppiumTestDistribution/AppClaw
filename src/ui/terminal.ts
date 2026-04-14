@@ -425,7 +425,7 @@ function wrapStreamText(text: string, maxWidth: number): string[] {
 
 const LOGO_LINES = ['▄▀█ █▀█ █▀█ █▀▀ █   ▄▀█ █ █ █', '█▀█ █▀▀ █▀▀ █▄▄ █▄▄ █▀█ ▀▄▀▄▀'];
 
-export function printHeader(version: string = '0.1.0'): void {
+export function printHeader(version: string): void {
   const logo = LOGO_LINES.map((l) => appGradient(l)).join('\n');
   const content = [
     logo,

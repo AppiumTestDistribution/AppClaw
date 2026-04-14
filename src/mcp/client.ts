@@ -3,6 +3,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { MCPClient, MCPConfig, MCPToolResult, MCPToolInfo } from './types.js';
 import { theme } from '../ui/terminal.js';
+import { VERSION } from '../version.js';
 
 /** Tools that produce verbose output we don't want to log */
 const QUIET_TOOLS = new Set(['appium_get_page_source', 'appium_screenshot', 'appium_list_apps']);
@@ -38,7 +39,7 @@ function logMCP(name: string, args: Record<string, unknown>, result: MCPToolResu
 
 /** Build the underlying MCP Client + connect transport */
 async function connectClient(config: MCPConfig): Promise<Client> {
-  const client = new Client({ name: 'appclaw', version: '0.1.0' });
+  const client = new Client({ name: 'appclaw', version: VERSION });
 
   if (config.transport === 'stdio') {
     // Detect Android SDK path for appium-mcp subprocess
