@@ -1,0 +1,60 @@
+name: AppClaw — LambdaTest Cloud
+
+# Run flows on real cloud devices via LambdaTest.
+# Works for both Android and iOS from ubuntu-latest — no macOS runner needed for iOS.
+#
+# Required secrets:
+#   LLM_API_KEY          — your LLM provider key
+#   LT_USERNAME          — LambdaTest username
+#   LT_ACCESS_KEY        — LambdaTest access key
+#   LT_ANDROID_APP_ID    — lt://APP... for Android app
+#   LT_IOS_APP_ID        — lt://APP... for iOS app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ── Android on LambdaTest ───────────────────────────────────────────────────
+  android-cloud:
+    name: Android — LambdaTest cloud
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+        with:
+          flow: flows/youtube.yaml
+          platform: android
+          api-key: ${{ secrets.LLM_API_KEY }}
+          cloud-provider: lambdatest
+          lambdatest-username: ${{ secrets.LT_USERNAME }}
+          lambdatest-access-key: ${{ secrets.LT_ACCESS_KEY }}
+          lambdatest-device-name: 'Pixel 7'
+          lambdatest-os-version: '13'
+          lambdatest-app: ${{ secrets.LT_ANDROID_APP_ID }}
+          report-name: lt-android-${{ github.run_id }}
+
+  # ── iOS on LambdaTest — from ubuntu-latest (no macOS runner needed) ──────────
+  ios-cloud:
+    name: iOS — LambdaTest cloud (ubuntu runner)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+        with:
+          flow: flows/ios-smoke.yaml
+          platform: ios
+          api-key: ${{ secrets.LLM_API_KEY }}
+          cloud-provider: lambdatest
+          lambdatest-username: ${{ secrets.LT_USERNAME }}
+          lambdatest-access-key: ${{ secrets.LT_ACCESS_KEY }}
+          lambdatest-device-name: 'iPhone 14'
+          lambdatest-os-version: '16'
+          lambdatest-app: ${{ secrets.LT_IOS_APP_ID }}
+          report-name: lt-ios-${{ github.run_id }}

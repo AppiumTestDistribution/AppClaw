@@ -22,5 +22,5 @@ jobs:
           goal: 'Open YouTube, search for Appium 3.0, tap the first result, scroll down, verify a video by TestMu AI is visible'
           platform: android
           provider: gemini
-          api-key: ${{ secrets.GEMINI_API_KEY }}
+          api-key: ${{ secrets.LLM_API_KEY }}
           max-steps: 20

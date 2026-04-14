@@ -1,0 +1,94 @@
+name: AppClaw Action — Branch Test (Layer 3)
+
+# Drop this file into any repo's .github/workflows/ to test the action
+# from the branch before it's merged and tagged.
+#
+# Usage:
+#   1. Copy this file to your test repo at .github/workflows/layer3-test.yml
+#   2. Add LLM_API_KEY to repo secrets (Settings → Secrets → Actions)
+#   3. Push or trigger manually from the Actions tab
+
+on:
+  workflow_dispatch:
+    inputs:
+      flow:
+        description: 'Path to YAML flow file in your repo'
+        required: false
+        default: 'flows/youtube.yaml'
+      goal:
+        description: 'Natural language goal (leave empty to use flow instead)'
+        required: false
+        default: ''
+      platform:
+        description: 'Platform to test'
+        required: false
+        default: 'android'
+        type: choice
+        options: [android, ios]
+
+jobs:
+  # ── Test 1: YAML flow on Android ────────────────────────────────────────────
+  android-flow:
+    name: Android — YAML flow
+    runs-on: ubuntu-latest
+    if: inputs.platform == 'android' && inputs.goal == ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@feat/parallel-testing-video-recording
+        id: run
+        with:
+          flow: ${{ inputs.flow }}
+          platform: android
+          provider: gemini
+          api-key: ${{ secrets.LLM_API_KEY }}
+          report-name: layer3-android-flow-${{ github.run_id }}
+
+      - name: Show report path
+        if: always()
+        run: echo "Report → ${{ steps.run.outputs.report-path }}"
+
+  # ── Test 2: Natural language goal on Android ─────────────────────────────────
+  android-goal:
+    name: Android — natural language goal
+    runs-on: ubuntu-latest
+    if: inputs.platform == 'android' && inputs.goal != ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@feat/parallel-testing-video-recording
+        id: run
+        with:
+          goal: ${{ inputs.goal }}
+          platform: android
+          provider: gemini
+          api-key: ${{ secrets.LLM_API_KEY }}
+          report-name: layer3-android-goal-${{ github.run_id }}
+
+      - name: Show report path
+        if: always()
+        run: echo "Report → ${{ steps.run.outputs.report-path }}"
+
+  # ── Test 3: YAML flow on iOS ─────────────────────────────────────────────────
+  ios-flow:
+    name: iOS — YAML flow
+    runs-on: macos-14
+    if: inputs.platform == 'ios'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: AppiumTestDistribution/AppClaw/github-action@feat/parallel-testing-video-recording
+        id: run
+        with:
+          flow: ${{ inputs.flow }}
+          platform: ios
+          provider: gemini
+          api-key: ${{ secrets.LLM_API_KEY }}
+          report-name: layer3-ios-flow-${{ github.run_id }}
+
+      - name: Show report path
+        if: always()
+        run: echo "Report → ${{ steps.run.outputs.report-path }}"
