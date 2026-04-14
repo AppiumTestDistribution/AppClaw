@@ -8,6 +8,9 @@ name: AppClaw Action — Branch Test (Layer 3)
 # Required secret: LLM_API_KEY
 
 on:
+  push:
+    branches: [feat/parallel-testing-video-recording]
+    paths: ['github-action/**']
   workflow_dispatch:
     inputs:
       flow:
