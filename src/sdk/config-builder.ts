@@ -14,13 +14,14 @@ const OPTION_TO_ENV_VAR: Partial<Record<keyof AppClawOptions, string>> = {
   apiKey: 'LLM_API_KEY',
   model: 'LLM_MODEL',
   platform: 'PLATFORM',
+  deviceUdid: 'DEVICE_UDID',
   agentMode: 'AGENT_MODE',
   maxSteps: 'MAX_STEPS',
   stepDelay: 'STEP_DELAY',
   mcpTransport: 'MCP_TRANSPORT',
   mcpHost: 'MCP_HOST',
   mcpPort: 'MCP_PORT',
-  // `silent` is SDK-only — no env-var equivalent.
+  // `silent`, `video`, `report`, `reportName` are SDK-only — no env-var equivalents.
 };
 
 /**

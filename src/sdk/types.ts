@@ -24,6 +24,12 @@ export interface AppClawOptions {
   model?: string;
   /** Target mobile platform. */
   platform?: Platform;
+  /**
+   * Target a specific device by UDID (Android serial or iOS UDID).
+   * Required when running tests in parallel so each instance targets a different device.
+   * Get Android UDIDs from: adb devices
+   */
+  deviceUdid?: string;
   /** Interaction strategy: DOM locators (default) or AI vision. */
   agentMode?: AgentMode;
   /** Maximum number of agent steps before giving up. Default: 30. */
@@ -42,6 +48,11 @@ export interface AppClawOptions {
   report?: boolean;
   /** Name shown in the report viewer. Default: 'AppClaw SDK Run'. */
   reportName?: string;
+  /**
+   * Record the screen during the run and embed the video in the report.
+   * Requires Appium to support `appium_screen_recording`. Default: false.
+   */
+  video?: boolean;
   /** How to connect to appium-mcp. Default: 'stdio'. */
   mcpTransport?: MCPTransport;
   /** appium-mcp host when transport is 'sse'. Default: 'localhost'. */

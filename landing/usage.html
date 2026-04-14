@@ -1105,7 +1105,7 @@
             <li><a href="#sdk-run-flow">runFlow()</a></li>
             <li><a href="#sdk-run-goal">runGoal()</a></li>
             <li><a href="#sdk-run">run()</a></li>
-            <li><a href="#sdk-reports">Reports</a></li>
+            <li><a href="#sdk-reports">Reports &amp; Video</a></li>
             <li><a href="#sdk-vitest">Vitest / Jest</a></li>
             <li><a href="#sdk-ci">CI Scripts</a></li>
             <li><a href="#sdk-options">Options Reference</a></li>
@@ -2579,6 +2579,44 @@ console<span class="p">.</span>log<span class="p">(</span>result<span class="p">
 <span class="c">// ↑ writes report to .appclaw/runs/&lt;runId&gt;/</span></pre>
           </div>
 
+          <h3>Screen recording</h3>
+          <p>
+            Pass <code>video: true</code> to record the screen for the entire run and embed the
+            video in the report. Recording starts automatically on the first <code>run()</code> call
+            and stops in <code>teardown()</code>.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  provider<span class="p">:</span>   <span class="s">'gemini'</span><span class="p">,</span>
+  apiKey<span class="p">:</span>     process<span class="p">.</span>env<span class="p">.</span>GEMINI_API_KEY<span class="p">,</span>
+  platform<span class="p">:</span>   <span class="s">'android'</span><span class="p">,</span>
+  reportName<span class="p">:</span> <span class="s">'YouTube Search'</span><span class="p">,</span>
+  video<span class="p">:</span>      <span class="k">true</span><span class="p">,</span>               <span class="c">// record screen for the whole run</span>
+<span class="p">});</span>
+
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'open YouTube app'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap Search'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'type Appium 3.0'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap the search button'</span><span class="p">);</span>
+
+<span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span>
+<span class="c">// ↑ report includes recording.mp4 under the Recording tab</span></pre>
+          </div>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Parallel-safe</div>
+            <p>
+              Each <code>AppClaw</code> instance records its own session independently — parallel
+              tests do not interfere. Port allocation (MJPEG, system port) is also handled
+              automatically per instance.
+            </p>
+          </div>
+
           <h3>Viewing the report</h3>
           <p>Run the built-in report server after your tests complete:</p>
 
@@ -2838,6 +2876,17 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
                 <td>string</td>
                 <td><code>'AppClaw SDK Run'</code></td>
                 <td>Name shown in the report viewer.</td>
+              </tr>
+              <tr>
+                <td>video</td>
+                <td>boolean</td>
+                <td><code>false</code></td>
+                <td>
+                  Record the screen for the entire run and embed the video under the
+                  <strong>Recording</strong> tab in the report. Recording starts on the first
+                  <code>run()</code> call and stops automatically in <code>teardown()</code>.
+                  Requires Appium screen recording support.
+                </td>
               </tr>
               <tr>
                 <td>mcpTransport</td>

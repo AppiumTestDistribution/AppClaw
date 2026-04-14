@@ -27,10 +27,12 @@ export class AppClaw {
 
   // ── Report state ───────────────────────────────────────────
   private readonly collector: RunArtifactCollector | null;
+  private readonly videoEnabled: boolean;
   private runStepCounter = 0;
   private runSuccess = true;
   private runFailedAt: number | undefined;
   private runFailureReason: string | undefined;
+  private recordingStarted = false;
 
   constructor(options: AppClawOptions = {}) {
     this.config = buildConfig(options);
@@ -50,6 +52,8 @@ export class AppClaw {
             (options.platform ?? 'android') as 'android' | 'ios'
           )
         : null;
+
+    this.videoEnabled = options.video === true;
   }
 
   /**
@@ -62,9 +66,20 @@ export class AppClaw {
    * @param instruction - e.g. "open YouTube app", "tap Search", "type Appium 3.0"
    */
   async run(instruction: string): Promise<RunResult> {
-    const { client } = await this.session.connect();
+    const { client, appResolver } = await this.session.connect();
+
+    // Start screen recording on the first step (best-effort — mirrors the YAML flow path)
+    if (!this.recordingStarted && this.videoEnabled) {
+      try {
+        await client.callTool('appium_screen_recording', { action: 'start' });
+        this.recordingStarted = true;
+      } catch {
+        /* appium version or driver may not support recording — skip silently */
+      }
+    }
+
     const stepIndex = ++this.runStepCounter;
-    const runner = new StepRunner(client, this.collector ?? undefined, stepIndex);
+    const runner = new StepRunner(client, this.collector ?? undefined, stepIndex, appResolver);
     const result = await runner.run(instruction);
 
     // Track first failure for report finalization
@@ -109,6 +124,20 @@ export class AppClaw {
    * Call this in afterAll() / test teardown hooks.
    */
   async teardown(): Promise<void> {
+    // Stop recording and attach to report before finalizing (MCP client must still be active)
+    if (this.recordingStarted && this.videoEnabled && this.collector) {
+      try {
+        const { client } = await this.session.connect();
+        const stopResult = await client.callTool('appium_screen_recording', { action: 'stop' });
+        const textContent = stopResult.content?.find((c: any) => c.type === 'text');
+        const text = (textContent?.type === 'text' ? textContent.text : '')?.trim() ?? '';
+        const match = text.match(/saved to:\s*(.+\.mp4)/i);
+        if (match?.[1]) this.collector.attachVideoFromPath(match[1].trim());
+      } catch {
+        /* ignore — report will just not have a video */
+      }
+    }
+
     if (this.collector && this.runStepCounter > 0) {
       const flowResult: RunYamlFlowResult = {
         success: this.runSuccess,

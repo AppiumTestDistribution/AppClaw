@@ -4,7 +4,7 @@ steps:
   - Open youtube app
   - wait for search icon to be visible
   - Click on Search icon
-  - Enter appium 3.0
+  - Type appium 3.0
   - Click on the first result from the list
   - wait 3s
   - scroll down
