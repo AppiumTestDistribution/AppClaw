@@ -24,6 +24,8 @@ vi.mock('../../src/agent/loop.js', () => ({
 
 vi.mock('../../src/ui/terminal.js', () => ({
   silenceTerminalUI: vi.fn(),
+  printWarning: vi.fn(),
+  printSetupOk: vi.fn(),
   theme: { dim: (s: string) => s, info: (s: string) => s },
 }));
 
