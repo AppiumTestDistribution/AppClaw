@@ -27,7 +27,12 @@ vi.mock('../../src/ui/terminal.js', () => ({
   theme: { dim: (s: string) => s, info: (s: string) => s },
 }));
 
+vi.mock('../../src/device/session.js', () => ({
+  createPlatformSession: vi.fn(),
+}));
+
 const { acquireSharedMCPClient } = await import('../../src/mcp/client.js');
+const { createPlatformSession } = await import('../../src/device/session.js');
 const { parseFlowYamlFile } = await import('../../src/flow/parse-yaml-flow.js');
 const { runYamlFlow } = await import('../../src/flow/run-yaml-flow.js');
 const { createLLMProvider } = await import('../../src/llm/provider.js');
@@ -81,9 +86,21 @@ const mockLLM = {
   resetHistory: vi.fn(),
 };
 
+const stubScopedMcp = {
+  callTool: vi.fn().mockResolvedValue({ content: [] }),
+  listTools: vi.fn().mockResolvedValue([]),
+  close: vi.fn().mockResolvedValue(undefined),
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(acquireSharedMCPClient).mockResolvedValue(makeSharedClient() as any);
+  vi.mocked(createPlatformSession).mockResolvedValue({
+    platform: 'android',
+    sessionText: 'mock session',
+    sessionId: 'mock-session-id',
+    scopedMcp: stubScopedMcp,
+  } as any);
   vi.mocked(parseFlowYamlFile).mockResolvedValue(stubParsedFlow as any);
   vi.mocked(runYamlFlow).mockResolvedValue(stubFlowResult as any);
   vi.mocked(createLLMProvider).mockReturnValue(mockLLM as any);

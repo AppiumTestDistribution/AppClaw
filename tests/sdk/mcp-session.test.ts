@@ -24,7 +24,12 @@ vi.mock('../../src/mcp/client.js', () => ({
   acquireSharedMCPClient: vi.fn(),
 }));
 
+vi.mock('../../src/device/session.js', () => ({
+  createPlatformSession: vi.fn(),
+}));
+
 const { acquireSharedMCPClient } = await import('../../src/mcp/client.js');
+const { createPlatformSession } = await import('../../src/device/session.js');
 const { McpSession } = await import('../../src/sdk/mcp-session.js');
 
 function makeConfig(overrides = {}) {
@@ -36,9 +41,21 @@ function makeConfig(overrides = {}) {
   } as any;
 }
 
+const mockScopedMcp: MCPClient = {
+  callTool: vi.fn().mockResolvedValue({ content: [] }),
+  listTools: vi.fn().mockResolvedValue([]),
+  close: vi.fn().mockResolvedValue(undefined),
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(acquireSharedMCPClient).mockResolvedValue(makeSharedClient());
+  vi.mocked(createPlatformSession).mockResolvedValue({
+    platform: 'android',
+    sessionText: 'mock session',
+    sessionId: 'mock-session-id',
+    scopedMcp: mockScopedMcp,
+  } as any);
 });
 
 // ── Lazy connection ───────────────────────────────────────────────────────
