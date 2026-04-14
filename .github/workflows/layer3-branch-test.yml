@@ -1,12 +1,11 @@
 name: AppClaw Action — Branch Test (Layer 3)
 
-# Drop this file into any repo's .github/workflows/ to test the action
-# from the branch before it's merged and tagged.
+# Layer 3 test — validates the action as an external caller would use it.
+# References the branch by name (not ./github-action) so it exercises the
+# full public action resolution path before the branch is tagged and published.
 #
-# Usage:
-#   1. Copy this file to your test repo at .github/workflows/layer3-test.yml
-#   2. Add GEMINI_API_KEY (or your LLM key) to repo secrets
-#   3. Push or trigger manually from the Actions tab
+# Trigger: Actions tab → "AppClaw Action — Branch Test (Layer 3)" → Run workflow
+# Required secret: LLM_API_KEY
 
 on:
   workflow_dispatch:
