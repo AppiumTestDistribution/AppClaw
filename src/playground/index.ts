@@ -1384,7 +1384,8 @@ async function processLine(line: string): Promise<void> {
       }
     } catch (err: any) {
       ui.stopSpinner();
-      console.log(`  ${theme.dim('Vision shortcut failed, falling back…')}`);
+      const errMsg = err?.message ?? String(err);
+      console.log(`  ${theme.dim(`Vision shortcut failed (${errMsg}), falling back…`)}`);
     }
   }
 

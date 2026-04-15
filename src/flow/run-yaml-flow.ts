@@ -978,30 +978,49 @@ export async function executeStep(
         return { success: false, message: 'Vision could not parse drag response' };
       }
       const dragAction = dragActions[0];
-      if (!dragAction || dragAction.action !== 'drag' || (dragAction.locators?.length ?? 0) < 2) {
-        const locCount = dragAction?.locators?.length ?? 0;
-        let msg: string;
-        if (!dragAction || dragAction.action !== 'drag') {
-          msg = `"${step.from}" and "${step.to}" are not visible on screen`;
-        } else if (locCount === 0) {
-          msg = `"${step.from}" and "${step.to}" are not visible on screen`;
-        } else {
-          // One locator found — assume "from" was found, "to" is missing
-          msg = `"${step.to}" is not visible on screen`;
-        }
-        return { success: false, message: msg };
-      }
-      const fromCoords = dragAction.locators[0].coordinates as [number, number] | undefined;
-      const toCoords = dragAction.locators[1].coordinates as [number, number] | undefined;
-      if (!fromCoords || !toCoords) {
-        return { success: false, message: 'Drag: vision returned no coordinates' };
-      }
+      const fromLocatorFallback = dragAction?.locators?.[0];
+      const toLocatorFallback = dragAction?.locators?.[1];
 
+      // Source must be found and visible
+      if (!dragAction || dragAction.action !== 'drag' || !fromLocatorFallback?.coordinates) {
+        return {
+          success: false,
+          message: `"${step.from}" is not visible on screen`,
+        };
+      }
+      const fromCoords = fromLocatorFallback.coordinates as [number, number];
       if (fromCoords[0] === 0 && fromCoords[1] === 0) {
         return { success: false, message: `Drag failed: "${step.from}" is not visible on screen` };
       }
-      if (toCoords[0] === 0 && toCoords[1] === 0) {
-        return { success: false, message: `Drag failed: "${step.to}" is not visible on screen` };
+
+      // Destination: use locator coordinates if valid; otherwise infer direction from step.to / step.from
+      const rawToCoords = toLocatorFallback?.coordinates as [number, number] | undefined;
+      const hasValidTo =
+        rawToCoords &&
+        rawToCoords.length >= 2 &&
+        !(rawToCoords[0] === 0 && rawToCoords[1] === 0);
+
+      let toCoords: [number, number];
+      if (hasValidTo) {
+        toCoords = rawToCoords!;
+      } else {
+        // Infer direction from the destination description or overall instruction
+        // Stark coordinates are [y, x] in 0-1000 normalized space
+        const directionSource = `${step.to} ${step.from}`.toLowerCase();
+        const DRAG_OFFSET = 200;
+        let dy = 0,
+          dx = 0;
+        if (/\bright\b/.test(directionSource)) dx = DRAG_OFFSET;
+        else if (/\bleft\b/.test(directionSource)) dx = -DRAG_OFFSET;
+        else if (/\bdown\b/.test(directionSource)) dy = DRAG_OFFSET;
+        else if (/\bup\b/.test(directionSource)) dy = -DRAG_OFFSET;
+        else {
+          return { success: false, message: `"${step.to}" is not visible on screen` };
+        }
+        toCoords = [
+          Math.max(0, Math.min(1000, fromCoords[0] + dy)),
+          Math.max(0, Math.min(1000, fromCoords[1] + dx)),
+        ];
       }
 
       const fromBbox = scaleDragCoords(fromCoords, dragScreenSize);

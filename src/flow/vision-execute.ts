@@ -537,6 +537,16 @@ export async function visionExecute(
   const t0 = performance.now();
   const rawResponse = await client.understandAndLocate(instruction, imageBase64);
   logTiming('understandAndLocate', Math.round(performance.now() - t0));
+  if (mcpDebug)
+    console.log(
+      `        ${theme.dim('vision')} ${theme.info('raw response:')} ${theme.dim(String(rawResponse).slice(0, 300))}`
+    );
+  if (!rawResponse) {
+    return {
+      step: { kind: 'tap', label: instruction, verbatim: instruction } as FlowStep,
+      result: { success: false, message: 'Vision returned empty response' },
+    };
+  }
   const cleanedText = rawResponse.trim().replace(/(^```json|```$)/g, '');
 
   let actions: any[];
@@ -587,12 +597,91 @@ export async function visionExecute(
   const value = action.value ?? null;
   const locators = action.locators ?? [];
 
-  // Swipe/scroll
+  if (mcpDebug)
+    console.log(
+      `        ${theme.dim('vision')} ${theme.info('parsed:')} action=${theme.warn(actionName)} value=${theme.dim(String(value))} locators=${theme.dim(JSON.stringify(locators).slice(0, 200))}`
+    );
+
+  // Swipe/scroll — full-screen (action IS the direction word) but only if no element locators
   if (SWIPE_ACTIONS.has(actionName)) {
     const direction = actionName as 'up' | 'down' | 'left' | 'right';
-    const step: FlowStep = { kind: 'swipe', direction, verbatim: instruction };
-    await mcp.callTool('appium_scroll', { direction });
-    return { step, result: { success: true, message: `Swiped ${direction}` } };
+    const firstLocator = locators[0];
+    const firstCoords = firstLocator?.coordinates;
+    const hasElementCoords =
+      firstCoords &&
+      firstCoords.length >= 2 &&
+      !(firstCoords[0] === 0 && firstCoords[1] === 0);
+
+    if (!hasElementCoords) {
+      const step: FlowStep = { kind: 'swipe', direction, verbatim: instruction };
+      // appium_scroll only supports up/down; use appium_swipe for left/right
+      const scrollTool = direction === 'left' || direction === 'right' ? 'appium_swipe' : 'appium_scroll';
+      await mcp.callTool(scrollTool, { direction });
+      return { step, result: { success: true, message: `Swiped ${direction}` } };
+    }
+    // Has element coords — fall through to element-targeted swipe below
+  }
+
+  // Element-targeted swipe: vision returns action=direction + locators, or action="swipe" + locators
+  // e.g. "swipe the font size slider to the right" → action:"swipe"|"right", locators[0]=slider
+  if ((SWIPE_ACTIONS.has(actionName) || actionName === 'swipe') && locators.length > 0) {
+    const elementLocator = locators[0];
+    const coords = elementLocator?.coordinates;
+    const hasElementCoords =
+      coords && coords.length >= 2 && !(coords[0] === 0 && coords[1] === 0);
+
+    // Resolve direction: action name itself (when vision returns direction as action), then value, then instruction text
+    const valueStr = value ? String(value).toLowerCase().trim() : '';
+    const direction = (
+      SWIPE_ACTIONS.has(actionName)
+        ? actionName
+        : SWIPE_ACTIONS.has(valueStr)
+          ? valueStr
+          : /\bright\b/.test(instruction.toLowerCase())
+            ? 'right'
+            : /\bleft\b/.test(instruction.toLowerCase())
+              ? 'left'
+              : /\bdown\b/.test(instruction.toLowerCase())
+                ? 'down'
+              : /\bup\b/.test(instruction.toLowerCase())
+                ? 'up'
+                : null
+    ) as 'up' | 'down' | 'left' | 'right' | null;
+
+    if (direction && hasElementCoords) {
+      const [ey, ex] = coords!;
+      const DRAG_OFFSET = 200;
+      const dy = direction === 'down' ? DRAG_OFFSET : direction === 'up' ? -DRAG_OFFSET : 0;
+      const dx = direction === 'right' ? DRAG_OFFSET : direction === 'left' ? -DRAG_OFFSET : 0;
+      const ty = Math.max(0, Math.min(1000, ey + dy));
+      const tx = Math.max(0, Math.min(1000, ex + dx));
+      const step: FlowStep = { kind: 'swipe', direction, verbatim: instruction };
+      const fromBbox = scaleCoordinates([ey, ex], screenSize);
+      const toBbox = scaleCoordinates([ty, tx], screenSize);
+      const dragResult = await mcp.callTool('appium_drag_and_drop', {
+        sourceX: Math.round(fromBbox.center.x),
+        sourceY: Math.round(fromBbox.center.y),
+        targetX: Math.round(toBbox.center.x),
+        targetY: Math.round(toBbox.center.y),
+        duration: 600,
+        longPressDuration: 400,
+      });
+      const dragText =
+        dragResult.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
+      const dragSuccess =
+        !dragText.toLowerCase().includes('failed') && !dragText.toLowerCase().includes('error');
+      return {
+        step,
+        result: {
+          success: dragSuccess,
+          message: dragSuccess
+            ? `Swiped "${elementLocator.element}" ${direction}`
+            : `Swipe failed: ${dragText.slice(0, 200)}`,
+        },
+      };
+    }
+
+    // Direction or coords missing — fall through to tap handler below
   }
 
   // Back
@@ -691,27 +780,56 @@ export async function visionExecute(
       verbatim: instruction,
     };
 
-    if (!fromLocator?.coordinates || !toLocator?.coordinates) {
-      const msg = !fromLocator?.coordinates
-        ? `"${step.from}" is not visible on screen`
-        : `"${step.to}" is not visible on screen`;
-      return { step, result: { success: false, message: msg } };
+    if (!fromLocator?.coordinates) {
+      return {
+        step,
+        result: { success: false, message: `"${step.from}" is not visible on screen` },
+      };
     }
 
     const [fy, fx] = fromLocator.coordinates;
-    const [ty, tx] = toLocator.coordinates;
-
     if (fy === 0 && fx === 0) {
       return {
         step,
         result: { success: false, message: `Drag failed: "${step.from}" is not visible on screen` },
       };
     }
-    if (ty === 0 && tx === 0) {
-      return {
-        step,
-        result: { success: false, message: `Drag failed: "${step.to}" is not visible on screen` },
-      };
+
+    // Determine destination coordinates.
+    // When the vision model returns a directional drag (slider/seekbar), the destination
+    // locator is either missing, empty, or just a direction word ("right", "left") with
+    // zero/null coordinates. In that case, compute the destination from the source +
+    // a normalized offset derived from the direction keyword in the instruction or to-element.
+    let ty: number, tx: number;
+    const hasValidToCoords =
+      toLocator?.coordinates &&
+      toLocator.coordinates.length >= 2 &&
+      !(toLocator.coordinates[0] === 0 && toLocator.coordinates[1] === 0);
+
+    if (hasValidToCoords) {
+      [ty, tx] = toLocator!.coordinates;
+    } else {
+      // Try to infer direction from destination element name, then fall back to full instruction.
+      // Stark coordinates are [y, x] in 0-1000 normalized space.
+      const directionSource = `${toLocator?.element ?? ''} ${instruction}`.toLowerCase();
+      const DRAG_OFFSET = 200; // ~20% of screen — enough to move a slider visibly
+      let dy = 0,
+        dx = 0;
+      if (/\bright\b/.test(directionSource)) dx = DRAG_OFFSET;
+      else if (/\bleft\b/.test(directionSource)) dx = -DRAG_OFFSET;
+      else if (/\bdown\b/.test(directionSource)) dy = DRAG_OFFSET;
+      else if (/\bup\b/.test(directionSource)) dy = -DRAG_OFFSET;
+      else {
+        return {
+          step,
+          result: {
+            success: false,
+            message: `"${step.to || 'destination'}" is not visible on screen`,
+          },
+        };
+      }
+      ty = Math.max(0, Math.min(1000, fy + dy));
+      tx = Math.max(0, Math.min(1000, fx + dx));
     }
 
     const fromBbox = scaleCoordinates([fy, fx], screenSize);
@@ -733,7 +851,7 @@ export async function visionExecute(
       result: {
         success: dragSuccess,
         message: dragSuccess
-          ? `Dragged "${step.from}" to "${step.to}"`
+          ? `Dragged "${step.from}" ${step.to ? `to "${step.to}"` : `(directional)`}`
           : `Drag failed: ${dragText.slice(0, 200)}`,
       },
     };

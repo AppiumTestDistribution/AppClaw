@@ -6,9 +6,17 @@
  * Returns context-aware recovery hints.
  */
 
+/** Keypad / timer / PIN style goals — hash may alternate while correcting digits. */
+export function isDataEntryLikeGoal(goal: string): boolean {
+  return /\b(type|digit|key|keypad|pin|passcode|timer|duration|hours?|minutes?|seconds?|code)\b|['']?\d{3,}/i.test(
+    goal
+  );
+}
+
 export interface StuckDetector {
   recordAction(action: string, screenHash: string): void;
   isStuck(goal?: string): boolean;
+  getLastSignals(): string[];
   getRecoveryHint(goal: string): string;
   /** Get a DOM-aware recovery hint that identifies untried interactive elements */
   getDOMRecoveryHint(goal: string, currentDom: string, triedSelectors: string[]): string;
@@ -21,6 +29,7 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
   const recentHashes: string[] = [];
   let unchangedCount = 0;
   let stuckCount = 0;
+  let lastSignals: string[] = [];
 
   return {
     recordAction(action: string, screenHash: string) {
@@ -82,9 +91,27 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
         }
       }
 
-      const stuck = allSameAction || allSameHash || highRepetition || oscillating;
+      // Keypad/timer entry can flip between two hashes (mistype → backspace → retry).
+      // Do not treat that ABAB pattern alone as a stuck "toggle oscillation".
+      const oscillationCountsAsStuck =
+        oscillating && !(goal && isDataEntryLikeGoal(goal));
+
+      // For keypad/timer/PIN entry, repeating `find_and_click` is expected while
+      // entering each next digit. Treat repetition as stuck only for non-entry goals.
+      const repetitionCountsAsStuck =
+        goal && isDataEntryLikeGoal(goal) ? false : allSameAction || highRepetition;
+
+      const stuck = repetitionCountsAsStuck || allSameHash || oscillationCountsAsStuck;
+      lastSignals = [];
+      if (repetitionCountsAsStuck) lastSignals.push('repetition');
+      if (allSameHash) lastSignals.push('unchanged');
+      if (oscillationCountsAsStuck) lastSignals.push('oscillation');
       if (stuck) stuckCount++;
       return stuck;
+    },
+
+    getLastSignals(): string[] {
+      return [...lastSignals];
     },
 
     getRecoveryHint(goal: string): string {
@@ -96,13 +123,27 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
       }
 
       if (isOscillating) {
+        if (isDataEntryLikeGoal(goal)) {
+          return (
+            'OSCILLATION (keypad / timer / PIN style): The UI is flipping between two states — usually you are tapping ' +
+            'ADJACENT keys (e.g. a digit vs backspace/delete) or the same wrong key twice. This is NOT a toggle that ' +
+            'means the goal is done.\n\n' +
+            '1. Read the LARGE on-screen value — compare it to what you still need to enter.\n' +
+            '2. Tap ONLY the next correct digit key, aiming at the CENTER of that key.\n' +
+            '3. Do NOT alternate backspace and the same digit in a loop. Use backspace at most once per real mistake.\n' +
+            '4. If coordinate taps (tapX/tapY) keep missing, call find_and_click WITHOUT tapX/tapY so vision locate runs.\n' +
+            '5. Call "done" ONLY when the displayed value matches the goal — not before.'
+          );
+        }
         return (
-          'CRITICAL — OSCILLATION DETECTED: The screen is toggling between TWO states because you keep tapping the same element. ' +
-          'This means the FIRST tap SUCCEEDED (it changed the state), and each subsequent tap UNDOES it. ' +
-          'Your goal "' +
+          'OSCILLATION DETECTED: The screen is toggling between two states. STOP TAPPING.\n\n' +
+          '1. Study the CURRENT SCREENSHOT carefully — what state is visible RIGHT NOW?\n' +
+          '2. Does the CURRENT visible state match what your goal "' +
           goal +
-          '" was ALREADY ACHIEVED on the first tap. ' +
-          'You MUST call "done" NOW. Do NOT tap anything else — you are undoing your own work.'
+          '" requires?\n' +
+          '3. If YES (correct state visible) → call "done" and describe exactly what you see that confirms it.\n' +
+          '4. If NO (wrong state visible) → tap ONCE more, then verify the result before doing anything else.\n\n' +
+          'Call "done" only based on what you can ACTUALLY SEE on screen — not assumptions.'
         );
       }
 
@@ -128,13 +169,14 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
 
         if (isToggleGoal) {
           return (
-            'CRITICAL: You have been stuck for multiple rounds repeating the same action. ' +
-            'STOP and think: your goal was "' +
+            'STUCK ON TOGGLE: You have been repeating the same toggle action multiple times. STOP.\n\n' +
+            '1. Look at the CURRENT SCREENSHOT — what is the actual state of the toggle/switch right now?\n' +
+            '2. Does the current visible state match what the goal "' +
             goal +
-            '". ' +
-            'The goal is VERY LIKELY ALREADY ACHIEVED. The action you keep repeating probably succeeded on the first try. ' +
-            'You MUST call "done" NOW with a reason explaining the goal was completed. ' +
-            'Do NOT tap, scroll, or interact again — call "done" immediately.'
+            '" requires?\n' +
+            '3. If YES (correct state visible on screen) → call "done" describing what you see.\n' +
+            '4. If NO (wrong state visible) → the toggle may have been reversed by repeated taps. Tap it ONCE and verify.\n\n' +
+            'Do NOT call "done" based on assumptions — only on what you can clearly see on screen.'
           );
         }
 
@@ -169,9 +211,9 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
 
         if (isToggleGoal) {
           hint +=
-            'You are tapping repeatedly on what appears to be a toggle action. ' +
-            'The toggle LIKELY ALREADY SUCCEEDED on your first tap. Tapping again UNDOES the toggle! ' +
-            'Call "done" NOW — the goal is achieved.\n\n';
+            'You are tapping repeatedly on a toggle. STOP and check the screenshot: ' +
+            'what is the CURRENT visible state of the toggle? If it already shows the correct state, call "done" with that observation. ' +
+            'If it shows the wrong state, tap it ONCE more and verify before deciding.\n\n';
         } else {
           hint +=
             'Your tap actions are having NO EFFECT. Likely causes:\n' +
@@ -267,6 +309,7 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
       recentHashes.length = 0;
       unchangedCount = 0;
       stuckCount = 0;
+      lastSignals = [];
     },
   };
 }

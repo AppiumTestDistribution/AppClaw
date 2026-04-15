@@ -910,10 +910,8 @@ async function main() {
       // Reset action history between sub-goals for clean context
       llm.resetHistory();
 
-      // Each sub-goal gets a proportional share of max steps
-      const stepsPerGoal = planResult.isComplex
-        ? Math.max(10, Math.floor(config.MAX_STEPS / executor.all.length))
-        : config.MAX_STEPS;
+      // Each sub-goal gets the full MAX_STEPS budget
+      const stepsPerGoal = config.MAX_STEPS;
 
       // ─── Screen-aware orchestration ─────────────────────
       // Before executing, check the screen and decide: skip, rewrite, or proceed

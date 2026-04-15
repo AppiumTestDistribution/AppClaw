@@ -15,8 +15,9 @@ import { typeViaKeyboard, detectDeviceUdid, pressEnterKey } from '../mcp/keyboar
 import type { LLMProvider, AgentContext, ToolCallDecision } from '../llm/provider.js';
 import type { ActionResult } from '../llm/schemas.js';
 import { getScreenState } from '../perception/screen.js';
-import { diffScreen, computeScreenHash } from '../perception/screen-diff.js';
+import { diffScreen, computePerceptionHash } from '../perception/screen-diff.js';
 import { createStuckDetector } from './stuck.js';
+import { shouldPreferVisionLocateTap } from './vision-tap-policy.js';
 import { createRecoveryEngine } from './recovery.js';
 import { askUser, classifyHITLRequest } from './human-in-the-loop.js';
 import { tapAtCoordinates, isAIElement, parseAIElementCoords } from './element-finder.js';
@@ -233,7 +234,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     detectedPlatform = screen.platform;
 
     const diff = diffScreen(prevDom, screen.dom);
-    const screenHash = computeScreenHash(screen.dom);
+    const screenHash = computePerceptionHash(screen.dom, screen.screenshot);
     prevDom = screen.dom;
 
     // ─── 2. CHECKPOINT (on screen changes) ───────────────
@@ -316,6 +317,10 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     if (stuck.isStuck(goal)) {
       ui.stopSpinner();
       ui.printStuck(step + 1);
+      const stuckSignals = stuck.getLastSignals();
+      if (stuckSignals.length > 0) {
+        ui.printStepDetail(`stuck signals: ${stuckSignals.join(', ')}`);
+      }
 
       const failedActions = history.slice(-3).map((h) => h.action);
       const alternatives = recovery.suggestAlternatives(failedActions);
@@ -495,65 +500,72 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       const reason = (decision.args.reason as string) ?? 'Goal completed';
 
       // ── Post-done verification ──────────────────────────
-      // Guards against the LLM hallucinating goal completion.
-      // Take a fresh screenshot and ask the LLM to verify the goal is actually achieved.
-      // Only verify once per done attempt — if verification itself fails, trust the LLM.
-      if (captureScreenshot && llm.supportsVision && step > 0) {
-        try {
-          await sleep(stepDelay);
-          const verifyScreen = await getScreenState(mcp, maxElements, true, skipPageSource, false);
-          if (verifyScreen.screenshot) {
-            const verifyDecision = await llm.getDecision({
-              goal:
-                `VERIFICATION: The agent claims the goal "${goal}" is achieved because: "${reason}". ` +
-                `Look at the screenshot carefully. Is the goal ACTUALLY achieved? ` +
-                `If YES → call "done" with the same reason. ` +
-                `If NO → call the appropriate action tool to continue working toward the goal. ` +
-                `Be strict: if the keyboard is still covering the screen, if the expected content is not visible, ` +
-                `or if the action clearly didn't complete, the goal is NOT achieved.`,
-              step,
-              maxSteps,
-              dom: verifyScreen.dom,
-              screenshot: verifyScreen.screenshot,
-              lastResult: `Agent called done with reason: "${reason}". Verifying...`,
-              screenChanges: {
-                changed: false,
-                addedCount: 0,
-                removedCount: 0,
-                summary: 'Verification step',
-              },
-              platform: detectedPlatform,
-            });
+      // Always verify before accepting "done" — guards against LLM hallucinating completion.
+      // Verification uses screenshot when available (vision mode) or DOM alone (DOM mode).
+      // Runs on every step including step 0 to catch immediate false positives.
+      try {
+        await sleep(stepDelay);
+        const verifyScreen = await getScreenState(
+          mcp,
+          maxElements,
+          captureScreenshot,
+          skipPageSource,
+          false
+        );
+        if (verifyScreen.dom || verifyScreen.screenshot) {
+          const verifyDecision = await llm.getDecision({
+            goal:
+              `VERIFICATION: The agent claims the goal "${goal}" is achieved because: "${reason}". ` +
+              `Study the current screen state carefully (screenshot and/or DOM). Is the goal ACTUALLY and FULLY achieved? ` +
+              `If YES → call "done" with the same reason. ` +
+              `If NO → call the appropriate action tool to continue working toward the goal. ` +
+              `Be strict: if the keyboard is still covering the screen, if the expected content is not visible, ` +
+              `or if the action clearly didn't complete, the goal is NOT achieved.`,
+            step,
+            maxSteps,
+            dom: verifyScreen.dom,
+            screenshot: verifyScreen.screenshot,
+            lastResult: `Agent called done with reason: "${reason}". Verifying...`,
+            screenChanges: {
+              changed: false,
+              addedCount: 0,
+              removedCount: 0,
+              summary: 'Verification step',
+            },
+            platform: detectedPlatform,
+          });
 
-            if (verifyDecision.usage) {
-              totalInputTokens += verifyDecision.usage.inputTokens;
-              totalOutputTokens += verifyDecision.usage.outputTokens;
-              totalCachedTokens += verifyDecision.usage.cachedTokens ?? 0;
-            }
-
-            if (verifyDecision.toolName !== 'done') {
-              // Verification rejected — the goal is NOT actually achieved
-              ui.printWarning(`Done rejected by verification — continuing`);
-              lastResult =
-                `⚠️ VERIFICATION FAILED: You called "done" but the screenshot does NOT confirm the goal is achieved. ` +
-                `Continue working toward the goal. Do NOT call "done" again until you have verified success visually.`;
-              llm.feedToolResult(lastResult);
-              // Use the verification's screenshot for the next step
-              postActionScreenshot = verifyScreen.screenshot;
-              cachedPostScreen = verifyScreen;
-              history.push({
-                step,
-                action: 'done_rejected',
-                decision,
-                result: lastResult,
-                screenHash,
-              });
-              continue; // Back to the top of the loop
-            }
+          if (verifyDecision.usage) {
+            totalInputTokens += verifyDecision.usage.inputTokens;
+            totalOutputTokens += verifyDecision.usage.outputTokens;
+            totalCachedTokens += verifyDecision.usage.cachedTokens ?? 0;
           }
-        } catch {
-          // Verification failed to execute — trust the LLM's original judgment
+
+          if (verifyDecision.toolName !== 'done') {
+            // Verification rejected — the goal is NOT actually achieved
+            ui.printWarning(`Done rejected by verification — continuing`);
+            lastResult =
+              `⚠️ VERIFICATION FAILED: You called "done" but the screen state does NOT confirm the goal is achieved. ` +
+              `Continue working toward the goal. Do NOT call "done" again until you have verified success on screen.`;
+            llm.feedToolResult(lastResult);
+            // Use the verification's screen for the next step
+            postActionScreenshot = verifyScreen.screenshot;
+            cachedPostScreen = verifyScreen;
+            history.push({
+              step,
+              action: 'done_rejected',
+              decision,
+              result: lastResult,
+              screenHash,
+            });
+            continue; // Back to the top of the loop
+          }
         }
+      } catch (err) {
+        // Verification failed to execute — log but accept the done to avoid blocking indefinitely
+        ui.printWarning(
+          `Done verification failed: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
 
       // ── Episodic memory: save winning trajectories ─────
@@ -853,9 +865,13 @@ async function executeMetaTool(
         if (isVisionMode) {
           // ══ VISION MODE: AI vision only, no DOM locators ══
 
+          // Keypad / single-digit targets: skip normalized fast-tap — LLM coords often hit
+          // adjacent keys (e.g. 5 vs backspace). Vision locate matches the labeled key.
+          const skipFastTapCoords = shouldPreferVisionLocateTap(selector);
+
           // Fast path: LLM provided 0-1000 normalized coordinates — skip vision locate entirely
           // Uses same scaleCoordinates() from df-vision as the playground
-          if (tapX != null && tapY != null) {
+          if (tapX != null && tapY != null && !skipFastTapCoords) {
             const scaled = await scaleLLMCoords(tapX, tapY);
             const tapped = await tapAtCoordinates(mcp, scaled.x, scaled.y);
             if (tapped) {
@@ -870,6 +886,10 @@ async function executeMetaTool(
             }
             attempts.push(`llm_coords [${scaled.x},${scaled.y}]: tap failed`);
             // Fall through to vision locate as backup
+          } else if (skipFastTapCoords && tapX != null && tapY != null && mcpDebug) {
+            console.log(
+              `        [vision-tap-policy] Ignoring LLM tap coords for keypad-like selector — using vision locate`
+            );
           }
 
           if (isVisionLocateEnabled()) {

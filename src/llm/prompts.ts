@@ -69,6 +69,7 @@ This skips the separate vision-locate step and executes the action much faster.
   Example: find_and_click(selector="search icon top right", tapX=950, tapY=70)
   Example: find_and_type(selector="search bar at center top", text="hello", tapX=500, tapY=120)
 The system handles scaling to device coordinates. If your coordinates miss, it falls back to vision locate.
+**Exception:** For single keypad digits, backspace, or "key N" targets, tap coordinates are ignored and vision locate runs — normalized guesses are too inaccurate on dense pads.
 
 **Writing good descriptions** — be specific about:
 - Visible text: "button labeled 'Send'", "field with hint 'Subject'"
@@ -84,7 +85,14 @@ Some apps (games, custom UIs) have on-screen keyboards where you must tap each k
 - Then tap each letter key one by one in the correct order.
 - After the last letter, tap the submit/enter/confirm key.
 - Use the screenshot to locate each key by its label and position on the keyboard.
-- After submitting, ALWAYS read the full screen feedback (colors, highlights, error messages) before deciding your next input. If the game rejects your input (e.g. "not a word"), delete it and choose a different valid input.`;
+- After submitting, ALWAYS read the full screen feedback (colors, highlights, error messages) before deciding your next input. If the game rejects your input (e.g. "not a word"), delete it and choose a different valid input.
+
+**NUMERIC PADS (timers, alarms, PINs, passcodes, dialers):**
+- Read the LARGE on-screen value first. Enter digits strictly in order until it matches the target (hours/minutes/seconds or code).
+- If the value is already correct through the first N digits, tap ONLY the next digit — do not use backspace unless you see a wrong digit you must erase.
+- Wrong key or accidental backspace: use backspace ONCE, then re-type only the tail digits you removed — never loop backspace + the same digit repeatedly.
+- Aim at the visual CENTER of each key; wrong rows often hit backspace or an adjacent number.
+- If two taps in a row with tapX/tapY missed the intended key, omit tapX/tapY on the next find_and_click so the pipeline uses vision locate (more accurate than guessed coordinates).`;
 
 /** Shared rules for both modes */
 const SHARED_RULES = `
@@ -102,6 +110,7 @@ RULES
 4. AFTER TAPPING — after find_and_click, check: did the screen change? If it looks the same, your tap may have missed. Try a different description.
 5. OVERLAYS — if anything is covering the screen (dialog, popup, dropdown, suggestions), handle it FIRST.
 6. NO REPETITION — if an action failed, try something DIFFERENT. Never repeat the same failing action.
+6b. ORDERED DIGITS (timer, PIN, passcode) — "Different" means the **next correct** digit/key you have not successfully entered yet. It does **not** mean delete/backspace unless the visible value clearly has a wrong extra digit. Never tap delete to explore or to satisfy "try something different."
 7. GO_BACK — only for dismissing popups or intentional navigation. Never mid-form — it discards your data.
 8. DONE — only when the goal is fully achieved AND verified in the screenshot.
 9. STAY FOCUSED — only your current goal. Ignore pending sub-goals.
@@ -243,7 +252,9 @@ export function buildUserMessage(context: AgentContext): string {
   }
 
   parts.push(
-    `\n⚡ Is the goal "${context.goal}" ALREADY achieved based on what you see? If yes, call "done".`
+    `\n⚡ COMPLETION CHECK: Is the goal "${context.goal}" fully and verifiably achieved? ` +
+      `Only call "done" if you can point to SPECIFIC VISIBLE EVIDENCE on screen confirming completion. ` +
+      `If there is any doubt, take one more verification action first.`
   );
 
   return parts.join('\n');
@@ -259,12 +270,13 @@ export function buildUserMessage(context: AgentContext): string {
 function buildContextualHints(context: AgentContext): string {
   const hints: string[] = [];
 
-  // Low on steps — push toward decisive action
+  // Low on steps — push toward decisive action, but still require evidence
   const stepRatio = (context.step + 1) / context.maxSteps;
   if (stepRatio > 0.7) {
     const remaining = context.maxSteps - context.step - 1;
     hints.push(
-      `⏳ LOW ON STEPS (${remaining} left) — prioritize direct actions. If the goal looks achieved, call "done" now.`
+      `⏳ LOW ON STEPS (${remaining} left) — take the most direct action available. ` +
+        `Only call "done" if you can see clear, specific evidence in the screenshot that the goal is fully achieved.`
     );
   }
 

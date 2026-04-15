@@ -226,9 +226,15 @@ function buildMetaTools(agentMode: 'dom' | 'vision'): Record<string, Tool> {
   return {
     done: tool({
       description:
-        'Signal that the goal has been achieved. Call this as soon as the task is complete.',
+        'Signal that the goal has been achieved. ONLY call this when you can see SPECIFIC, OBSERVABLE EVIDENCE on the current screen that the goal is fully complete. ' +
+        'Your reason MUST describe what you can see on screen that proves completion (e.g., "The timer shows 16:20", "WiFi toggle is now ON", "Message sent confirmation visible"). ' +
+        'Never call done based on assumptions or because an action was performed — only when you can verify the result on screen.',
       inputSchema: z.object({
-        reason: z.string().describe('Why the goal is complete'),
+        reason: z
+          .string()
+          .describe(
+            'What you can SEE on screen right now that proves the goal is complete (cite specific visible elements, text, or state)'
+          ),
       }),
     }),
 
@@ -283,9 +289,17 @@ function buildMetaTools(agentMode: 'dom' | 'vision'): Record<string, Tool> {
 // Models known to support extended thinking
 const THINKING_MODELS: Record<string, RegExp> = {
   anthropic: /claude/, // All Claude models support thinking
-  gemini: /gemini-(2\.5|3\.|[4-9])/, // Gemini 2.5+ supports thinking
+  gemini: /gemini-(2\.5|3\.|[4-9])/, // Gemini 2.5+ and 3+ (Google thinking API)
   openai: /^(o1|o3|o4)/, // Only reasoning models (o-series)
 };
+
+function isGemini3Family(modelId: string): boolean {
+  return /gemini-3/i.test(modelId);
+}
+
+function isGemini25Family(modelId: string): boolean {
+  return /gemini-2\.5/i.test(modelId);
+}
 
 export function buildThinkingOptions(config: AppClawConfig): Record<string, any> | undefined {
   if (config.LLM_THINKING !== 'on') return undefined;
@@ -305,12 +319,25 @@ export function buildThinkingOptions(config: AppClawConfig): Record<string, any>
           thinking: { type: 'enabled', budgetTokens: budget },
         },
       };
-    case 'gemini':
-      return {
-        google: {
-          thinkingConfig: { thinkingBudget: budget },
-        },
-      };
+    case 'gemini': {
+      // https://ai.google.dev/gemini-api/docs/thinking
+      const thinkingConfig: Record<string, unknown> = {};
+      if (config.LLM_GEMINI_INCLUDE_THOUGHTS) {
+        thinkingConfig.includeThoughts = true;
+      }
+      if (isGemini3Family(modelId)) {
+        thinkingConfig.thinkingLevel = config.LLM_GEMINI_THINKING_LEVEL;
+        return { google: { thinkingConfig } };
+      }
+      if (isGemini25Family(modelId)) {
+        thinkingConfig.thinkingBudget = budget;
+        return { google: { thinkingConfig } };
+      }
+      if (config.LLM_GEMINI_INCLUDE_THOUGHTS) {
+        return { google: { thinkingConfig } };
+      }
+      return undefined;
+    }
     case 'openai':
       return {
         openai: {
@@ -415,10 +442,18 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
         // Defer onTextStart until the first non-empty chunk arrives — avoids
         // a brief "Reasoning..." flicker for providers (Gemini, GPT-4o) that
         // go straight to tool calls with no text prefix.
+        // Gemini thought summaries map to reasoning-delta; plain pre-tool text is text-delta.
+        // textStream omits reasoning — use fullStream so goal-based runs show thinking.
         let reasoningText = '';
         let streamingStarted = false;
-        for await (const chunk of stream.textStream) {
-          if (!chunk) continue; // Skip empty keep-alive frames from providers
+        for await (const part of stream.fullStream) {
+          const chunk =
+            part.type === 'reasoning-delta'
+              ? part.text
+              : part.type === 'text-delta'
+                ? part.text
+                : '';
+          if (!chunk) continue;
           if (!streamingStarted) {
             callbacks.onTextStart?.();
             streamingStarted = true;
@@ -498,10 +533,11 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
       // Extract the first tool call
       const toolCall = result.toolCalls?.[0];
       if (!toolCall) {
+        const fallbackReason = [result.reasoningText, result.text].filter(Boolean).join('\n');
         return {
           toolName: 'done',
-          args: { reason: result.text || 'No action decided' },
-          reasoning: result.text,
+          args: { reason: result.text || fallbackReason || 'No action decided' },
+          reasoning: fallbackReason || result.text,
           usage,
         };
       }
@@ -512,10 +548,12 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
       // Track last tool for feedToolResult
       lastToolName = toolCall.toolName;
 
+      const reasoningCombined = [result.reasoningText, result.text].filter(Boolean).join('\n');
+
       return {
         toolName: toolCall.toolName,
         args: (toolArgs ?? {}) as Record<string, unknown>,
-        reasoning: result.text || undefined,
+        reasoning: reasoningCombined || undefined,
         usage,
       };
     },

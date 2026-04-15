@@ -92,8 +92,24 @@ const envSchema = z.object({
 
   /** Enable extended thinking/reasoning for supported providers (anthropic, gemini, openai) */
   LLM_THINKING: z.enum(['on', 'off']).default('on'),
-  /** Max tokens the model can use for thinking (budget). Higher = deeper reasoning but slower + more expensive. */
+  /**
+   * Gemini 2.5: thinking token budget (0 = off, -1 = dynamic per Google).
+   * Gemini 3.x: prefer LLM_GEMINI_THINKING_LEVEL; budget is not sent for 3.x to avoid odd interactions on 3 Pro.
+   * Anthropic: extended thinking budget.
+   */
   LLM_THINKING_BUDGET: z.coerce.number().default(128),
+
+  /**
+   * Gemini 3.x only — reasoning depth (https://ai.google.dev/gemini-api/docs/thinking).
+   * Ignored for Gemini 2.5 (those use LLM_THINKING_BUDGET).
+   */
+  LLM_GEMINI_THINKING_LEVEL: z.enum(['minimal', 'low', 'medium', 'high']).default('medium'),
+
+  /** When Gemini thinking is on, request thought summaries in the API stream (includeThoughts). */
+  LLM_GEMINI_INCLUDE_THOUGHTS: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
 
   /**
    * If > 0, screenshots sent to the agent/planner LLM are downscaled so max(width,height) ≤ this value (aspect preserved).

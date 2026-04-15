@@ -168,7 +168,7 @@ Overlays include:
 
 Return "adapt" ONLY if you see an overlay in the DOM that is blocking the goal. The adapted goal should describe how to dismiss the specific overlay (tap a specific element from the DOM).
 
-Return "done" if the current sub-goal is clearly already achieved on the current screen.
+Return "done" ONLY if the current sub-goal is UNAMBIGUOUSLY and FULLY achieved — meaning there is specific, visible evidence in the DOM confirming completion (e.g., the correct screen is showing, the element is in the expected state, the expected text/value is visible). When in any doubt, return "continue".
 
 Return "continue" for everything else — this is the DEFAULT. When in doubt, return "continue".
 
@@ -380,10 +380,11 @@ CRITICAL: Do NOT assume the screen matches what you'd expect after the completed
 
 Your job is to decide ONE of three actions:
 
-**skip** — The sub-goal is ALREADY achieved on the current screen. For example:
-- Sub-goal is "Open Settings" but Settings is already open
-- Sub-goal is "Navigate to WiFi settings" but WiFi settings are already visible
-- Sub-goal is "Enter email address" but the address is already in the field
+**skip** — The sub-goal is CLEARLY and UNAMBIGUOUSLY already achieved on the current screen, with specific visible evidence. For example:
+- Sub-goal is "Open Settings" but Settings is already open (DOM shows Settings screen elements)
+- Sub-goal is "Navigate to WiFi settings" but WiFi settings are already visible in DOM
+- Sub-goal is "Enter email address" but the address is already present in the field in the DOM
+Only skip when there is CONCRETE evidence in the DOM/screenshot — never skip based on assumptions.
 
 **rewrite** — The sub-goal needs adaptation because the screen state is different than expected. For example:
 - Sub-goal is "Navigate to X" but X is already visible — rewrite to the actual action needed
@@ -422,6 +423,7 @@ Rules:
 9. IMPORTANT: When a sub-goal involves typing/entering text into a field, use the word "Type" explicitly (not "Enter" which is ambiguous). Example: "Type 'hello@email.com' into the To field" NOT "Enter hello@email.com in the recipient field"
 10. FIELD-SPECIFIC SUB-GOALS: When a screen has multiple input fields, create a separate sub-goal for EACH field that needs to be filled. Always name the specific field in the sub-goal (e.g., "Type 'X' into the [field name] field"). NEVER say "Type into the field" without specifying WHICH field. The agent needs to know exactly which field to target.
 11. ITERATIVE FEEDBACK LOOPS — Do NOT decompose tasks that require repeated action→observe→adapt cycles. If completing the goal requires submitting input, reading a response, and submitting again based on that response (e.g., word puzzles, quizzes, multi-round challenges), keep ALL of those cycles inside ONE sub-goal. Splitting "type", "tap submit", and "analyze result" into separate sub-goals destroys the agent's ability to adapt between rounds — it loses the context of previous results. The single sub-goal description should explain the full loop: what to input, how to submit, and how to interpret the feedback for the next round.
+12. FIXED-ORDER KEYPAD / PIN / CODE — When the user specifies an exact multi-digit value (duration, PIN, OTP, room number, etc.), the plan must make the digit order unambiguous: either state the full sequence explicitly in one sub-goal, or split into one sub-goal per digit. Avoid a single vague step like "enter the digits" or "tap the keys in order" with no sequence — the executor cannot infer order reliably.
 
 Examples of SIMPLE goals (no decomposition needed):
 - "Open Settings" → simple (single app launch)

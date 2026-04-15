@@ -66,7 +66,16 @@ function tryParseSizeFromText(text: string): { width: number; height: number } |
   } catch {
     /* not JSON */
   }
-  const m = trimmed.match(/\b(\d{2,5})\s*[x×,]\s*(\d{2,5})\b/);
+  // Handle "Width: 1440, Height: 3120" format returned by appium_get_window_size MCP tool
+  const wMatch = trimmed.match(/\bwidth[:\s]+(\d+)/i);
+  const hMatch = trimmed.match(/\bheight[:\s]+(\d+)/i);
+  if (wMatch && hMatch) {
+    const w = parseInt(wMatch[1], 10);
+    const h = parseInt(hMatch[1], 10);
+    if (w > 0 && h > 0) return { width: w, height: h };
+  }
+  // Handle "NxM" or "N,M" compact formats
+  const m = trimmed.match(/\b(\d{2,5})\s*[x×]\s*(\d{2,5})\b/);
   if (m) {
     const w = parseInt(m[1], 10);
     const h = parseInt(m[2], 10);

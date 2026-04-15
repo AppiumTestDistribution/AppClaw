@@ -7,6 +7,25 @@ import { createHash } from 'crypto';
 import type { UIElement, CompactUIElement } from './types.js';
 import { extractTexts } from './dom-trimmer.js';
 
+/**
+ * Perception hash for stuck detection and per-screen failure caches.
+ * When DOM is unavailable (vision-only runs), fingerprints the screenshot so
+ * real UI changes (e.g. timer digits) still advance the hash.
+ */
+export function computePerceptionHash(dom: string, screenshot?: string): string {
+  const trimmed = dom.trim();
+  if (trimmed.length > 0) {
+    return computeScreenHash(trimmed);
+  }
+  if (screenshot && screenshot.length > 0) {
+    return createHash('md5')
+      .update(`img:${screenshot.length}:`)
+      .update(screenshot.slice(0, 32768))
+      .digest('hex');
+  }
+  return computeScreenHash('');
+}
+
 /** Compute a hash for screen state comparison. */
 export function computeScreenHash(input: string | UIElement[] | CompactUIElement[]): string {
   if (typeof input === 'string') {
