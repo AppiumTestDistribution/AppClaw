@@ -996,9 +996,7 @@ export async function executeStep(
       // Destination: use locator coordinates if valid; otherwise infer direction from step.to / step.from
       const rawToCoords = toLocatorFallback?.coordinates as [number, number] | undefined;
       const hasValidTo =
-        rawToCoords &&
-        rawToCoords.length >= 2 &&
-        !(rawToCoords[0] === 0 && rawToCoords[1] === 0);
+        rawToCoords && rawToCoords.length >= 2 && !(rawToCoords[0] === 0 && rawToCoords[1] === 0);
 
       let toCoords: [number, number];
       if (hasValidTo) {

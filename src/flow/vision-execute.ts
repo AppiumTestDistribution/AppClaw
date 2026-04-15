@@ -608,14 +608,13 @@ export async function visionExecute(
     const firstLocator = locators[0];
     const firstCoords = firstLocator?.coordinates;
     const hasElementCoords =
-      firstCoords &&
-      firstCoords.length >= 2 &&
-      !(firstCoords[0] === 0 && firstCoords[1] === 0);
+      firstCoords && firstCoords.length >= 2 && !(firstCoords[0] === 0 && firstCoords[1] === 0);
 
     if (!hasElementCoords) {
       const step: FlowStep = { kind: 'swipe', direction, verbatim: instruction };
       // appium_scroll only supports up/down; use appium_swipe for left/right
-      const scrollTool = direction === 'left' || direction === 'right' ? 'appium_swipe' : 'appium_scroll';
+      const scrollTool =
+        direction === 'left' || direction === 'right' ? 'appium_swipe' : 'appium_scroll';
       await mcp.callTool(scrollTool, { direction });
       return { step, result: { success: true, message: `Swiped ${direction}` } };
     }
@@ -627,8 +626,7 @@ export async function visionExecute(
   if ((SWIPE_ACTIONS.has(actionName) || actionName === 'swipe') && locators.length > 0) {
     const elementLocator = locators[0];
     const coords = elementLocator?.coordinates;
-    const hasElementCoords =
-      coords && coords.length >= 2 && !(coords[0] === 0 && coords[1] === 0);
+    const hasElementCoords = coords && coords.length >= 2 && !(coords[0] === 0 && coords[1] === 0);
 
     // Resolve direction: action name itself (when vision returns direction as action), then value, then instruction text
     const valueStr = value ? String(value).toLowerCase().trim() : '';
@@ -643,9 +641,9 @@ export async function visionExecute(
               ? 'left'
               : /\bdown\b/.test(instruction.toLowerCase())
                 ? 'down'
-              : /\bup\b/.test(instruction.toLowerCase())
-                ? 'up'
-                : null
+                : /\bup\b/.test(instruction.toLowerCase())
+                  ? 'up'
+                  : null
     ) as 'up' | 'down' | 'left' | 'right' | null;
 
     if (direction && hasElementCoords) {

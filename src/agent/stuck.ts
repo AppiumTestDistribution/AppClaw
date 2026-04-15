@@ -93,8 +93,7 @@ export function createStuckDetector(windowSize: number = 8): StuckDetector {
 
       // Keypad/timer entry can flip between two hashes (mistype → backspace → retry).
       // Do not treat that ABAB pattern alone as a stuck "toggle oscillation".
-      const oscillationCountsAsStuck =
-        oscillating && !(goal && isDataEntryLikeGoal(goal));
+      const oscillationCountsAsStuck = oscillating && !(goal && isDataEntryLikeGoal(goal));
 
       // For keypad/timer/PIN entry, repeating `find_and_click` is expected while
       // entering each next digit. Treat repetition as stuck only for non-entry goals.
