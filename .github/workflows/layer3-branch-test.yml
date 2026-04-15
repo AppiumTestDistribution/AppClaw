@@ -1,13 +1,4 @@
-name: AppClaw Action — Branch Test (Layer 3)
-
-# Layer 3 test — validates the action as an external caller would use it.
-# References the branch by name (not ./github-action) so it exercises the
-# full public action resolution path before the branch is tagged and published.
-#
-# Triggers:
-#   - Every pull_request (android YAML flow by default)
-#   - Actions tab → "Run workflow" for manual runs with custom inputs
-# Required secret: LLM_API_KEY
+name: AppClaw Action
 
 on:
   pull_request:
