@@ -169,9 +169,7 @@ async function runWorkerJob(
   const deviceResult = await setupDevice(sharedMcp, {
     ...baseSetupArgs,
     cliUdid: isCloud ? null : device.udid,
-    extraCaps: isCloud
-      ? { ...appCap }
-      : { 'appium:udid': device.udid, ...workerCaps, ...appCap },
+    extraCaps: isCloud ? { ...appCap } : { 'appium:udid': device.udid, ...workerCaps, ...appCap },
   });
 
   emitJson({
