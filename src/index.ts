@@ -22,6 +22,7 @@ import { SessionLogger } from './logger.js';
 import { ActionRecorder } from './recording/recorder.js';
 import { loadRecording, replayRecording } from './recording/replayer.js';
 import { parseFlowYamlFile, isSuiteYaml, parseSuiteYamlFile } from './flow/parse-yaml-flow.js';
+import { resolveFlowApp } from './flow/types.js';
 import { runYamlFlow } from './flow/run-yaml-flow.js';
 import { runFlowOnDevices, runSuite, printParallelSummary } from './flow/parallel-runner.js';
 import { readFileSync } from 'fs';
@@ -641,10 +642,11 @@ async function main() {
       emitJson({ event: 'connected', data: { transport: config.MCP_TRANSPORT } });
       let flowScopedMcp = mcp;
       try {
+        const flowApp = resolveFlowApp(parsed.meta.app, flowCliPlatform);
         const deviceResult = await setupDevice(mcp, {
           ...baseSetupArgs,
           cliPlatform: flowCliPlatform,
-          ...(parsed.meta.app ? { extraCaps: { 'appium:app': parsed.meta.app } } : {}),
+          ...(flowApp ? { extraCaps: { 'appium:app': flowApp } } : {}),
         });
         flowPlatform = deviceResult.platform;
         flowDeviceUdid = deviceResult.deviceUdid;

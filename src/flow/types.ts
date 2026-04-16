@@ -5,9 +5,18 @@ export interface FlowMeta {
    * Local file path or HTTP(S) URL to the app to install for this flow (APK/IPA).
    * Passed as `appium:app` capability at session creation so Appium installs it automatically.
    * Overrides the global APP_PATH env var.
-   * Example: `app: https://example.com/MyApp.apk`
+   *
+   * Single string (same URL for all platforms):
+   *   `app: https://example.com/MyApp.apk`
+   *
+   * Platform-specific URLs:
+   *   ```yaml
+   *   app:
+   *     android: https://example.com/MyApp.apk
+   *     ios: https://example.com/MyApp.zip
+   *   ```
    */
-  app?: string;
+  app?: string | { android?: string; ios?: string };
   name?: string;
   description?: string;
   platform?: 'android' | 'ios';
@@ -113,4 +122,14 @@ export interface PhaseResult {
   stepsTotal: number;
   failedAt?: number;
   reason?: string;
+}
+
+/** Resolve the app path/URL for a given platform from a FlowMeta.app value. */
+export function resolveFlowApp(
+  app: FlowMeta['app'],
+  platform: 'android' | 'ios' | null | undefined
+): string | undefined {
+  if (!app) return undefined;
+  if (typeof app === 'string') return app;
+  return platform === 'ios' ? app.ios : app.android;
 }
