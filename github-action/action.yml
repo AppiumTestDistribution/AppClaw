@@ -111,6 +111,10 @@ inputs:
     description: 'AppClaw npm package version to install. Default: latest'
     required: false
     default: 'latest'
+  use-local-build:
+    description: 'Build and install AppClaw from the checked-out source instead of npm. Use in PRs to test local changes.'
+    required: false
+    default: 'false'
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
@@ -161,11 +165,22 @@ runs:
       with:
         node-version: '22'
 
-    - name: Install AppClaw
+    - name: Install AppClaw (from npm)
+      if: inputs.use-local-build == 'false'
       shell: bash
       run: |
         echo "::group::Installing appclaw@${{ inputs.appclaw-version }}"
         npm install -g appclaw@${{ inputs.appclaw-version }} mjpeg-consumer
+        echo "::endgroup::"
+
+    - name: Install AppClaw (from local source)
+      if: inputs.use-local-build == 'true'
+      shell: bash
+      run: |
+        echo "::group::Building and installing AppClaw from local source"
+        npm ci
+        npm run build
+        npm install -g . mjpeg-consumer
         echo "::endgroup::"
 
     # ── LambdaTest — YAML flow ────────────────────────────────────────────────

@@ -33,6 +33,7 @@ jobs:
       - uses: ./github-action
         id: run
         with:
+          use-local-build: 'true'
           flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: android
           provider: gemini
@@ -56,6 +57,7 @@ jobs:
       - uses: ./github-action
         id: run
         with:
+          use-local-build: 'true'
           goal: ${{ inputs.goal }}
           platform: android
           provider: gemini
@@ -79,6 +81,7 @@ jobs:
       - uses: ./github-action
         id: run
         with:
+          use-local-build: 'true'
           flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: ios
           provider: gemini
