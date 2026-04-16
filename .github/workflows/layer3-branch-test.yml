@@ -7,7 +7,7 @@ on:
       flow:
         description: 'Path to YAML flow file in your repo'
         required: false
-        default: 'flows/youtube.yaml'
+        default: 'flows/wdio.yaml'
       goal:
         description: 'Natural language goal (leave empty to use flow instead)'
         required: false
@@ -33,7 +33,7 @@ jobs:
       - uses: ./github-action
         id: run
         with:
-          flow: ${{ inputs.flow || 'flows/youtube.yaml' }}
+          flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: android
           provider: gemini
           api-key: ${{ secrets.LLM_API_KEY }}
@@ -79,7 +79,7 @@ jobs:
       - uses: ./github-action
         id: run
         with:
-          flow: ${{ inputs.flow || 'flows/youtube.yaml' }}
+          flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: ios
           provider: gemini
           api-key: ${{ secrets.LLM_API_KEY }}
