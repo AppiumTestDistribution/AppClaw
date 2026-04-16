@@ -65,6 +65,10 @@ inputs:
     description: 'Emulator system image target: default or google_apis'
     required: false
     default: 'default'
+  android-arch:
+    description: 'Emulator CPU architecture: x86_64 or x86. Default: x86_64 (required for API 31+)'
+    required: false
+    default: 'x86_64'
 
   # ── LambdaTest cloud ─────────────────────────────────────────────────────────
   cloud-provider:
@@ -107,6 +111,10 @@ inputs:
     description: 'AppClaw npm package version to install. Default: latest'
     required: false
     default: 'latest'
+  use-local-build:
+    description: 'Build and install AppClaw from the checked-out source instead of npm. Use in PRs to test local changes.'
+    required: false
+    default: 'false'
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
@@ -157,11 +165,22 @@ runs:
       with:
         node-version: '22'
 
-    - name: Install AppClaw
+    - name: Install AppClaw (from npm)
+      if: inputs.use-local-build == 'false'
       shell: bash
       run: |
         echo "::group::Installing appclaw@${{ inputs.appclaw-version }}"
-        npm install -g appclaw@${{ inputs.appclaw-version }}
+        npm install -g appclaw@${{ inputs.appclaw-version }} mjpeg-consumer
+        echo "::endgroup::"
+
+    - name: Install AppClaw (from local source)
+      if: inputs.use-local-build == 'true'
+      shell: bash
+      run: |
+        echo "::group::Building and installing AppClaw from local source"
+        npm install --no-package-lock
+        npm run build
+        npm install -g . mjpeg-consumer
         echo "::endgroup::"
 
     # ── LambdaTest — YAML flow ────────────────────────────────────────────────
@@ -231,6 +250,7 @@ runs:
         PLATFORM: android
       with:
         api-level: ${{ inputs.android-api-level }}
+        arch: ${{ inputs.android-arch }}
         profile: ${{ inputs.android-profile }}
         target: ${{ inputs.android-target }}
         emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
@@ -252,6 +272,7 @@ runs:
         PLATFORM: android
       with:
         api-level: ${{ inputs.android-api-level }}
+        arch: ${{ inputs.android-arch }}
         profile: ${{ inputs.android-profile }}
         target: ${{ inputs.android-target }}
         emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim

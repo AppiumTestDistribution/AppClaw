@@ -54,9 +54,13 @@ export async function createPlatformSession(
     }
   } else if (platform === 'ios') {
     // For iOS, appium-mcp handles most capabilities internally (WDA setup, device selection).
-    // Only pass extraCaps when provided (e.g. wdaLocalPort for parallel runs).
-    if (extraCaps && Object.keys(extraCaps).length > 0) {
-      args.capabilities = extraCaps;
+    // Merge config-level APP_PATH with extraCaps (extraCaps wins, e.g. per-flow app: overrides .env).
+    const iosCaps = {
+      ...(config.APP_PATH ? { 'appium:app': config.APP_PATH } : {}),
+      ...extraCaps,
+    };
+    if (Object.keys(iosCaps).length > 0) {
+      args.capabilities = iosCaps;
     }
   }
 
@@ -96,7 +100,7 @@ export async function createPlatformSession(
   }
 }
 
-/** Build Android-specific session capabilities (MJPEG etc.) */
+/** Build Android-specific session capabilities (MJPEG, app install etc.) */
 function buildAndroidCapabilities(config: AppClawConfig): Record<string, unknown> {
   const caps: Record<string, unknown> = {};
   const explicitUrl = config.APPIUM_MJPEG_SCREENSHOT_URL.trim();
@@ -107,6 +111,9 @@ function buildAndroidCapabilities(config: AppClawConfig): Record<string, unknown
   }
   if (explicitUrl) {
     caps['appium:mjpegScreenshotUrl'] = explicitUrl;
+  }
+  if (config.APP_PATH) {
+    caps['appium:app'] = config.APP_PATH;
   }
 
   return caps;

@@ -1,0 +1,7 @@
+platform: ios
+---
+steps:
+  - open contacts
+  - click on plus icon
+  - wait for Add photo text
+  - done

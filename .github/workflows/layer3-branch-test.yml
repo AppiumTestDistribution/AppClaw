@@ -7,7 +7,7 @@ on:
       flow:
         description: 'Path to YAML flow file in your repo'
         required: false
-        default: 'flows/youtube.yaml'
+        default: 'flows/wdio.yaml'
       goal:
         description: 'Natural language goal (leave empty to use flow instead)'
         required: false
@@ -33,9 +33,11 @@ jobs:
       - uses: ./github-action
         id: run
         with:
-          flow: ${{ inputs.flow || 'flows/youtube.yaml' }}
+          use-local-build: 'true'
+          flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: android
           provider: gemini
+          agent-mode: vision
           api-key: ${{ secrets.LLM_API_KEY }}
           report-name: layer3-android-flow-${{ github.run_id }}
 
@@ -56,9 +58,11 @@ jobs:
       - uses: ./github-action
         id: run
         with:
+          use-local-build: 'true'
           goal: ${{ inputs.goal }}
           platform: android
           provider: gemini
+          agent-mode: vision
           api-key: ${{ secrets.LLM_API_KEY }}
           report-name: layer3-android-goal-${{ github.run_id }}
 
@@ -71,7 +75,7 @@ jobs:
   ios-flow:
     name: iOS — YAML flow
     runs-on: macos-14
-    if: github.event_name == 'workflow_dispatch' && inputs.platform == 'ios'
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.platform == 'ios')
 
     steps:
       - uses: actions/checkout@v4
@@ -79,9 +83,11 @@ jobs:
       - uses: ./github-action
         id: run
         with:
-          flow: ${{ inputs.flow || 'flows/youtube.yaml' }}
+          use-local-build: 'true'
+          flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: ios
           provider: gemini
+          agent-mode: vision
           api-key: ${{ secrets.LLM_API_KEY }}
           report-name: layer3-ios-flow-${{ github.run_id }}
 

@@ -31,6 +31,7 @@ import { AppResolver } from '../agent/app-resolver.js';
 import { runYamlFlow } from './run-yaml-flow.js';
 import type { RunYamlFlowOptions, RunYamlFlowResult } from './run-yaml-flow.js';
 import type { ParsedFlow, ParsedSuite } from './types.js';
+import { resolveFlowApp } from './types.js';
 import { parseFlowYamlFile } from './parse-yaml-flow.js';
 import { RunArtifactCollector, writeSuiteEntry } from '../report/writer.js';
 import { emitJson, isJsonMode } from '../json-emitter.js';
@@ -165,10 +166,12 @@ async function runWorkerJob(
   const { caps: workerCaps, mjpegUrl } = isCloud
     ? { caps: {}, mjpegUrl: undefined }
     : await buildWorkerCaps(platform);
+  const appUrl = resolveFlowApp(job.parsed.meta.app, platform);
+  const appCap = appUrl ? { 'appium:app': appUrl } : {};
   const deviceResult = await setupDevice(sharedMcp, {
     ...baseSetupArgs,
     cliUdid: isCloud ? null : device.udid,
-    extraCaps: isCloud ? {} : { 'appium:udid': device.udid, ...workerCaps },
+    extraCaps: isCloud ? { ...appCap } : { 'appium:udid': device.udid, ...workerCaps, ...appCap },
   });
 
   emitJson({
