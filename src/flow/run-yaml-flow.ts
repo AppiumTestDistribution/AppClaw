@@ -559,9 +559,10 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
     ...(baseUrl && { coordinateOrder: getStarkVisionCoordinateOrder() }),
   });
 
-  const query = `Is "${text}" visible or present on this screen?`;
-
-  // Single attempt — callers (waitUntilCondition, assertTextVisible) handle retrying
+  // Single attempt — callers (waitUntilCondition, assertTextVisible) handle retrying.
+  // Use getElementInfo (semantic prompt) instead of isElementVisible (exact-match prompt):
+  // getElementInfo interprets the condition as intent, handling typos ("viisble"),
+  // extra words ("is visible", "until"), and any spoken language naturally.
   const maxAttempts = 1;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (attempt > 0) await sleep(500);
@@ -570,13 +571,13 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
       ui.printAgentBullet(
         `[vision-assert] Taking screenshot for: "${text}"${attempt > 0 ? ` (retry ${attempt})` : ''}`
       );
-    const rawImage = await screenshot(mcp);
-    if (!rawImage) {
+    // Use the raw screenshot without downscaling — text-reading assertions need
+    // full resolution to identify small labels (e.g. bottom nav items on high-DPI devices).
+    const imageBase64 = await screenshot(mcp);
+    if (!imageBase64) {
       if (mcpDebug) ui.printWarning('[vision-assert] Failed to capture screenshot');
       continue;
     }
-    const { downscaleForVision } = await import('./vision-execute.js');
-    const imageBase64 = await downscaleForVision(rawImage);
     if (mcpDebug)
       ui.printAgentBullet(
         `[vision-assert] Screenshot captured (${Math.round(imageBase64.length / 1024)}KB)`
@@ -587,13 +588,12 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
         `[vision-assert] Asking LLM: is "${text}" visible? (model: ${getStarkVisionModel()})`
       );
     const visT0 = performance.now();
-    const response = await client.isElementVisible(imageBase64, query, false);
+    const response = await client.isElementVisible(imageBase64, text, false);
     const visElapsed = Math.round(performance.now() - visT0);
     if (mcpDebug)
       ui.printAgentBullet(`[vision-assert] LLM response (${visElapsed}ms): ${response}`);
 
-    // Parse structured JSON response first (e.g. { conditionSatisfied: true/false })
-    // Strip markdown code fences if present (```json ... ```)
+    // Parse { conditionSatisfied: boolean } from isElementVisible response
     let result = false;
     const jsonStr = response
       .replace(/^```(?:json)?\s*\n?/i, '')
@@ -608,6 +608,20 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
       } else {
         const lower = jsonStr.toLowerCase();
         result = lower.includes('"conditionsatisfied": true') || lower.includes('"visible": true');
+      }
+      // The isElementVisible prompt returns conditionSatisfied=false when a popup is present,
+      // even if that popup IS what the user is waiting for. If the popup type matches the
+      // search text (e.g. waiting for "success" and typeOfPopUp="Success"), treat as visible.
+      if (!result && parsed.systemPopUp === true) {
+        const popupType = (parsed.typeOfPopUp ?? '').toLowerCase().trim();
+        const searchText = text.toLowerCase();
+        if (popupType && (searchText.includes(popupType) || popupType.includes(searchText))) {
+          if (mcpDebug)
+            ui.printAgentBullet(
+              `[vision-assert] popup match: typeOfPopUp="${parsed.typeOfPopUp}" matches "${text}" → treating as VISIBLE`
+            );
+          result = true;
+        }
       }
     } catch {
       const lower = response.toLowerCase();
@@ -776,6 +790,11 @@ async function waitUntilCondition(
 ): Promise<ActionResult> {
   const pollMs = 500;
   const deadline = Date.now() + timeoutSeconds * 1000;
+
+  if (mcpDebug)
+    ui.printAgentBullet(
+      `[waitUntil] condition=${condition} text=${text ? `"${text}"` : 'n/a'} timeout=${timeoutSeconds}s`
+    );
 
   if (condition === 'screenLoaded') {
     // Wait until the screen has stabilized.

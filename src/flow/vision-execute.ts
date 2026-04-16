@@ -317,12 +317,16 @@ function preCheck(instruction: string): PreCheckResult | null {
     return { step: { kind: 'waitUntil', condition: 'gone', text, timeoutSeconds, verbatim: t } };
   }
   const waitUntilVisible = waitBody.match(
-    /^(?:wait\s+until|wait\s+for)\s+["']?(.+?)["']?(?:\s+(?:is\s+)?(?:visible|present|shown|displayed|there|appears?))?\.?$/i
+    /^(?:wait\s+until|wait\s+for)\s+["']?(.+?)["']?(?:\s+(?:is\s+|to\s+be\s+)?(?:vis\w*|present|shown|displayed?|there|appears?))?\.?$/i
   );
   if (waitUntilVisible) {
     const text = waitUntilVisible[1].trim();
     // Exclude bare "wait for Ns" (already handled above) and very short strings
     if (text && !/^\d+(?:\.\d+)?\s*(?:s|sec|seconds|ms)?$/i.test(text)) {
+      if (mcpDebug)
+        console.log(
+          `        ${theme.dim('preCheck')} ${theme.info('waitUntil visible')} extracted text=${theme.warn(`"${text}"`)} timeout=${theme.dim(`${timeoutSeconds}s`)} from ${theme.dim(`"${t}"`)}`
+        );
       return {
         step: { kind: 'waitUntil', condition: 'visible', text, timeoutSeconds, verbatim: t },
       };
@@ -702,11 +706,14 @@ export async function visionExecute(
     return { step, result: { success: false, message: '__needs_executeStep__' } };
   }
 
-  // Verify/assert — pass the user's original instruction to the vision model
+  // Verify/assert — use the extracted value (element name) from understandAndLocate,
+  // not the raw instruction which may contain action words like "wait unil X is visible".
   if (ASSERT_ACTIONS.has(actionName)) {
-    const step: FlowStep = { kind: 'assert', text: instruction, verbatim: instruction };
+    const assertTarget =
+      value && typeof value === 'string' && value.trim() ? value.trim() : instruction;
+    const step: FlowStep = { kind: 'assert', text: assertTarget, verbatim: instruction };
     const t2 = performance.now();
-    const visResponse = await client.isElementVisible(imageBase64, instruction, true);
+    const visResponse = await client.isElementVisible(imageBase64, assertTarget, true);
     logTiming('isElementVisible', Math.round(performance.now() - t2));
     let visible = false;
     const visJsonStr = visResponse
