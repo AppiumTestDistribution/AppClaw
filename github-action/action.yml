@@ -178,7 +178,7 @@ runs:
       shell: bash
       run: |
         echo "::group::Building and installing AppClaw from local source"
-        npm ci
+        npm install --no-package-lock
         npm run build
         npm install -g . mjpeg-consumer
         echo "::endgroup::"
