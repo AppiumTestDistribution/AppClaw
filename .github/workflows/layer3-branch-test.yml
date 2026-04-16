@@ -75,7 +75,7 @@ jobs:
   ios-flow:
     name: iOS — YAML flow
     runs-on: macos-14
-    if: github.event_name == 'workflow_dispatch' && inputs.platform == 'ios'
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.platform == 'ios')
 
     steps:
       - uses: actions/checkout@v4
