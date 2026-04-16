@@ -23,6 +23,14 @@ const envSchema = z.object({
   /** Device name to target (e.g. "iPhone 16 Pro"). Alternative to DEVICE_UDID. */
   DEVICE_NAME: z.string().default(''),
 
+  /**
+   * Local file path or HTTP(S) URL to an APK/IPA to install at session start.
+   * Passed as the `appium:app` capability so Appium downloads and installs it automatically.
+   * Example: APP_PATH=/path/to/app.apk  or  APP_PATH=https://example.com/MyApp.apk
+   * Can be overridden per-flow via the `app:` key in the YAML meta section.
+   */
+  APP_PATH: z.string().default(''),
+
   MCP_TRANSPORT: z.enum(['stdio', 'sse']).default('stdio'),
   MCP_HOST: z.string().default('localhost'),
   MCP_PORT: z.coerce.number().default(8080),

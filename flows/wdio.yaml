@@ -1,0 +1,14 @@
+platform: android
+app: https://github.com/webdriverio/native-demo-app/releases/download/v2.2.0/android.wdio.native.app.v2.2.0.apk
+---
+steps:
+  - open wdio app
+  - wait for Login
+  - click on Login
+  - enter appclaw@gmail.com in the username field
+  - enter appclaw123 in the password field
+  - go back
+  - click on login button
+  - wait for 2 seconds
+  - assert You are logged in
+  - done

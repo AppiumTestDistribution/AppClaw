@@ -1,6 +1,13 @@
 /** Optional header (first YAML document before `---`) */
 export interface FlowMeta {
   appId?: string;
+  /**
+   * Local file path or HTTP(S) URL to the app to install for this flow (APK/IPA).
+   * Passed as `appium:app` capability at session creation so Appium installs it automatically.
+   * Overrides the global APP_PATH env var.
+   * Example: `app: https://example.com/MyApp.apk`
+   */
+  app?: string;
   name?: string;
   description?: string;
   platform?: 'android' | 'ios';

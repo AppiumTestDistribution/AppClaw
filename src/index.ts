@@ -644,6 +644,7 @@ async function main() {
         const deviceResult = await setupDevice(mcp, {
           ...baseSetupArgs,
           cliPlatform: flowCliPlatform,
+          ...(parsed.meta.app ? { extraCaps: { 'appium:app': parsed.meta.app } } : {}),
         });
         flowPlatform = deviceResult.platform;
         flowDeviceUdid = deviceResult.deviceUdid;

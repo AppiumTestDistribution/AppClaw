@@ -165,10 +165,13 @@ async function runWorkerJob(
   const { caps: workerCaps, mjpegUrl } = isCloud
     ? { caps: {}, mjpegUrl: undefined }
     : await buildWorkerCaps(platform);
+  const appCap = job.parsed.meta.app ? { 'appium:app': job.parsed.meta.app } : {};
   const deviceResult = await setupDevice(sharedMcp, {
     ...baseSetupArgs,
     cliUdid: isCloud ? null : device.udid,
-    extraCaps: isCloud ? {} : { 'appium:udid': device.udid, ...workerCaps },
+    extraCaps: isCloud
+      ? { ...appCap }
+      : { 'appium:udid': device.udid, ...workerCaps, ...appCap },
   });
 
   emitJson({
