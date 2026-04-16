@@ -8,7 +8,6 @@ import os from 'node:os';
 import type { Platform, DeviceType } from '../index.js';
 import type { AppClawConfig } from '../config.js';
 import { interactivePicker } from './interactive-picker.js';
-import * as ui from '../ui/terminal.js';
 
 interface PlatformPickerArgs {
   cliPlatform: Platform | null;
@@ -43,12 +42,8 @@ export async function resolvePlatform(args: PlatformPickerArgs): Promise<Platfor
     if (canPrompt()) {
       deviceType = await promptDeviceType();
     } else {
-      // Non-interactive iOS without device type: error
-      ui.printError(
-        'iOS requires --device-type (simulator or real)',
-        'Set --device-type simulator or --device-type real, or DEVICE_TYPE env var.'
-      );
-      process.exit(1);
+      // Non-interactive (CI): default to simulator
+      deviceType = 'simulator';
     }
   }
 
