@@ -37,6 +37,7 @@ jobs:
           flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: android
           provider: gemini
+          agent-mode: vision
           api-key: ${{ secrets.LLM_API_KEY }}
           report-name: layer3-android-flow-${{ github.run_id }}
 
@@ -61,6 +62,7 @@ jobs:
           goal: ${{ inputs.goal }}
           platform: android
           provider: gemini
+          agent-mode: vision
           api-key: ${{ secrets.LLM_API_KEY }}
           report-name: layer3-android-goal-${{ github.run_id }}
 
@@ -85,6 +87,7 @@ jobs:
           flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: ios
           provider: gemini
+          agent-mode: vision
           api-key: ${{ secrets.LLM_API_KEY }}
           report-name: layer3-ios-flow-${{ github.run_id }}
 
