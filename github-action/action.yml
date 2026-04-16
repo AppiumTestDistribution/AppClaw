@@ -165,7 +165,7 @@ runs:
       shell: bash
       run: |
         echo "::group::Installing appclaw@${{ inputs.appclaw-version }}"
-        npm install -g appclaw@${{ inputs.appclaw-version }}
+        npm install -g appclaw@${{ inputs.appclaw-version }} mjpeg-consumer
         echo "::endgroup::"
 
     # ── LambdaTest — YAML flow ────────────────────────────────────────────────
