@@ -1,0 +1,332 @@
+name: 'AppClaw Mobile Tests'
+description: 'Run mobile UI automation flows and AI-driven goals in CI — Android emulator, iOS simulator, or LambdaTest cloud devices.'
+author: 'AppiumTestDistribution'
+
+branding:
+  icon: 'smartphone'
+  color: 'purple'
+
+# ── Inputs ────────────────────────────────────────────────────────────────────
+
+inputs:
+  # ── What to run ─────────────────────────────────────────────────────────────
+  flow:
+    description: 'Path to a YAML flow file (mutually exclusive with goal)'
+    required: false
+    default: ''
+  goal:
+    description: 'Natural language goal for the LLM agent (mutually exclusive with flow)'
+    required: false
+    default: ''
+
+  # ── Platform ─────────────────────────────────────────────────────────────────
+  platform:
+    description: 'Target platform: android or ios'
+    required: false
+    default: 'android'
+
+  # ── LLM ──────────────────────────────────────────────────────────────────────
+  provider:
+    description: 'LLM provider: gemini, anthropic, openai, groq'
+    required: false
+    default: 'gemini'
+  api-key:
+    description: 'LLM API key — passed to AppClaw as LLM_API_KEY'
+    required: true
+  model:
+    description: 'LLM model ID to use (e.g. gemini-2.0-flash, claude-3-5-haiku-20241022). Defaults to the provider built-in.'
+    required: false
+    default: ''
+
+  # ── Agent ────────────────────────────────────────────────────────────────────
+  agent-mode:
+    description: 'Interaction strategy: dom (element locators) or vision (screenshot AI)'
+    required: false
+    default: 'dom'
+  max-steps:
+    description: 'Maximum agent steps before the run is marked failed. Default: 30'
+    required: false
+    default: '30'
+  step-delay:
+    description: 'Delay in milliseconds between steps. Default: 500'
+    required: false
+    default: '500'
+
+  # ── Android emulator ─────────────────────────────────────────────────────────
+  android-api-level:
+    description: 'Android emulator API level. Default: 33 (Android 13)'
+    required: false
+    default: '33'
+  android-profile:
+    description: 'Android AVD hardware profile. Default: pixel_6'
+    required: false
+    default: 'pixel_6'
+  android-target:
+    description: 'Emulator system image target: default or google_apis'
+    required: false
+    default: 'default'
+  android-arch:
+    description: 'Emulator CPU architecture: x86_64 or x86. Default: x86_64 (required for API 31+)'
+    required: false
+    default: 'x86_64'
+
+  # ── LambdaTest cloud ─────────────────────────────────────────────────────────
+  cloud-provider:
+    description: 'Cloud device provider: lambdatest. Leave empty for local emulator/simulator (default).'
+    required: false
+    default: ''
+  lambdatest-username:
+    description: 'LambdaTest account username (required when cloud-provider=lambdatest)'
+    required: false
+    default: ''
+  lambdatest-access-key:
+    description: 'LambdaTest access key (required when cloud-provider=lambdatest)'
+    required: false
+    default: ''
+  lambdatest-device-name:
+    description: 'Cloud device name, e.g. "Pixel 7" or "iPhone 14" (required when cloud-provider=lambdatest)'
+    required: false
+    default: ''
+  lambdatest-os-version:
+    description: 'Cloud OS version, e.g. "13" for Android or "16" for iOS (required when cloud-provider=lambdatest)'
+    required: false
+    default: ''
+  lambdatest-app:
+    description: 'LambdaTest app ID (lt://APP...) — the app to test on the cloud device'
+    required: false
+    default: ''
+
+  # ── Report ───────────────────────────────────────────────────────────────────
+  report:
+    description: 'Upload HTML report as a workflow artifact after the run. Default: true'
+    required: false
+    default: 'true'
+  report-name:
+    description: 'Name of the uploaded artifact. Default: appclaw-report'
+    required: false
+    default: 'appclaw-report'
+
+  # ── AppClaw version ───────────────────────────────────────────────────────────
+  appclaw-version:
+    description: 'AppClaw npm package version to install. Default: latest'
+    required: false
+    default: 'latest'
+  use-local-build:
+    description: 'Build and install AppClaw from the checked-out source instead of npm. Use in PRs to test local changes.'
+    required: false
+    default: 'false'
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+
+outputs:
+  report-path:
+    description: 'Path to the generated .appclaw/runs/<id>/ report directory'
+    value: ${{ steps.report-path.outputs.path }}
+
+# ── Steps ─────────────────────────────────────────────────────────────────────
+
+runs:
+  using: composite
+  steps:
+    # ── Validate ──────────────────────────────────────────────────────────────
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.flow }}" ] && [ -z "${{ inputs.goal }}" ]; then
+          echo "::error title=Missing input::Provide either 'flow' (path to YAML) or 'goal' (natural language string)"
+          exit 1
+        fi
+        if [ -n "${{ inputs.flow }}" ] && [ -n "${{ inputs.goal }}" ]; then
+          echo "::error title=Conflicting inputs::Provide either 'flow' or 'goal', not both"
+          exit 1
+        fi
+        if [ "${{ inputs.platform }}" != "android" ] && [ "${{ inputs.platform }}" != "ios" ]; then
+          echo "::error title=Invalid platform::platform must be 'android' or 'ios', got '${{ inputs.platform }}'"
+          exit 1
+        fi
+        if [ -n "${{ inputs.cloud-provider }}" ] && [ "${{ inputs.cloud-provider }}" != "lambdatest" ]; then
+          echo "::error title=Invalid cloud-provider::cloud-provider must be 'lambdatest' or empty, got '${{ inputs.cloud-provider }}'"
+          exit 1
+        fi
+        if [ "${{ inputs.cloud-provider }}" = "lambdatest" ]; then
+          if [ -z "${{ inputs.lambdatest-username }}" ] || [ -z "${{ inputs.lambdatest-access-key }}" ]; then
+            echo "::error title=Missing LambdaTest credentials::lambdatest-username and lambdatest-access-key are required when cloud-provider=lambdatest"
+            exit 1
+          fi
+          if [ -z "${{ inputs.lambdatest-device-name }}" ] || [ -z "${{ inputs.lambdatest-os-version }}" ]; then
+            echo "::error title=Missing device info::lambdatest-device-name and lambdatest-os-version are required when cloud-provider=lambdatest"
+            exit 1
+          fi
+        fi
+
+    # ── Node + AppClaw ────────────────────────────────────────────────────────
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Install AppClaw (from npm)
+      if: inputs.use-local-build == 'false'
+      shell: bash
+      run: |
+        echo "::group::Installing appclaw@${{ inputs.appclaw-version }}"
+        npm install -g appclaw@${{ inputs.appclaw-version }} mjpeg-consumer
+        echo "::endgroup::"
+
+    - name: Install AppClaw (from local source)
+      if: inputs.use-local-build == 'true'
+      shell: bash
+      run: |
+        echo "::group::Building and installing AppClaw from local source"
+        npm install --no-package-lock
+        npm run build
+        npm install -g . mjpeg-consumer
+        echo "::endgroup::"
+
+    # ── LambdaTest — YAML flow ────────────────────────────────────────────────
+    - name: Run YAML flow on LambdaTest
+      if: inputs.cloud-provider == 'lambdatest' && inputs.flow != ''
+      shell: bash
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        LLM_MODEL: ${{ inputs.model }}
+        LLM_THINKING: 'off'
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: ${{ inputs.platform }}
+        CLOUD_PROVIDER: lambdatest
+        LAMBDATEST_USERNAME: ${{ inputs.lambdatest-username }}
+        LAMBDATEST_ACCESS_KEY: ${{ inputs.lambdatest-access-key }}
+        LAMBDATEST_DEVICE_NAME: ${{ inputs.lambdatest-device-name }}
+        LAMBDATEST_OS_VERSION: ${{ inputs.lambdatest-os-version }}
+        LAMBDATEST_APP: ${{ inputs.lambdatest-app }}
+      run: appclaw --flow "${{ inputs.flow }}" --platform ${{ inputs.platform }}
+
+    # ── LambdaTest — natural language goal ────────────────────────────────────
+    - name: Run goal on LambdaTest
+      if: inputs.cloud-provider == 'lambdatest' && inputs.goal != ''
+      shell: bash
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        LLM_MODEL: ${{ inputs.model }}
+        LLM_THINKING: 'off'
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: ${{ inputs.platform }}
+        CLOUD_PROVIDER: lambdatest
+        LAMBDATEST_USERNAME: ${{ inputs.lambdatest-username }}
+        LAMBDATEST_ACCESS_KEY: ${{ inputs.lambdatest-access-key }}
+        LAMBDATEST_DEVICE_NAME: ${{ inputs.lambdatest-device-name }}
+        LAMBDATEST_OS_VERSION: ${{ inputs.lambdatest-os-version }}
+        LAMBDATEST_APP: ${{ inputs.lambdatest-app }}
+      run: appclaw "${{ inputs.goal }}" --platform ${{ inputs.platform }}
+
+    # ── Android — enable KVM ──────────────────────────────────────────────────
+    - name: Enable KVM
+      if: inputs.platform == 'android' && inputs.cloud-provider == ''
+      shell: bash
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+          | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    # ── Android — YAML flow ───────────────────────────────────────────────────
+    - name: Run YAML flow on Android emulator
+      if: inputs.platform == 'android' && inputs.cloud-provider == '' && inputs.flow != ''
+      uses: reactivecircus/android-emulator-runner@v2
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        LLM_MODEL: ${{ inputs.model }}
+        LLM_THINKING: 'off'
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: android
+      with:
+        api-level: ${{ inputs.android-api-level }}
+        arch: ${{ inputs.android-arch }}
+        profile: ${{ inputs.android-profile }}
+        target: ${{ inputs.android-target }}
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+        disable-animations: true
+        script: appclaw --flow "${{ inputs.flow }}" --platform android
+
+    # ── Android — natural language goal ───────────────────────────────────────
+    - name: Run goal on Android emulator
+      if: inputs.platform == 'android' && inputs.cloud-provider == '' && inputs.goal != ''
+      uses: reactivecircus/android-emulator-runner@v2
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        LLM_MODEL: ${{ inputs.model }}
+        LLM_THINKING: 'off'
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: android
+      with:
+        api-level: ${{ inputs.android-api-level }}
+        arch: ${{ inputs.android-arch }}
+        profile: ${{ inputs.android-profile }}
+        target: ${{ inputs.android-target }}
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+        disable-animations: true
+        script: appclaw "${{ inputs.goal }}" --platform android
+
+    # ── iOS — YAML flow ───────────────────────────────────────────────────────
+    - name: Run YAML flow on iOS simulator
+      if: inputs.platform == 'ios' && inputs.cloud-provider == '' && inputs.flow != ''
+      shell: bash
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        LLM_MODEL: ${{ inputs.model }}
+        LLM_THINKING: 'off'
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: ios
+        DEVICE_TYPE: simulator
+      run: appclaw --flow "${{ inputs.flow }}" --platform ios
+
+    # ── iOS — natural language goal ───────────────────────────────────────────
+    - name: Run goal on iOS simulator
+      if: inputs.platform == 'ios' && inputs.cloud-provider == '' && inputs.goal != ''
+      shell: bash
+      env:
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        LLM_MODEL: ${{ inputs.model }}
+        LLM_THINKING: 'off'
+        AGENT_MODE: ${{ inputs.agent-mode }}
+        MAX_STEPS: ${{ inputs.max-steps }}
+        STEP_DELAY: ${{ inputs.step-delay }}
+        PLATFORM: ios
+        DEVICE_TYPE: simulator
+      run: appclaw "${{ inputs.goal }}" --platform ios
+
+    # ── Report ────────────────────────────────────────────────────────────────
+    - name: Find report path
+      id: report-path
+      if: always()
+      shell: bash
+      run: |
+        DIR=$(ls -td .appclaw/runs/*/ 2>/dev/null | head -1 || echo "")
+        echo "path=${DIR}" >> $GITHUB_OUTPUT
+        if [ -n "$DIR" ]; then
+          echo "::notice title=AppClaw Report::Report written to ${DIR}"
+        fi
+
+    - name: Upload report artifact
+      if: ${{ always() && inputs.report == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.report-name }}
+        path: .appclaw/runs/
+        if-no-files-found: warn
