@@ -53,6 +53,8 @@ export interface AgentContext {
   failedOnScreen?: string;
   /** Episodic memory: relevant past experience from previous successful runs */
   pastExperience?: string;
+  /** AppGuide: per-app navigation knowledge injected when a known app is in the foreground */
+  appGuide?: string;
 }
 
 /** Token usage for a single LLM call */

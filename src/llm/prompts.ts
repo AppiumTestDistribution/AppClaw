@@ -232,6 +232,13 @@ export function buildUserMessage(context: AgentContext): string {
     parts.push(`\n${context.pastExperience}`);
   }
 
+  // ── AppGuide: per-app navigation knowledge ────────────
+  // Injected when the foreground app is recognised — gives the agent
+  // app-specific navigation patterns so it doesn't have to rediscover them.
+  if (context.appGuide) {
+    parts.push(`\n${context.appGuide}`);
+  }
+
   // ── Contextual hints ──────────────────────────────────
   // Targeted micro-reminders based on current state. Additive only —
   // these reinforce existing rules when they matter most.

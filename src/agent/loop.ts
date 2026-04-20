@@ -39,6 +39,7 @@ import {
   extractGoalKeywords,
   extractAppIdFromText,
 } from '../memory/fingerprint.js';
+import { loadAppGuide } from '../appguides/index.js';
 
 const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
 
@@ -133,6 +134,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   let lastResult = '';
   let detectedPlatform: 'android' | 'ios' = 'android';
   let postActionScreenshot: string | undefined; // Screenshot captured after previous action
+  let lastAppGuideId = ''; // Track last app a guide was logged for (avoid duplicate logs)
   let cachedPostScreen: import('../perception/types.js').ScreenState | undefined; // Reuse post-action screen as next step's perception
   const triedSelectors: string[] = []; // Track selectors the LLM has tried (for stuck recovery)
 
@@ -394,6 +396,14 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       }
     }
 
+    // ── AppGuide: per-app navigation knowledge ────────────
+    const currentAppId = episodicRecorder?.currentAppId ?? '';
+    const appGuide = loadAppGuide(currentAppId);
+    if (appGuide && currentAppId !== lastAppGuideId) {
+      ui.printAgentBullet(`AppGuide: loaded guide for ${currentAppId}`);
+      lastAppGuideId = currentAppId;
+    }
+
     const context: AgentContext = {
       goal,
       step,
@@ -408,6 +418,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       editableCount: screen.editableCount,
       failedOnScreen,
       pastExperience,
+      appGuide,
     };
 
     let decision: ToolCallDecision;
