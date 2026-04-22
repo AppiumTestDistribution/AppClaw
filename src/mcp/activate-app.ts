@@ -43,7 +43,7 @@ export async function activateAppWithFallback(
   mcp: MCPClient,
   packageId: string
 ): Promise<{ success: boolean; message: string }> {
-  const primary = await mcp.callTool('appium_activate_app', { id: packageId });
+  const primary = await mcp.callTool('appium_app_lifecycle', { action: 'activate', id: packageId });
   const t0 = extractText(primary);
   if (!responseLooksLikeFailure(t0)) {
     return { success: true, message: t0.slice(0, 240) || `Activated ${packageId}` };
@@ -51,34 +51,16 @@ export async function activateAppWithFallback(
 
   const url = DEEP_LINK_BY_PACKAGE[packageId];
   if (url) {
-    const deepVariants: Record<string, unknown>[] = [
-      { url, appId: packageId },
-      { url, package: packageId },
-    ];
-    for (const deepArgs of deepVariants) {
-      const t1 = await callToolQuiet(mcp, 'appium_deep_link', deepArgs);
-      if (t1 !== null && !responseLooksLikeFailure(t1)) {
-        return {
-          success: true,
-          message: `Deep link opened ${packageId}: ${t1.slice(0, 160)}`,
-        };
-      }
-    }
-
-    const t2 = await callToolQuiet(mcp, 'appium_execute_script', {
-      script: 'mobile: deepLink',
-      args: [{ url, package: packageId }],
+    const t1 = await callToolQuiet(mcp, 'appium_app_lifecycle', {
+      action: 'deep_link',
+      url,
+      id: packageId,
     });
-    if (t2 !== null && !responseLooksLikeFailure(t2)) {
-      return { success: true, message: `mobile:deepLink: ${t2.slice(0, 200)}` };
-    }
-
-    const t3 = await callToolQuiet(mcp, 'appium_execute_script', {
-      script: 'mobile: deepLink',
-      args: [{ url, appPackage: packageId }],
-    });
-    if (t3 !== null && !responseLooksLikeFailure(t3)) {
-      return { success: true, message: `mobile:deepLink: ${t3.slice(0, 200)}` };
+    if (t1 !== null && !responseLooksLikeFailure(t1)) {
+      return {
+        success: true,
+        message: `Deep link opened ${packageId}: ${t1.slice(0, 160)}`,
+      };
     }
   }
 

@@ -214,7 +214,7 @@ async function detectScreenSize(mcp: MCPClient, platform: Platform): Promise<voi
 
   // Android / fallback: try device info
   try {
-    const result = await mcp.callTool('appium_mobile_get_device_info', {});
+    const result = await mcp.callTool('appium_mobile_device_info', {});
     const text = extractText(result);
 
     if (platform === 'android') {

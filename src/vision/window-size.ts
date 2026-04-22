@@ -117,9 +117,9 @@ export async function getScreenSizeForStark(
     }
   }
 
-  // 2. appium_mobile_get_device_info — Android: realDisplaySize in physical pixels
+  // 2. appium_mobile_device_info — Android: realDisplaySize in physical pixels
   try {
-    const result = await mcp.callTool('appium_mobile_get_device_info', {});
+    const result = await mcp.callTool('appium_mobile_device_info', {});
     const text = mcpResultText(result);
     const sizeMatch = text.match(/realDisplaySize['":\s]+(\d+)x(\d+)/i);
     if (sizeMatch) {

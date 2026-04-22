@@ -51,12 +51,17 @@ export interface PlannerResult {
 export async function decomposeGoal(
   goal: string,
   model: any,
-  providerOptions?: Record<string, any>
+  providerOptions?: Record<string, any>,
+  appGuide?: string
 ): Promise<PlannerResult> {
+  const system = appGuide
+    ? `${PLANNER_SYSTEM_PROMPT}\n\n--- APP-SPECIFIC KNOWLEDGE ---\nThe following guide describes the target app's UI layout and common actions. Use it to create better, more specific sub-goals that leverage known UI patterns (e.g., prefer the correct gesture or button name from the guide).\n\n${appGuide}`
+    : PLANNER_SYSTEM_PROMPT;
+
   const { object } = await generateObject({
     model,
     schema: planSchema,
-    system: PLANNER_SYSTEM_PROMPT,
+    system,
     messages: [{ role: 'user', content: goal }],
     ...(providerOptions ? { providerOptions } : {}),
   });
@@ -241,16 +246,21 @@ export async function evaluateSubGoal(
   completedGoals: string[],
   currentScreenDOM: string,
   providerOptions?: Record<string, any>,
-  screenshot?: string
+  screenshot?: string,
+  appGuide?: string
 ): Promise<OrchestratorDecision> {
   // Build message content — include screenshot if available for visual verification
+  const appGuideSection = appGuide
+    ? `\nAPP-SPECIFIC KNOWLEDGE:\n${appGuide}\nUse this knowledge when deciding whether to skip, rewrite, or proceed. If the guide describes how to achieve the sub-goal more directly than planned, REWRITE to leverage the known UI patterns.\n`
+    : '';
+
   const textContent = `OVERALL GOAL: ${overallGoal}
 
 CURRENT SUB-GOAL TO EVALUATE: ${subGoal}
 
 COMPLETED SUB-GOALS:
 ${completedGoals.length > 0 ? completedGoals.map((g, i) => `${i + 1}. ${g}`).join('\n') : '(none)'}
-
+${appGuideSection}
 CURRENT SCREEN STATE (DOM):
 ${currentScreenDOM}
 
@@ -308,11 +318,16 @@ export async function assessScreenReadiness(
   nextGoal: string,
   currentScreenDOM: string,
   providerOptions?: Record<string, any>,
-  screenshot?: string
+  screenshot?: string,
+  appGuide?: string
 ): Promise<ScreenReadiness> {
+  const appGuideSection = appGuide
+    ? `\nAPP-SPECIFIC KNOWLEDGE:\n${appGuide}\nUse this knowledge to understand the app's UI and suggest precise cleanup actions (e.g., specific button names or gestures from the guide).\n`
+    : '';
+
   const textContent = `JUST COMPLETED: ${completedGoal}
 NEXT SUB-GOAL: ${nextGoal}
-
+${appGuideSection}
 CURRENT SCREEN STATE (DOM):
 ${currentScreenDOM}
 

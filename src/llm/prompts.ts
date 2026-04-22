@@ -25,6 +25,7 @@ HOW TO INTERACT (DOM MODE)
 
 **To tap an element:** Use find_and_click(strategy, selector) — finds and clicks in ONE step.
 **To type into a field:** Use find_and_type(strategy, selector, text) — finds, clicks, clears, and types in ONE step.
+**To long-press an element (context menu, drag, swipe-to-delete):** Use find_and_long_press(strategy, selector) — finds and long-presses in ONE step.
 
 **Locator strategies:**
 
@@ -61,6 +62,11 @@ HOW TO INTERACT (VISION MODE)
 **To type into a field:** Use find_and_type and describe the field.
   Example: find_and_type(selector="text input field labeled 'To' at the top", text="user@example.com")
   Example: find_and_type(selector="large text area below the subject line", text="Hello")
+
+**To long-press an element (context menu, drag, swipe-to-delete):** Use find_and_long_press and describe what you SEE.
+  Example: find_and_long_press(selector="Medium Daily Digest email row", tapX=500, tapY=270)
+  Example: find_and_long_press(selector="file icon labeled report.pdf", duration=1500)
+  Do NOT use appium_gesture or any raw Appium tool for long press — always use find_and_long_press.
 
 **SPEED BOOST — provide tap coordinates:**
 If you can estimate WHERE the element is in the screenshot, include tapX and tapY.
@@ -148,11 +154,13 @@ export function buildSystemPrompt(
     ? `
 **Primary tools — use strategy="ai_instruction" with a visual description:**
 - find_and_click: Visually find + click in one step.
-- find_and_type: Visually find + click + type text in one step.`
+- find_and_type: Visually find + click + type text in one step.
+- find_and_long_press: Visually find + long-press in one step (context menus, drag initiation).`
     : `
 **Primary tools:**
 - find_and_click: Find element + click in one step (strategy + selector).
-- find_and_type: Find element + click + type text in one step (strategy + selector + text).`;
+- find_and_type: Find element + click + type text in one step (strategy + selector + text).
+- find_and_long_press: Find element + long-press in one step (strategy + selector + optional duration).`;
 
   // Vision fallback section for DOM mode
   const visionFallback =

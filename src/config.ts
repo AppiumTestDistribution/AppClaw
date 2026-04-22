@@ -51,6 +51,8 @@ const envSchema = z.object({
   STEP_DELAY: z.coerce.number().default(500),
   MAX_ELEMENTS: z.coerce.number().default(40),
   MAX_HISTORY_STEPS: z.coerce.number().default(10),
+  /** Milliseconds before an LLM request is aborted. Default 60 s. Set to 0 to disable. */
+  LLM_REQUEST_TIMEOUT_MS: z.coerce.number().default(60_000),
 
   VISION_MODE: z.enum(['always', 'fallback', 'never']).default('fallback'),
   LOG_DIR: z.string().default('logs'),

@@ -84,6 +84,8 @@ function stepAction(step: FlowStep): string {
       return 'open';
     case 'tap':
       return 'tap';
+    case 'longPress':
+      return 'longpress';
     case 'type':
       return 'type';
     case 'swipe':
@@ -120,6 +122,8 @@ function stepTarget(step: FlowStep): string {
       return step.query;
     case 'tap':
       return `"${step.label}"`;
+    case 'longPress':
+      return `"${step.label}"${step.duration != null ? ` (${step.duration}ms)` : ''}`;
     case 'type':
       return `"${step.text}"${step.target ? ` → ${step.target}` : ''}`;
     case 'swipe':
@@ -160,6 +164,8 @@ function spinnerDetail(step: FlowStep): string {
   switch (step.kind) {
     case 'tap':
       return 'tapping the screen…';
+    case 'longPress':
+      return 'long-pressing the screen…';
     case 'type':
       return 'typing into the field…';
     case 'swipe':
@@ -246,6 +252,10 @@ function stepToYaml(step: FlowStep): unknown {
       return `open ${step.query} app`;
     case 'tap':
       return `tap ${step.label}`;
+    case 'longPress':
+      return step.duration != null
+        ? `long press ${step.label} for ${step.duration}ms`
+        : `long press ${step.label}`;
     case 'type':
       return `type "${step.text}"`;
     case 'swipe':
@@ -585,6 +595,15 @@ function printHelp(): void {
         'click Search button',
         'select English',
         'navigate to Settings screen',
+      ],
+    },
+    {
+      category: 'Long Press',
+      lines: [
+        'long press on first email',
+        'long-press the image',
+        'press and hold Delete button',
+        'long press on file for 1500ms',
       ],
     },
     {
@@ -1387,6 +1406,39 @@ async function processLine(line: string): Promise<void> {
       const errMsg = err?.message ?? String(err);
       console.log(`  ${theme.dim(`Vision shortcut failed (${errMsg}), falling back…`)}`);
     }
+  }
+
+  // ── Regex fast path: try parsing without LLM first ──
+  const regexParsed = tryParseNaturalFlowLine(line);
+  if (regexParsed) {
+    const stepNum = state.steps.length + 1;
+    if (regexParsed.kind === 'done') {
+      state.steps.push(regexParsed);
+      printStepSuccess(stepNum, regexParsed, 'recorded');
+      return;
+    }
+    if (regexParsed.kind === 'getInfo') {
+      await handleGetInfo(regexParsed.query);
+      return;
+    }
+    ui.startSpinner(`[${stepNum}] ${regexParsed.kind}`, spinnerDetail(regexParsed));
+    resetVisionTokens();
+    try {
+      const result = await runStepOnDevice(regexParsed);
+      ui.stopSpinner();
+      if (result.success) {
+        state.steps.push(regexParsed);
+        printStepSuccess(stepNum, regexParsed, result.message);
+      } else {
+        printStepFail(stepNum, regexParsed, result.message);
+        console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
+      }
+    } catch (err: any) {
+      ui.stopSpinner();
+      printStepFail(stepNum, regexParsed, err?.message ?? String(err));
+      console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
+    }
+    return;
   }
 
   // ── Two-call fallback: classify via LLM → execute via step runner ──

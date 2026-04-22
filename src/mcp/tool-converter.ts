@@ -43,7 +43,7 @@ export const EXCLUDED_MCP_TOOLS = new Set([
   'delete_session',
   'list_sessions',
   'selectSession',
-  'select_platform',
+  'select_session',
   'select_device',
   'prepare_ios_simulator',
   // AI code-gen tools — not relevant to device control
@@ -51,6 +51,9 @@ export const EXCLUDED_MCP_TOOLS = new Set([
   'appium_generate_locators',
   'generate_tests',
   'generate_locators',
+  // Documentation/skills tools — not relevant to device control
+  'appium_documentation_query',
+  'appium_skills',
 ]);
 
 /** Additional tools to exclude in vision mode — DOM-based tools that distract the agent */

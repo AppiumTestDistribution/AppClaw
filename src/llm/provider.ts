@@ -192,6 +192,58 @@ function buildMetaTools(agentMode: 'dom' | 'vision'): Record<string, Tool> {
     }),
   });
 
+  const findAndLongPressVision = tool({
+    description:
+      'Long-press something on screen using AI vision (press and hold to open context menus, trigger drag, etc.). ' +
+      'Describe what you SEE in plain language — visible text, icon shape, color, position. ' +
+      'Do NOT use xpath, resource IDs, or element UUIDs. ' +
+      'If you can estimate the location, provide tapX and tapY (normalized 0-1000) to skip the vision-locate step.',
+    inputSchema: z.object({
+      selector: z
+        .string()
+        .describe(
+          'Plain-language target, e.g. Medium Daily Digest email row, red unread notification dot'
+        ),
+      tapY: z
+        .number()
+        .optional()
+        .describe('Estimated Y position in normalized 0-1000 scale (0=top, 1000=bottom)'),
+      tapX: z
+        .number()
+        .optional()
+        .describe('Estimated X position in normalized 0-1000 scale (0=left, 1000=right)'),
+      duration: z
+        .number()
+        .int()
+        .optional()
+        .describe('Hold duration in milliseconds (default 2000, range 500-10000)'),
+      bounds: z
+        .string()
+        .optional()
+        .describe('Optional [x1,y1][x2,y2] center fallback if vision fails'),
+    }),
+  });
+
+  const findAndLongPressDom = tool({
+    description:
+      'Find an element and long-press it (press and hold) in one step. ' +
+      'Use EXACT locator values from the DOM. ALWAYS include bounds from the DOM as fallback. ' +
+      'Use for context menus, drag initiation, or any press-and-hold interaction.',
+    inputSchema: z.object({
+      strategy: z.enum(['accessibility id', 'id', 'xpath']).describe('Locator strategy'),
+      selector: z.string().describe('Locator value — MUST be the EXACT, FULL string from the DOM'),
+      duration: z
+        .number()
+        .int()
+        .optional()
+        .describe('Hold duration in milliseconds (default 2000, range 500-10000)'),
+      bounds: z
+        .string()
+        .optional()
+        .describe('Element bounds from DOM e.g. [x1,y1][x2,y2] — used as coordinate fallback'),
+    }),
+  });
+
   const findAndClickDom = tool({
     description:
       'Find an element and click it in one step. ' +
@@ -251,6 +303,8 @@ function buildMetaTools(agentMode: 'dom' | 'vision'): Record<string, Tool> {
     find_and_click: agentMode === 'vision' ? findAndClickVision : findAndClickDom,
 
     find_and_type: agentMode === 'vision' ? findAndTypeVision : findAndTypeDom,
+
+    find_and_long_press: agentMode === 'vision' ? findAndLongPressVision : findAndLongPressDom,
 
     launch_app: tool({
       description:
@@ -426,6 +480,13 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
         },
       ];
 
+      // Request timeout — abort if the LLM takes too long (hangs on preview models).
+      const timeoutMs = config.LLM_REQUEST_TIMEOUT_MS;
+      const abortController = timeoutMs > 0 ? new AbortController() : undefined;
+      const abortTimer = abortController
+        ? setTimeout(() => abortController.abort(), timeoutMs)
+        : undefined;
+
       // Use streaming when callbacks are provided for live reasoning display.
       // Single streamText call with tools — streams any reasoning text the model
       // emits before its tool call, then extracts the tool call from the final result.
@@ -437,6 +498,7 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
           tools: allTools,
           toolChoice: 'required' as const,
           ...(thinkingOptions ? { providerOptions: thinkingOptions } : {}),
+          ...(abortController ? { abortSignal: abortController.signal } : {}),
           messages,
         });
 
@@ -492,6 +554,7 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
 
         const toolCall = toolCalls?.[0];
         if (!toolCall) {
+          clearTimeout(abortTimer);
           return {
             toolName: 'done',
             args: { reason: text || reasoningText || 'No action decided' },
@@ -503,6 +566,7 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
         const toolArgs = 'args' in toolCall ? (toolCall as any).args : (toolCall as any).input;
 
         lastToolName = toolCall.toolName;
+        clearTimeout(abortTimer);
 
         return {
           toolName: toolCall.toolName,
@@ -519,8 +583,10 @@ export function createLLMProvider(config: AppClawConfig, mcpTools: MCPToolInfo[]
         tools: allTools,
         toolChoice: 'required' as const,
         ...(thinkingOptions ? { providerOptions: thinkingOptions } : {}),
+        ...(abortController ? { abortSignal: abortController.signal } : {}),
         messages,
       });
+      clearTimeout(abortTimer);
 
       // Prefer totalUsage + raw Gemini usageMetadata — some models omit fields the SDK maps to 0
       const extracted = extractUsageFromGenerateTextResult(result);

@@ -43,6 +43,7 @@ import { runExplorer } from './explorer/index.js';
 import type { ExplorerConfig } from './explorer/types.js';
 import { runPlayground } from './playground/index.js';
 import { setupDevice } from './device/index.js';
+import { loadAppGuide } from './appguides/index.js';
 import * as ui from './ui/terminal.js';
 import { silenceTerminalUI } from './ui/terminal.js';
 import { enableJsonMode, isJsonMode, emitJson } from './json-emitter.js';
@@ -854,12 +855,32 @@ async function main() {
     const appResolver = new AppResolver();
     await appResolver.initialize(agentScopedMcp, resolvedPlatform);
 
+    // ── Detect app ID early — needed for AppGuide in planner + orchestrator ──
+    let journeyAppId: string | undefined;
+    try {
+      const { extractAppIdFromText } = await import('./memory/fingerprint.js');
+      journeyAppId = extractAppIdFromText(goal);
+      if (!journeyAppId) {
+        const appMatch = goal.match(
+          /(?:open|launch|start)\s+(?:the\s+)?(\w[\w\s]*?)(?:\s+app|\s+and\b)/i
+        );
+        if (appMatch) {
+          journeyAppId = appResolver.resolve(appMatch[1].trim()) ?? undefined;
+        }
+      }
+    } catch {
+      // Non-critical
+    }
+
+    // Load AppGuide for the target app (if known) — shared by planner, orchestrator, and agent
+    const journeyAppGuide = journeyAppId ? loadAppGuide(journeyAppId) : undefined;
+
     // ─── Always decompose goals into sub-goals ─────────
     ui.printPlanStart();
     const plannerModel = buildModel(config);
     const thinkingOptions = buildThinkingOptions(config);
 
-    const planResult = await decomposeGoal(goal, plannerModel, thinkingOptions);
+    const planResult = await decomposeGoal(goal, plannerModel, thinkingOptions, journeyAppGuide);
     const executor = createPlanExecutor(planResult.subGoals);
     ui.stopSpinner();
 
@@ -886,26 +907,6 @@ async function main() {
     let journeyOutputTokens = 0;
     let journeyCost = 0;
     const allHistory: any[] = [];
-
-    // ── Episodic memory: detect app ID for the journey ──
-    // Try to resolve the primary app from the goal so all sub-goals share it.
-    let journeyAppId: string | undefined;
-    try {
-      const { extractAppIdFromText } = await import('./memory/fingerprint.js');
-      // First try the raw goal for package names
-      journeyAppId = extractAppIdFromText(goal);
-      // If not found, try resolving app names from the goal (e.g., "YouTube" → "com.google.android.youtube")
-      if (!journeyAppId) {
-        const appMatch = goal.match(
-          /(?:open|launch|start)\s+(?:the\s+)?(\w[\w\s]*?)(?:\s+app|\s+and\b)/i
-        );
-        if (appMatch) {
-          journeyAppId = appResolver.resolve(appMatch[1].trim()) ?? undefined;
-        }
-      }
-    } catch {
-      // Non-critical
-    }
 
     while (!executor.isDone()) {
       const subGoal = executor.current!;
@@ -960,7 +961,8 @@ async function main() {
                   subGoal.goal,
                   orchestratorDom,
                   thinkingOptions,
-                  orchestratorScreenshot
+                  orchestratorScreenshot,
+                  journeyAppGuide
                 )
               : Promise.resolve({ ready: true, issues: [] as string[] } as {
                   ready: boolean;
@@ -974,7 +976,8 @@ async function main() {
               completedGoalsList,
               orchestratorDom,
               thinkingOptions,
-              orchestratorScreenshot
+              orchestratorScreenshot,
+              journeyAppGuide
             ),
           ]);
 

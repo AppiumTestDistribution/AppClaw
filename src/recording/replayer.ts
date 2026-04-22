@@ -219,7 +219,7 @@ async function executeReplayAction(
         const uuid = await findElementWithFallback(mcp, screenElements, elementId, coords);
 
         if (uuid) {
-          await mcp.callTool('appium_click', { elementUUID: uuid });
+          await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
           return { success: true, message: `Tapped ${elementId || `[${coordX}, ${coordY}]`}` };
         }
 
@@ -239,7 +239,7 @@ async function executeReplayAction(
                 }
               }
             } else {
-              await mcp.callTool('appium_click', { elementUUID: visionUuid });
+              await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: visionUuid });
               return { success: true, message: `Tapped "${visionDescription}" via AI vision` };
             }
           }
@@ -272,7 +272,7 @@ async function executeReplayAction(
           // Target is directly editable — use it
           const uuid = await findElementWithFallback(mcp, screenElements, elementId, coords);
           if (uuid) {
-            await mcp.callTool('appium_click', { elementUUID: uuid });
+            await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
             await mcp.callTool('appium_clear_element', { elementUUID: uuid }).catch(() => {});
             await mcp.callTool('appium_set_value', { elementUUID: uuid, text });
             return { success: true, message: `Typed "${text}"` };
@@ -283,7 +283,7 @@ async function executeReplayAction(
         // page source to find the actual editable element
         const clickUuid = await findElementWithFallback(mcp, screenElements, elementId, coords);
         if (clickUuid) {
-          await mcp.callTool('appium_click', { elementUUID: clickUuid });
+          await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: clickUuid });
         }
 
         // Re-read page source to discover the real editable element
@@ -309,7 +309,7 @@ async function executeReplayAction(
           return { success: false, message: `Could not find an editable input near ${target}` };
         }
 
-        await mcp.callTool('appium_click', { elementUUID: typeUuid });
+        await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: typeUuid });
         await mcp.callTool('appium_clear_element', { elementUUID: typeUuid }).catch(() => {});
         await mcp.callTool('appium_set_value', { elementUUID: typeUuid, text });
         return { success: true, message: `Typed "${text}"` };

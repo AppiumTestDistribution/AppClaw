@@ -213,7 +213,10 @@ async function anchorVisibleInVision(
 }
 
 /** Actions from combinedInstructionPrompt that map to tap/click. */
-const TAP_ACTIONS = new Set(['click', 'tap', 'touch', 'select', 'long press', 'longpress']);
+const TAP_ACTIONS = new Set(['click', 'tap', 'touch', 'select']);
+
+/** Actions that map to long press. */
+const LONG_PRESS_ACTIONS = new Set(['long press', 'longpress', 'long-press', 'press and hold']);
 
 /** Actions that map to type/enter text. */
 const TYPE_ACTIONS = new Set(['enter', 'type', 'send', 'sendkeys', 'set', 'set value']);
@@ -350,6 +353,25 @@ function preCheck(instruction: string): PreCheckResult | null {
   );
   if (enterMatch) {
     return { step: { kind: 'enter', verbatim: t } };
+  }
+
+  // 5b. long press (natural language — route to longPress step kind)
+  const longPressMatch = t.match(
+    /^(?:long[\s-]press|long[\s-]tap|press\s+and\s+hold)(?:\s+on)?\s+(?:the\s+)?(.+?)(?:\s+for\s+(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|seconds?))?$/i
+  );
+  if (longPressMatch) {
+    const label = longPressMatch[1].replace(/[.!?]+$/g, '').trim();
+    const durRaw = longPressMatch[2];
+    const durUnit = longPressMatch[3] ?? 'ms';
+    const duration = durRaw
+      ? durUnit.startsWith('s')
+        ? Math.round(Number(durRaw) * 1000)
+        : Math.round(Number(durRaw))
+      : undefined;
+    if (label)
+      return {
+        step: { kind: 'longPress', label, ...(duration != null ? { duration } : {}), verbatim: t },
+      };
   }
 
   // 6. Visibility assert — any instruction starting with an assert/verify verb,
@@ -859,6 +881,16 @@ export async function visionExecute(
           ? `Dragged "${step.from}" ${step.to ? `to "${step.to}"` : `(directional)`}`
           : `Drag failed: ${dragText.slice(0, 200)}`,
       },
+    };
+  }
+
+  // Long press — LLM classified this as "long press"
+  if (LONG_PRESS_ACTIONS.has(actionName)) {
+    const label = locators[0]?.element || instruction;
+    const step: FlowStep = { kind: 'longPress', label, verbatim: instruction };
+    return {
+      step,
+      result: { success: true, message: '__needs_executeStep__' },
     };
   }
 

@@ -65,6 +65,7 @@ export type FlowStep =
       timeoutSeconds: number;
     } & Verbatim)
   | ({ kind: 'tap'; label: string } & Verbatim)
+  | ({ kind: 'longPress'; label: string; duration?: number } & Verbatim)
   | ({ kind: 'type'; text: string; target?: string } & Verbatim)
   | ({ kind: 'enter' } & Verbatim)
   | ({ kind: 'back' } & Verbatim)

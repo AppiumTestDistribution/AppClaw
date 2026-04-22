@@ -133,10 +133,34 @@ export function extractGoalKeywords(goal: string): string[] {
  * Android DOM elements have `rid="com.foo.bar:id/xyz"` — extract the package prefix.
  * Returns undefined if no package can be detected.
  */
+/** iOS XCUITest app name → bundle ID for known apps */
+const IOS_APP_NAME_TO_BUNDLE_ID: Record<string, string> = {
+  Gmail: 'com.google.gmail',
+  YouTube: 'com.google.ios.youtube',
+  WhatsApp: 'net.whatsapp.WhatsApp',
+  Chrome: 'com.google.chrome',
+  Settings: 'com.apple.Preferences',
+  Safari: 'com.apple.mobilesafari',
+  Messages: 'com.apple.MobileSMS',
+  Maps: 'com.apple.Maps',
+  Instagram: 'com.burbn.instagram',
+  Spotify: 'com.spotify.client',
+  Twitter: 'com.atebits.Tweetie2',
+  X: 'com.atebits.Tweetie2',
+};
+
 export function extractAppIdFromDom(dom: string): string | undefined {
   if (!dom) return undefined;
-  const match = dom.match(/rid="([a-z][a-z0-9_.]*):id\//);
-  return match?.[1];
+
+  // Android: resource ID prefix e.g. rid="com.google.android.gm:id/..."
+  const androidMatch = dom.match(/rid="([a-z][a-z0-9_.]*):id\//);
+  if (androidMatch) return androidMatch[1];
+
+  // iOS: XCUIElementTypeApplication name attribute e.g. name="Gmail"
+  const iosMatch = dom.match(/XCUIElementTypeApplication[^>]*\sname="([^"]+)"/);
+  if (iosMatch) return IOS_APP_NAME_TO_BUNDLE_ID[iosMatch[1]];
+
+  return undefined;
 }
 
 /**

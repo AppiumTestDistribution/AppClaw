@@ -9,7 +9,7 @@
  */
 
 import type { MCPClient } from '../mcp/types.js';
-import { getPageSource } from '../mcp/tools.js';
+import { getPageSource, findElementByVision } from '../mcp/tools.js';
 import { activateAppWithFallback } from '../mcp/activate-app.js';
 import { detectDeviceUdid, typeViaKeyboard, typeViaSetValue } from '../mcp/keyboard.js';
 import { detectPlatform } from '../perception/screen.js';
@@ -136,6 +136,8 @@ function stepLabel(step: FlowStep): string {
       return `wait until "${step.text}" is visible (${step.timeoutSeconds}s timeout)`;
     case 'tap':
       return `tap "${step.label}"`;
+    case 'longPress':
+      return `long-press "${step.label}"${step.duration != null ? ` (${step.duration}ms)` : ''}`;
     case 'type':
       return `type "${step.text.length > 40 ? `${step.text.slice(0, 37)}…` : step.text}"`;
     case 'enter':
@@ -198,12 +200,9 @@ async function pressEnterKey(mcp: MCPClient): Promise<ActionResult> {
     /* try next strategy */
   }
 
-  // Strategy 2: mobile: shell via appium_execute_script (Android)
+  // Strategy 2: appium_mobile_press_key ENTER fallback
   try {
-    await mcp.callTool('appium_execute_script', {
-      script: 'mobile: shell',
-      args: [{ command: 'input', args: ['keyevent', '66'] }],
-    });
+    await mcp.callTool('appium_mobile_press_key', { key: 'ENTER' });
     return { success: true, message: 'Pressed Enter' };
   } catch {
     /* try next strategy */
@@ -250,7 +249,7 @@ async function tryTapByVision(mcp: MCPClient, label: string): Promise<ActionResu
     return null;
   }
 
-  await mcp.callTool('appium_click', { elementUUID: uuid });
+  await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
   return { success: true, message: `Tapped "${label}" via vision` };
 }
 
@@ -280,7 +279,7 @@ async function tryTapByLabelOnDom(
   const uuid = await findByIdStrategies(mcp, pick.accessibilityId || pick.id, pick.text);
   if (!uuid) return null;
 
-  await mcp.callTool('appium_click', { elementUUID: uuid });
+  await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
   const coords = pick.center;
   return { success: true, message: `Tapped "${label}" at [${coords[0]}, ${coords[1]}]` };
 }
@@ -321,6 +320,55 @@ async function tapByLabel(
   return { success: false, message: `No matching element for "${label}"` };
 }
 
+/** Long-press an element by visual label. Uses vision locate if available, falls back to DOM. */
+async function longPressByLabel(
+  mcp: MCPClient,
+  label: string,
+  duration: number = 2000
+): Promise<ActionResult> {
+  // Vision mode: locate via df-vision → coordinate-based long press
+  if (isVisionMode() || isVisionLocateEnabled()) {
+    try {
+      const visionUuid = await findElementByVision(mcp, label);
+      const coords = parseAIElementCoords(visionUuid);
+      if (coords) {
+        await mcp.callTool('appium_gesture', {
+          action: 'long_press',
+          x: coords.x,
+          y: coords.y,
+          duration,
+        });
+        return {
+          success: true,
+          message: `Long-pressed "${label}" via vision at [${coords.x}, ${coords.y}] (${duration}ms)`,
+        };
+      }
+    } catch {
+      // Fall through to DOM
+    }
+  }
+
+  // DOM mode: find element UUID → long press by UUID
+  const pageSource = await getPageSource(mcp);
+  const platform = detectPlatform(pageSource);
+  const elements =
+    platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
+
+  const scored = elements
+    .map((el) => ({ el, s: scoreTapMatch(el, label) }))
+    .filter((x) => x.s >= 0)
+    .sort((a, b) => b.s - a.s);
+
+  const pick = scored[0]?.el;
+  if (!pick) return { success: false, message: `No matching element for "${label}"` };
+
+  const uuid = await findByIdStrategies(mcp, pick.accessibilityId || pick.id, pick.text);
+  if (!uuid) return { success: false, message: `Found "${label}" but could not locate element` };
+
+  await mcp.callTool('appium_gesture', { action: 'long_press', elementUUID: uuid, duration });
+  return { success: true, message: `Long-pressed "${label}" (${duration}ms)` };
+}
+
 async function flowTypeText(
   mcp: MCPClient,
   text: string,
@@ -347,7 +395,7 @@ async function flowTypeText(
           const coords = parseAIElementCoords(visionUuid);
           if (coords) await tapAtCoordinates(mcp, coords.x, coords.y);
         } else {
-          await mcp.callTool('appium_click', { elementUUID: visionUuid });
+          await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: visionUuid });
         }
       }
     }
@@ -393,7 +441,7 @@ async function flowTypeText(
   if (!uuid) {
     return { success: false, message: 'Could not resolve editable element' };
   }
-  await mcp.callTool('appium_click', { elementUUID: uuid });
+  await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
   await mcp.callTool('appium_clear_element', { elementUUID: uuid }).catch(() => {});
   const setResult = await mcp.callTool('appium_set_value', {
     ...(Config.CLOUD_PROVIDER ? { w3cActions: true } : { elementUUID: uuid }),
@@ -747,7 +795,7 @@ async function scrollUntilVisible(
   }
 
   for (let scroll = 0; scroll < maxScrolls; scroll++) {
-    await mcp.callTool('appium_scroll', { direction });
+    await mcp.callTool('appium_gesture', { action: 'scroll', direction });
     await sleep(800);
 
     if (await isVisible()) {
@@ -928,6 +976,8 @@ export async function executeStep(
       return waitUntilCondition(mcp, step.condition, step.text, step.timeoutSeconds, tapPoll);
     case 'tap':
       return tapByLabel(mcp, step.label, tapPoll);
+    case 'longPress':
+      return longPressByLabel(mcp, step.label, step.duration);
     case 'type':
       return flowTypeText(mcp, step.text, step.target, deviceUdid);
     case 'enter':

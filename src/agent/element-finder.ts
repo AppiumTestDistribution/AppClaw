@@ -155,24 +155,13 @@ export async function findElementWithFallback(
  * Works without finding an element — taps at the exact x,y position.
  */
 export async function tapAtCoordinates(mcp: MCPClient, x: number, y: number): Promise<boolean> {
-  // Preferred: appium-mcp's built-in tap by coordinates tool
+  // Preferred: appium_gesture tap at coordinates (appium-mcp 1.61+)
   try {
-    const result = await mcp.callTool('appium_tap_by_coordinates', { x, y });
+    const result = await mcp.callTool('appium_gesture', { action: 'tap', x, y });
     const text = result.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
     if (!text.toLowerCase().includes('error') && !text.toLowerCase().includes('failed')) {
       return true;
     }
-  } catch {
-    /* not supported or failed */
-  }
-
-  // Android: mobile: clickGesture
-  try {
-    await mcp.callTool('appium_execute_script', {
-      script: 'mobile: clickGesture',
-      args: [{ x, y }],
-    });
-    return true;
   } catch {
     /* not supported or failed */
   }

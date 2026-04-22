@@ -18,7 +18,6 @@ import type { MCPClient, MCPToolResult, MCPToolInfo } from './types.js';
  */
 const PRE_SESSION_TOOLS = new Set([
   'create_session',
-  'select_platform',
   'select_device',
   'delete_all_sessions',
   'list_sessions',

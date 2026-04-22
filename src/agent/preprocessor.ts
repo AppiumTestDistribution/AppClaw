@@ -15,6 +15,8 @@ export interface PreprocessResult {
   handled: boolean;
   action?: string;
   message?: string;
+  /** Resolved package / bundle ID when action is 'launch' */
+  appId?: string;
 }
 
 /**
@@ -43,7 +45,12 @@ export async function preprocessAction(
       ui.printStepDetail(`activateApp("${packageId}") for "${appName}"`);
       const r = await activateAppWithFallback(mcp, packageId);
       if (r.success) {
-        return { handled: true, action: 'launch', message: `Launched ${appName} (${packageId})` };
+        return {
+          handled: true,
+          action: 'launch',
+          message: `Launched ${appName} (${packageId})`,
+          appId: packageId,
+        };
       }
       return { handled: false };
     }
@@ -59,7 +66,7 @@ export async function preprocessAction(
     // Check if it's a URL
     if (/^https?:\/\//i.test(appName)) {
       const browserPkg = appResolver.resolve('chrome') ?? 'com.android.chrome';
-      await mcp.callTool('appium_activate_app', { id: browserPkg });
+      await mcp.callTool('appium_app_lifecycle', { action: 'activate', id: browserPkg });
       return { handled: true, action: 'open_url', message: `Opened browser for ${appName}` };
     }
 
@@ -69,7 +76,12 @@ export async function preprocessAction(
       ui.printStepDetail(`activateApp("${packageId}") for "${appName}"`);
       const r = await activateAppWithFallback(mcp, packageId);
       if (r.success) {
-        return { handled: true, action: 'launch', message: `Launched ${appName} (${packageId})` };
+        return {
+          handled: true,
+          action: 'launch',
+          message: `Launched ${appName} (${packageId})`,
+          appId: packageId,
+        };
       }
       return { handled: false };
     }

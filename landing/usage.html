@@ -2964,7 +2964,9 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
           </p>
           <p>
             Available on the
-            <a href="https://github.com/marketplace/actions/appclaw-mobile-tests" target="_blank">GitHub Marketplace</a>
+            <a href="https://github.com/marketplace/actions/appclaw-mobile-tests" target="_blank"
+              >GitHub Marketplace</a
+            >
             as <strong>AppClaw Mobile Tests</strong>.
           </p>
 
@@ -3053,27 +3055,135 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
               </tr>
             </thead>
             <tbody>
-              <tr><td><code>flow</code></td><td>one of*</td><td>—</td><td>Path to a YAML flow file relative to repo root</td></tr>
-              <tr><td><code>goal</code></td><td>one of*</td><td>—</td><td>Natural language goal executed by the LLM agent</td></tr>
-              <tr><td><code>platform</code></td><td>no</td><td><code>android</code></td><td>Target platform: <code>android</code> or <code>ios</code></td></tr>
-              <tr><td><code>provider</code></td><td>no</td><td><code>gemini</code></td><td>LLM provider: <code>gemini</code>, <code>anthropic</code>, <code>openai</code>, <code>groq</code></td></tr>
-              <tr><td><code>api-key</code></td><td><strong>yes</strong></td><td>—</td><td>LLM API key — stored as <code>LLM_API_KEY</code></td></tr>
-              <tr><td><code>model</code></td><td>no</td><td><em>provider default</em></td><td>LLM model ID to pin (e.g. <code>gemini-2.0-flash</code>)</td></tr>
-              <tr><td><code>agent-mode</code></td><td>no</td><td><code>dom</code></td><td><code>dom</code> (element locators) or <code>vision</code> (screenshot AI)</td></tr>
-              <tr><td><code>max-steps</code></td><td>no</td><td><code>30</code></td><td>Maximum agent steps before the run fails</td></tr>
-              <tr><td><code>step-delay</code></td><td>no</td><td><code>500</code></td><td>Milliseconds between steps</td></tr>
-              <tr><td><code>android-api-level</code></td><td>no</td><td><code>33</code></td><td>Android emulator API level (33 = Android 13)</td></tr>
-              <tr><td><code>android-profile</code></td><td>no</td><td><code>pixel_6</code></td><td>Android AVD hardware profile</td></tr>
-              <tr><td><code>android-target</code></td><td>no</td><td><code>default</code></td><td>Emulator target: <code>default</code> or <code>google_apis</code></td></tr>
-              <tr><td><code>cloud-provider</code></td><td>no</td><td><em>local</em></td><td>Cloud provider: <code>lambdatest</code>. Leave empty for local.</td></tr>
-              <tr><td><code>lambdatest-username</code></td><td>no**</td><td>—</td><td>LambdaTest account username</td></tr>
-              <tr><td><code>lambdatest-access-key</code></td><td>no**</td><td>—</td><td>LambdaTest access key</td></tr>
-              <tr><td><code>lambdatest-device-name</code></td><td>no**</td><td>—</td><td>Cloud device name (e.g. <code>Pixel 7</code>)</td></tr>
-              <tr><td><code>lambdatest-os-version</code></td><td>no**</td><td>—</td><td>Cloud OS version (e.g. <code>13</code>, <code>16</code>)</td></tr>
-              <tr><td><code>lambdatest-app</code></td><td>no</td><td>—</td><td>LambdaTest app ID (<code>lt://APP...</code>)</td></tr>
-              <tr><td><code>report</code></td><td>no</td><td><code>true</code></td><td>Upload HTML report as workflow artifact</td></tr>
-              <tr><td><code>report-name</code></td><td>no</td><td><code>appclaw-report</code></td><td>Name of the uploaded artifact</td></tr>
-              <tr><td><code>appclaw-version</code></td><td>no</td><td><code>latest</code></td><td>npm package version to pin</td></tr>
+              <tr>
+                <td><code>flow</code></td>
+                <td>one of*</td>
+                <td>—</td>
+                <td>Path to a YAML flow file relative to repo root</td>
+              </tr>
+              <tr>
+                <td><code>goal</code></td>
+                <td>one of*</td>
+                <td>—</td>
+                <td>Natural language goal executed by the LLM agent</td>
+              </tr>
+              <tr>
+                <td><code>platform</code></td>
+                <td>no</td>
+                <td><code>android</code></td>
+                <td>Target platform: <code>android</code> or <code>ios</code></td>
+              </tr>
+              <tr>
+                <td><code>provider</code></td>
+                <td>no</td>
+                <td><code>gemini</code></td>
+                <td>
+                  LLM provider: <code>gemini</code>, <code>anthropic</code>, <code>openai</code>,
+                  <code>groq</code>
+                </td>
+              </tr>
+              <tr>
+                <td><code>api-key</code></td>
+                <td><strong>yes</strong></td>
+                <td>—</td>
+                <td>LLM API key — stored as <code>LLM_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td><code>model</code></td>
+                <td>no</td>
+                <td><em>provider default</em></td>
+                <td>LLM model ID to pin (e.g. <code>gemini-2.0-flash</code>)</td>
+              </tr>
+              <tr>
+                <td><code>agent-mode</code></td>
+                <td>no</td>
+                <td><code>dom</code></td>
+                <td><code>dom</code> (element locators) or <code>vision</code> (screenshot AI)</td>
+              </tr>
+              <tr>
+                <td><code>max-steps</code></td>
+                <td>no</td>
+                <td><code>30</code></td>
+                <td>Maximum agent steps before the run fails</td>
+              </tr>
+              <tr>
+                <td><code>step-delay</code></td>
+                <td>no</td>
+                <td><code>500</code></td>
+                <td>Milliseconds between steps</td>
+              </tr>
+              <tr>
+                <td><code>android-api-level</code></td>
+                <td>no</td>
+                <td><code>33</code></td>
+                <td>Android emulator API level (33 = Android 13)</td>
+              </tr>
+              <tr>
+                <td><code>android-profile</code></td>
+                <td>no</td>
+                <td><code>pixel_6</code></td>
+                <td>Android AVD hardware profile</td>
+              </tr>
+              <tr>
+                <td><code>android-target</code></td>
+                <td>no</td>
+                <td><code>default</code></td>
+                <td>Emulator target: <code>default</code> or <code>google_apis</code></td>
+              </tr>
+              <tr>
+                <td><code>cloud-provider</code></td>
+                <td>no</td>
+                <td><em>local</em></td>
+                <td>Cloud provider: <code>lambdatest</code>. Leave empty for local.</td>
+              </tr>
+              <tr>
+                <td><code>lambdatest-username</code></td>
+                <td>no**</td>
+                <td>—</td>
+                <td>LambdaTest account username</td>
+              </tr>
+              <tr>
+                <td><code>lambdatest-access-key</code></td>
+                <td>no**</td>
+                <td>—</td>
+                <td>LambdaTest access key</td>
+              </tr>
+              <tr>
+                <td><code>lambdatest-device-name</code></td>
+                <td>no**</td>
+                <td>—</td>
+                <td>Cloud device name (e.g. <code>Pixel 7</code>)</td>
+              </tr>
+              <tr>
+                <td><code>lambdatest-os-version</code></td>
+                <td>no**</td>
+                <td>—</td>
+                <td>Cloud OS version (e.g. <code>13</code>, <code>16</code>)</td>
+              </tr>
+              <tr>
+                <td><code>lambdatest-app</code></td>
+                <td>no</td>
+                <td>—</td>
+                <td>LambdaTest app ID (<code>lt://APP...</code>)</td>
+              </tr>
+              <tr>
+                <td><code>report</code></td>
+                <td>no</td>
+                <td><code>true</code></td>
+                <td>Upload HTML report as workflow artifact</td>
+              </tr>
+              <tr>
+                <td><code>report-name</code></td>
+                <td>no</td>
+                <td><code>appclaw-report</code></td>
+                <td>Name of the uploaded artifact</td>
+              </tr>
+              <tr>
+                <td><code>appclaw-version</code></td>
+                <td>no</td>
+                <td><code>latest</code></td>
+                <td>npm package version to pin</td>
+              </tr>
             </tbody>
           </table>
           <p>* Provide either <code>flow</code> <strong>or</strong> <code>goal</code>, not both.</p>
@@ -3083,17 +3193,36 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
         <section id="gha-secrets" class="reveal">
           <h2>Secrets Setup</h2>
           <p>
-            Go to your repo &rarr; <strong>Settings &rarr; Secrets and variables &rarr; Actions &rarr; New repository secret</strong>:
+            Go to your repo &rarr;
+            <strong
+              >Settings &rarr; Secrets and variables &rarr; Actions &rarr; New repository
+              secret</strong
+            >:
           </p>
           <table>
             <thead>
-              <tr><th>Secret name</th><th>Description</th></tr>
+              <tr>
+                <th>Secret name</th>
+                <th>Description</th>
+              </tr>
             </thead>
             <tbody>
-              <tr><td><code>LLM_API_KEY</code></td><td>Your API key — works for any provider (Gemini, Anthropic, OpenAI, Groq)</td></tr>
-              <tr><td><code>LT_USERNAME</code></td><td>LambdaTest username (only if using cloud devices)</td></tr>
-              <tr><td><code>LT_ACCESS_KEY</code></td><td>LambdaTest access key (only if using cloud devices)</td></tr>
-              <tr><td><code>LT_APP_ID</code></td><td>LambdaTest app ID (only if using cloud devices)</td></tr>
+              <tr>
+                <td><code>LLM_API_KEY</code></td>
+                <td>Your API key — works for any provider (Gemini, Anthropic, OpenAI, Groq)</td>
+              </tr>
+              <tr>
+                <td><code>LT_USERNAME</code></td>
+                <td>LambdaTest username (only if using cloud devices)</td>
+              </tr>
+              <tr>
+                <td><code>LT_ACCESS_KEY</code></td>
+                <td>LambdaTest access key (only if using cloud devices)</td>
+              </tr>
+              <tr>
+                <td><code>LT_APP_ID</code></td>
+                <td>LambdaTest app ID (only if using cloud devices)</td>
+              </tr>
             </tbody>
           </table>
         </section>
@@ -3209,8 +3338,9 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
         <section id="gha-reports" class="reveal">
           <h2>Reports</h2>
           <p>
-            When <code>report: true</code> (default), an HTML report is uploaded as a workflow artifact after each run.
-            Download it from the <strong>Actions run summary &rarr; Artifacts</strong>. The report includes:
+            When <code>report: true</code> (default), an HTML report is uploaded as a workflow
+            artifact after each run. Download it from the
+            <strong>Actions run summary &rarr; Artifacts</strong>. The report includes:
           </p>
           <ul>
             <li>Step-by-step screenshots with tap overlays</li>
@@ -3241,7 +3371,11 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
           <h2>Runner Requirements</h2>
           <table>
             <thead>
-              <tr><th>Platform</th><th>Runner</th><th>Notes</th></tr>
+              <tr>
+                <th>Platform</th>
+                <th>Runner</th>
+                <th>Notes</th>
+              </tr>
             </thead>
             <tbody>
               <tr>
@@ -3257,7 +3391,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
             </tbody>
           </table>
           <p>
-            <strong>iOS tip:</strong> For faster iOS CI, use LambdaTest cloud devices on <code>ubuntu-latest</code>
+            <strong>iOS tip:</strong> For faster iOS CI, use LambdaTest cloud devices on
+            <code>ubuntu-latest</code>
             instead of a macOS runner.
           </p>
         </section>

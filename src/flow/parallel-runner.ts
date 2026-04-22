@@ -90,7 +90,7 @@ async function discoverDevices(
   const args: Record<string, unknown> = { platform };
   if (platform === 'ios' && deviceType) args.iosDeviceType = deviceType;
 
-  const result = await mcp.callTool('select_platform', args);
+  const result = await mcp.callTool('select_device', args);
   const text = extractText(result);
   const devices = parseDeviceList(text, platform);
 

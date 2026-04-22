@@ -52,7 +52,7 @@ export async function discoverAndSelectDevice(
     selectPlatformArgs.iosDeviceType = deviceType;
   }
 
-  const platformResult = await mcp.callTool('select_platform', selectPlatformArgs);
+  const platformResult = await mcp.callTool('select_device', selectPlatformArgs);
   const platformText = extractText(platformResult);
   ui.stopSpinner();
 

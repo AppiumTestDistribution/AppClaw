@@ -15,6 +15,11 @@ const stepSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('openApp'), query: z.string().describe('App name to open') }),
   z.object({ kind: z.literal('tap'), label: z.string().describe('Element label/text to tap') }),
   z.object({
+    kind: z.literal('longPress'),
+    label: z.string().describe('Element label/text to long-press'),
+    duration: z.number().optional().describe('Hold duration in ms, default 2000'),
+  }),
+  z.object({
     kind: z.literal('type'),
     text: z.string().describe('Text to type'),
     target: z.string().optional().describe('Target field to type into'),
@@ -58,6 +63,7 @@ const SYSTEM_PROMPT =
   `Rules:\n` +
   `- "open/launch/start <app>" → openApp\n` +
   `- "click/tap/press/select <element>" → tap\n` +
+  `- "long press/long-press/press and hold <element>" → longPress\n` +
   `- "type/enter/input <text>" or "search for <text>" → type\n` +
   `- "wait for <element> to be visible/appear" → waitUntil (visible)\n` +
   `- "wait for <element> to disappear/be gone" → waitUntil (gone)\n` +

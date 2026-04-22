@@ -49,7 +49,7 @@ export async function readScreen(mcp: MCPClient, maxScrolls: number = 5): Promis
 
       // Scroll down for more content (skip on last iteration)
       if (i < maxScrolls) {
-        await mcp.callTool('appium_scroll', { direction: 'down' });
+        await mcp.callTool('appium_gesture', { action: 'scroll', direction: 'down' });
         scrollCount++;
         await sleep(500);
       }

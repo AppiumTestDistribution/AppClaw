@@ -50,14 +50,15 @@ export async function findAndTap(
   try {
     // First try: use appium-mcp's scroll_to_element with accessibility id
     try {
-      await mcp.callTool('appium_scroll_to_element', {
+      await mcp.callTool('appium_gesture', {
+        action: 'scroll_to_element',
         strategy: 'accessibility id',
         selector: query,
         direction,
         maxScrolls,
       });
       const uuid = await findElement(mcp, 'accessibility id', query);
-      await mcp.callTool('appium_click', { elementUUID: uuid });
+      await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
       return { success: true, message: `Found and tapped "${query}" via accessibility ID` };
     } catch {
       // Fall through
@@ -65,14 +66,15 @@ export async function findAndTap(
 
     // Second try: resource id strategy
     try {
-      await mcp.callTool('appium_scroll_to_element', {
+      await mcp.callTool('appium_gesture', {
+        action: 'scroll_to_element',
         strategy: 'id',
         selector: query,
         direction,
         maxScrolls,
       });
       const uuid = await findElement(mcp, 'id', query);
-      await mcp.callTool('appium_click', { elementUUID: uuid });
+      await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
       return { success: true, message: `Found and tapped "${query}" via resource ID` };
     } catch {
       // Fall through
@@ -93,7 +95,7 @@ export async function findAndTap(
         if (match.accessibilityId) {
           try {
             const uuid = await findElement(mcp, 'accessibility id', match.accessibilityId);
-            await mcp.callTool('appium_click', { elementUUID: uuid });
+            await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
             return {
               success: true,
               message: `Found and tapped "${query}" (accessibility id: ${match.accessibilityId})`,
@@ -104,7 +106,7 @@ export async function findAndTap(
 
           try {
             const uuid = await findElement(mcp, 'id', match.accessibilityId);
-            await mcp.callTool('appium_click', { elementUUID: uuid });
+            await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
             return {
               success: true,
               message: `Found and tapped "${query}" (resource id: ${match.accessibilityId})`,
@@ -122,7 +124,7 @@ export async function findAndTap(
 
       // Not found — scroll and try again
       if (i < maxScrolls) {
-        await mcp.callTool('appium_scroll', { direction });
+        await mcp.callTool('appium_gesture', { action: 'scroll', direction });
         await sleep(500);
       }
     }
@@ -132,7 +134,7 @@ export async function findAndTap(
       try {
         const visionUuid = await findElementByVision(mcp, query);
         // Pass UUID directly to appium_click — it handles ai-element: UUIDs natively
-        await mcp.callTool('appium_click', { elementUUID: visionUuid });
+        await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: visionUuid });
         const coords = parseAIElementCoords(visionUuid);
         const coordInfo = coords ? ` at [${coords.x},${coords.y}]` : '';
         return { success: true, message: `Found and tapped "${query}" via AI vision${coordInfo}` };

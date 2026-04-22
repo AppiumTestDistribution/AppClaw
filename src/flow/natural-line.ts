@@ -39,6 +39,24 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     if (label) return { kind: 'tap', label, verbatim };
   }
 
+  // "long press X" / "long-press X" / "long tap X" / "press and hold X"
+  const longPressMatch = t.match(
+    /^(?:long[\s-]press|long[\s-]tap|press\s+and\s+hold)(?:\s+on)?\s+(?:the\s+)?(.+?)(?:\s+for\s+(\d+(?:\.\d+)?)\s*(?:ms|milliseconds?|s|seconds?))?$/i
+  );
+  if (longPressMatch) {
+    const label = trimPunct(longPressMatch[1].trim());
+    const durRaw = longPressMatch[2];
+    const durUnit =
+      longPressMatch[0].match(/(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|seconds?)$/i)?.[2] ?? 'ms';
+    const duration = durRaw
+      ? durUnit.startsWith('s')
+        ? Math.round(Number(durRaw) * 1000)
+        : Math.round(Number(durRaw))
+      : undefined;
+    if (label)
+      return { kind: 'longPress', label, ...(duration != null ? { duration } : {}), verbatim };
+  }
+
   const clickMatch = t.match(/^(?:click|tap|select|choose|pick)(?:\s+on)?\s+(?:the\s+)?(.+)$/i);
   if (clickMatch) {
     const label = trimPunct(clickMatch[1].trim());

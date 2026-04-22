@@ -132,7 +132,7 @@ export async function crawlApp(
   // Launch app if appId provided
   if (appId) {
     try {
-      await mcp.callTool('appium_activate_app', { appId });
+      await mcp.callTool('appium_app_lifecycle', { action: 'activate', id: appId });
       await sleep(1500);
     } catch {
       ui.printWarning(`Could not launch app ${appId}, using current screen`);
@@ -170,10 +170,17 @@ export async function crawlApp(
       try {
         // Tap the element
         ui.printExplorerAction(`tap "${element.label}"`);
-        await mcp.callTool('appium_find_and_click', {
+        const foundEl = await mcp.callTool('appium_find_element', {
           strategy: 'accessibility id',
           selector: element.label,
         });
+        const foundUuid = foundEl.content
+          ?.map((c: any) => c.text ?? '')
+          .join('')
+          .trim();
+        if (foundUuid) {
+          await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: foundUuid });
+        }
         await sleep(options.stepDelayMs);
 
         // Capture new screen
@@ -211,7 +218,7 @@ export async function crawlApp(
         }
 
         // Navigate back to the original screen
-        await mcp.callTool('appium_press_back', {});
+        await mcp.callTool('appium_mobile_press_key', { key: 'BACK' });
         await sleep(options.stepDelayMs);
 
         // Verify we're back on the expected screen
@@ -219,7 +226,7 @@ export async function crawlApp(
         const backId = findMatchingScreen(backState.dom, screens);
         if (backId !== screenId) {
           // Not back on the expected screen — try one more back
-          await mcp.callTool('appium_press_back', {});
+          await mcp.callTool('appium_mobile_press_key', { key: 'BACK' });
           await sleep(options.stepDelayMs);
         }
       } catch {

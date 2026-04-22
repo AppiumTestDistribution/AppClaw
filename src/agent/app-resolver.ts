@@ -126,7 +126,7 @@ export class AppResolver {
     }
 
     try {
-      const result = await mcp.callTool('appium_list_apps', {});
+      const result = await mcp.callTool('appium_app_lifecycle', { action: 'list' });
       const text = result.content?.map((c: any) => c.text ?? '').join('\n') ?? '';
 
       this.apps = parseAppList(text);

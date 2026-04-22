@@ -112,7 +112,7 @@ export async function submitMessage(mcp: MCPClient): Promise<ActionResult> {
     if (sendButton.accessibilityId) {
       try {
         const uuid = await findElement(mcp, 'accessibility id', sendButton.accessibilityId);
-        await mcp.callTool('appium_click', { elementUUID: uuid });
+        await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
         await sleep(1000);
         return { success: true, message: `Tapped Send button (${sendButton.accessibilityId})` };
       } catch {
@@ -123,7 +123,7 @@ export async function submitMessage(mcp: MCPClient): Promise<ActionResult> {
     if (sendButton.id) {
       try {
         const uuid = await findElement(mcp, 'id', sendButton.id);
-        await mcp.callTool('appium_click', { elementUUID: uuid });
+        await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
         await sleep(1000);
         return { success: true, message: `Tapped Send button (${sendButton.id})` };
       } catch {
@@ -135,7 +135,7 @@ export async function submitMessage(mcp: MCPClient): Promise<ActionResult> {
     try {
       const xpathQuery = `//*[@text='${sendButton.text}' or @content-desc='${sendButton.text}']`;
       const uuid = await findElement(mcp, 'xpath', xpathQuery);
-      await mcp.callTool('appium_click', { elementUUID: uuid });
+      await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
       await sleep(1000);
       return { success: true, message: `Tapped Send button via xpath` };
     } catch {
