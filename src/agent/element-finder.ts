@@ -155,15 +155,24 @@ export async function findElementWithFallback(
  * Works without finding an element — taps at the exact x,y position.
  */
 export async function tapAtCoordinates(mcp: MCPClient, x: number, y: number): Promise<boolean> {
+  const ix = Math.round(x);
+  const iy = Math.round(y);
+  const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
+
   // Preferred: appium_gesture tap at coordinates (appium-mcp 1.61+)
   try {
-    const result = await mcp.callTool('appium_gesture', { action: 'tap', x, y });
+    const result = await mcp.callTool('appium_gesture', { action: 'tap', x: ix, y: iy });
     const text = result.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
+    if (mcpDebug)
+      console.log(`        tapAtCoordinates(${ix},${iy}) gesture response: ${text.slice(0, 200)}`);
     if (!text.toLowerCase().includes('error') && !text.toLowerCase().includes('failed')) {
       return true;
     }
-  } catch {
-    /* not supported or failed */
+  } catch (err) {
+    if (mcpDebug)
+      console.log(
+        `        tapAtCoordinates gesture error: ${err instanceof Error ? err.message : err}`
+      );
   }
 
   // W3C Actions pointer tap
@@ -175,7 +184,7 @@ export async function tapAtCoordinates(mcp: MCPClient, x: number, y: number): Pr
           id: 'finger1',
           parameters: { pointerType: 'touch' },
           actions: [
-            { type: 'pointerMove', duration: 0, x, y },
+            { type: 'pointerMove', duration: 0, x: ix, y: iy },
             { type: 'pointerDown', button: 0 },
             { type: 'pause', duration: 100 },
             { type: 'pointerUp', button: 0 },
@@ -184,8 +193,11 @@ export async function tapAtCoordinates(mcp: MCPClient, x: number, y: number): Pr
       ],
     });
     return true;
-  } catch {
-    /* not supported or failed */
+  } catch (err) {
+    if (mcpDebug)
+      console.log(
+        `        tapAtCoordinates w3c error: ${err instanceof Error ? err.message : err}`
+      );
   }
 
   return false;

@@ -638,10 +638,8 @@ export async function visionExecute(
 
     if (!hasElementCoords) {
       const step: FlowStep = { kind: 'swipe', direction, verbatim: instruction };
-      // appium_scroll only supports up/down; use appium_swipe for left/right
-      const scrollTool =
-        direction === 'left' || direction === 'right' ? 'appium_swipe' : 'appium_scroll';
-      await mcp.callTool(scrollTool, { direction });
+      const gestureAction = direction === 'left' || direction === 'right' ? 'swipe' : 'scroll';
+      await mcp.callTool('appium_gesture', { action: gestureAction, direction });
       return { step, result: { success: true, message: `Swiped ${direction}` } };
     }
     // Has element coords — fall through to element-targeted swipe below

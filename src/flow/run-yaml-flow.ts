@@ -989,13 +989,15 @@ export async function executeStep(
       await mcp.callTool('appium_mobile_press_key', { key: 'HOME' });
       return { success: true, message: 'Home' };
     case 'swipe': {
-      // appium_scroll only supports up/down; use appium_swipe for left/right
       const dir = step.direction;
       const count = step.repeat ?? 1;
-      const toolName = dir === 'left' || dir === 'right' ? 'appium_swipe' : 'appium_scroll';
+      const gestureAction = dir === 'left' || dir === 'right' ? 'swipe' : 'scroll';
       let lastError = '';
       for (let i = 0; i < count; i++) {
-        const result = await mcp.callTool(toolName, { direction: dir });
+        const result = await mcp.callTool('appium_gesture', {
+          action: gestureAction,
+          direction: dir,
+        });
         const text =
           result.content
             ?.map((c: { type: string; text?: string }) => (c.type === 'text' ? c.text : ''))
