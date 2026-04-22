@@ -254,6 +254,71 @@ let spinnerFrame = 0;
 let spinnerLineActive = false;
 let spinnerPrimary = '';
 let spinnerDetail: string | undefined;
+let wordRotateTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Fun verbs shown while the agent is thinking — rotated randomly. */
+const THINKING_VERBS = [
+  'Brewing…',
+  'Cascading…',
+  'Channeling…',
+  'Choreographing…',
+  'Churning…',
+  'Coalescing…',
+  'Cogitating…',
+  'Composing…',
+  'Computing…',
+  'Concocting…',
+  'Considering…',
+  'Contemplating…',
+  'Cooking…',
+  'Crafting…',
+  'Crunching…',
+  'Crystallizing…',
+  'Cultivating…',
+  'Deciphering…',
+  'Deliberating…',
+  'Determining…',
+  'Elucidating…',
+  'Envisioning…',
+  'Fermenting…',
+  'Forging…',
+  'Forming…',
+  'Generating…',
+  'Germinating…',
+  'Harmonizing…',
+  'Hatching…',
+  'Ideating…',
+  'Imagining…',
+  'Incubating…',
+  'Inferring…',
+  'Manifesting…',
+  'Marinating…',
+  'Mulling…',
+  'Musing…',
+  'Noodling…',
+  'Orchestrating…',
+  'Percolating…',
+  'Pondering…',
+  'Processing…',
+  'Ruminating…',
+  'Simmering…',
+  'Sketching…',
+  'Spinning…',
+  'Sprouting…',
+  'Synthesizing…',
+  'Tinkering…',
+  'Unravelling…',
+  'Vibing…',
+  'Whirring…',
+  'Whisking…',
+  'Working…',
+  'Wrangling…',
+  'Zesting…',
+];
+
+function pickThinkingVerb(): string {
+  return THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)];
+}
 
 function paintSpinnerLine(frame: number, overwrite: boolean): void {
   const sym = theme.brand(SPINNER.frames[frame % SPINNER.frames.length]);
@@ -267,12 +332,17 @@ function paintSpinnerLine(frame: number, overwrite: boolean): void {
   process.stdout.write(line);
 }
 
-export function formatAgentThinkingDetail(modelName: string): string {
+export function formatAgentThinkingDetail(
+  modelName: string,
+  step?: number,
+  maxSteps?: number
+): string {
   const mode = Config.AGENT_MODE === 'vision' ? 'vision' : 'dom';
   const think = Config.LLM_THINKING === 'on' ? 'thinking on' : 'thinking off';
   const m = modelName.trim() || 'model';
   const short = m.length > 40 ? `${m.slice(0, 37)}…` : m;
-  return `${mode} · ${think} · ${short}`;
+  const stepStr = step != null && maxSteps != null ? `${step}/${maxSteps} · ` : '';
+  return `${stepStr}${mode} · ${think} · ${short}`;
 }
 
 export function printAgentBullet(message: string): void {
@@ -286,11 +356,11 @@ export function updateSpinner(message?: string, detail?: string): void {
   paintSpinnerLine(spinnerFrame, true);
 }
 
-export function startSpinner(message: string, detail?: string): void {
+export function startSpinner(message: string, detail?: string, rotateWords = false): void {
   stopSpinner();
   spinnerFrame = 0;
   spinnerLineActive = true;
-  spinnerPrimary = message;
+  spinnerPrimary = rotateWords ? pickThinkingVerb() : message;
   spinnerDetail = detail;
   process.stdout.write('\x1B[?25l');
   paintSpinnerLine(spinnerFrame, false);
@@ -298,9 +368,19 @@ export function startSpinner(message: string, detail?: string): void {
     spinnerFrame = (spinnerFrame + 1) % SPINNER.frames.length;
     paintSpinnerLine(spinnerFrame, true);
   }, SPINNER.interval);
+  if (rotateWords) {
+    wordRotateTimer = setInterval(() => {
+      spinnerPrimary = pickThinkingVerb();
+      paintSpinnerLine(spinnerFrame, true);
+    }, 2500);
+  }
 }
 
 export function stopSpinner(finalMessage?: string): void {
+  if (wordRotateTimer) {
+    clearInterval(wordRotateTimer);
+    wordRotateTimer = null;
+  }
   if (spinnerTimer) {
     clearInterval(spinnerTimer);
     spinnerTimer = null;
@@ -493,7 +573,7 @@ export function printGoalStart(goal: string, maxSteps: number): void {
   const content = [
     ...wrapped.map((l) => chalk.bold(l)),
     '',
-    `${theme.dim(`max ${maxSteps} steps`)}  ${progressBar(0, maxSteps, 15)}`,
+    theme.dim(`max ${maxSteps} steps`),
   ].join('\n');
 
   console.log();

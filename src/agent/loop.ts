@@ -24,7 +24,7 @@ import { tapAtCoordinates, isAIElement, parseAIElementCoords } from './element-f
 import { findElementByVision } from '../mcp/tools.js';
 import { Config } from '../config.js';
 import { isVisionLocateEnabled } from '../vision/locate-enabled.js';
-import { getCachedScreenSize } from '../vision/window-size.js';
+import { getCachedScreenSize, getScreenSizeForStark } from '../vision/window-size.js';
 import type { ActionRecorder } from '../recording/recorder.js';
 import type { AppResolver } from './app-resolver.js';
 import { preprocessAction, resolveAppId } from './preprocessor.js';
@@ -135,6 +135,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   let detectedPlatform: 'android' | 'ios' = 'android';
   let postActionScreenshot: string | undefined; // Screenshot captured after previous action
   let lastAppGuideId = ''; // Track last app a guide was logged for (avoid duplicate logs)
+  let activeAppId = options.appId ?? ''; // Current foreground app — drives AppGuide loading
   let cachedPostScreen: import('../perception/types.js').ScreenState | undefined; // Reuse post-action screen as next step's perception
   const triedSelectors: string[] = []; // Track selectors the LLM has tried (for stuck recovery)
 
@@ -148,8 +149,6 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
   // Detect device UDID for keyboard input (ADB-based typing on Android)
   const deviceUdid = await detectDeviceUdid();
-  const agentSpinDetail = ui.formatAgentThinkingDetail(modelName);
-
   // ── Episodic Memory ──────────────────────────────────
   // Cross-session trajectory store: remembers winning actions from previous runs.
   const episodicEnabled = Config.EPISODIC_MEMORY === 'on';
@@ -164,7 +163,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   const episodicStore = episodicEnabled ? loadStore(episodicStorePath) : undefined;
   const goalKeywords = episodicEnabled ? extractGoalKeywords(goal) : [];
 
-  if (episodicEnabled) {
+  if (episodicEnabled && mcpDebug) {
     const entryCount = episodicStore?.entries.length ?? 0;
     ui.printAgentBullet(`Episodic memory: ON (${entryCount} stored trajectories)`);
   }
@@ -178,6 +177,10 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       if (preResult.handled) {
         ui.printPreprocessor(preResult.message ?? '');
         lastResult = preResult.message ?? '';
+        // Track launched app for AppGuide (independent of episodic memory)
+        if (preResult.appId) {
+          activeAppId = preResult.appId;
+        }
         // Feed preprocessor result to episodic recorder for app ID detection
         if (episodicRecorder && lastResult) {
           const appIdFromResult = extractAppIdFromText(lastResult);
@@ -191,11 +194,12 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   }
 
   for (let step = 0; step < maxSteps; step++) {
-    if (step === 0) {
+    if (step === 0 && mcpDebug) {
       ui.printAgentBullet('Pulling UI state from the device');
       ui.printAgentBullet('Consulting the agent model for the next action');
     }
-    ui.startSpinner('Reasoning…', agentSpinDetail);
+    const agentSpinDetail = ui.formatAgentThinkingDetail(modelName, step + 1, maxSteps);
+    ui.startSpinner('Reasoning…', agentSpinDetail, true);
 
     // ─── 1. PERCEIVE ─────────────────────────────────────
     const captureScreenshot =
@@ -298,12 +302,12 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
               ui.printWarning(
                 `Rejected adaptation: "${adapted.slice(0, 80)}" — keeping original goal`
               );
-              ui.startSpinner('Reasoning…', agentSpinDetail);
+              ui.startSpinner('Reasoning…', agentSpinDetail, true);
             } else {
               ui.stopSpinner();
               ui.printInfo(`Goal adapted: ${adapted}`);
               goal = adapted;
-              ui.startSpinner('Reasoning…', agentSpinDetail);
+              ui.startSpinner('Reasoning…', agentSpinDetail, true);
             }
           }
         }
@@ -349,7 +353,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         stuckHint += `\n\n${rollbackResult.message}`;
         stuck.reset();
       }
-      ui.startSpinner('Reasoning…', agentSpinDetail);
+      ui.startSpinner('Reasoning…', agentSpinDetail, true);
     }
 
     // ─── 4. REASON (LLM call) ────────────────────────────
@@ -390,18 +394,31 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       if (matches.length > 0) {
         pastExperience = formatExperienceForPrompt(matches);
         episodicRecorder.trackInjectedTrajectories(matches);
-        ui.printAgentBullet(
-          `Episodic memory: injecting ${matches.length} past experience(s) (score: ${matches[0].score.toFixed(2)})`
-        );
+        if (mcpDebug) {
+          ui.printAgentBullet(
+            `Episodic memory: injecting ${matches.length} past experience(s) (score: ${matches[0].score.toFixed(2)})`
+          );
+        }
       }
     }
 
     // ── AppGuide: per-app navigation knowledge ────────────
-    const currentAppId = episodicRecorder?.currentAppId ?? '';
-    const appGuide = loadAppGuide(currentAppId);
-    if (appGuide && currentAppId !== lastAppGuideId) {
-      ui.printAgentBullet(`AppGuide: loaded guide for ${currentAppId}`);
-      lastAppGuideId = currentAppId;
+    // activeAppId is set by the preprocessor or launch_app meta-tool (independent of episodic memory)
+    // Also sync from episodic recorder if it detected a new app via DOM
+    if (episodicRecorder?.currentAppId) activeAppId = episodicRecorder.currentAppId;
+    const appGuide = loadAppGuide(activeAppId);
+    if (appGuide) {
+      if (activeAppId !== lastAppGuideId) {
+        lastAppGuideId = activeAppId;
+        if (mcpDebug) {
+          const firstLine = appGuide.split('\n')[0];
+          ui.printAgentBullet(
+            `AppGuide: injecting ${firstLine.replace('APP_GUIDE ', '').replace(':', '').trim()}`
+          );
+        }
+      } else if (mcpDebug) {
+        ui.printAgentBullet(`AppGuide: active (${activeAppId})`);
+      }
     }
 
     const context: AgentContext = {
@@ -425,19 +442,24 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     let streamingStarted = false;
     const llmT0 = performance.now();
     try {
-      decision = await llm.getDecision(context, {
-        onTextStart() {
-          streamingStarted = true;
-          ui.stopSpinner();
-          ui.startStreaming('Reasoning');
-        },
-        onTextChunk(text) {
-          ui.streamChunk(text);
-        },
-        onDone() {
-          ui.stopStreaming();
-        },
-      });
+      decision = await llm.getDecision(
+        context,
+        mcpDebug
+          ? {
+              onTextStart() {
+                streamingStarted = true;
+                ui.stopSpinner();
+                ui.startStreaming('Reasoning');
+              },
+              onTextChunk(text) {
+                ui.streamChunk(text);
+              },
+              onDone() {
+                ui.stopStreaming();
+              },
+            }
+          : {}
+      );
     } catch (err: any) {
       const errName = err?.name ?? '';
       const errMsg = err?.message ?? '';
@@ -477,8 +499,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       );
     }
 
-    // If reasoning text is available but wasn't streamed live, show it now
-    if (decision.reasoning && !streamingStarted) {
+    // If reasoning text is available but wasn't streamed live, show it now (debug only)
+    if (mcpDebug && decision.reasoning && !streamingStarted) {
       ui.printReasoning(decision.reasoning);
     }
 
@@ -636,7 +658,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         appResolver,
         deviceUdid,
         detectedPlatform,
-        screenshotForLLM
+        screenshotForLLM,
+        episodicRecorder
       );
     } else {
       // Forward directly to MCP — appium tools, skills, everything
@@ -644,6 +667,12 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     }
 
     lastResult = `${decision.toolName} → ${result.success ? 'OK' : 'FAILED'}: ${result.message}`;
+
+    // ── Track launched app for AppGuide ──────────────────
+    if (decision.toolName === 'launch_app' && result.success) {
+      const launchedId = (decision.args.appId as string) ?? '';
+      if (launchedId) activeAppId = launchedId;
+    }
 
     // ── Record failure in negative cache ──────────────────
     // Only track failures with a selector — these are the ones the LLM
@@ -811,6 +840,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 const META_TOOLS = new Set([
   'find_and_click',
   'find_and_type',
+  'find_and_long_press',
   'launch_app',
   'go_back',
   'go_home',
@@ -830,7 +860,8 @@ async function executeMetaTool(
   deviceUdid?: string | null,
   platform: 'android' | 'ios' = 'android',
   /** Reusable screenshot from the current step (avoids redundant capture in vision locate) */
-  currentScreenshot?: string
+  currentScreenshot?: string,
+  episodicRecorder?: EpisodicRecorder
 ): Promise<ActionResult> {
   /**
    * Scale LLM-provided 0-1000 normalized coordinates to device space.
@@ -840,18 +871,17 @@ async function executeMetaTool(
    * Note: df-vision convention is [y, x] order for coordinates.
    */
   async function scaleLLMCoords(tapX: number, tapY: number): Promise<{ x: number; y: number }> {
-    const deviceSize = getCachedScreenSize(mcp);
-    if (!deviceSize) {
-      // Fallback: no device size, can't scale — return as-is (will likely miss)
-      return { x: Math.round(tapX), y: Math.round(tapY) };
-    }
     try {
+      // getScreenSizeForStark fetches from Appium if cache is empty — never silently skips scaling
+      const deviceSize = await getScreenSizeForStark(mcp, currentScreenshot ?? '');
       const starkVision = (await import('df-vision')).default;
       // scaleCoordinates expects [y, x] in 0-1000 normalized space
       const bbox = starkVision.scaleCoordinates([tapY, tapX] as [number, number], deviceSize);
       return { x: Math.round(bbox.center.x), y: Math.round(bbox.center.y) };
     } catch {
-      // df-vision unavailable — simple fallback
+      // df-vision unavailable — simple proportional fallback using cached size
+      const deviceSize = getCachedScreenSize(mcp);
+      if (!deviceSize) return { x: Math.round(tapX), y: Math.round(tapY) };
       return {
         x: Math.round((tapX / 1000) * deviceSize.width),
         y: Math.round((tapY / 1000) * deviceSize.height),
@@ -908,7 +938,10 @@ async function executeMetaTool(
               const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
               // Pass the UUID (ai-element: or standard) directly to appium_click
               // appium-mcp handles ai-element: UUIDs natively with coordinate tapping
-              const clickResult = await mcp.callTool('appium_click', { elementUUID: visionUuid });
+              const clickResult = await mcp.callTool('appium_gesture', {
+                action: 'tap',
+                elementUUID: visionUuid,
+              });
               if (!isMCPError(clickResult)) {
                 const coords = parseAIElementCoords(visionUuid);
                 const coordInfo = coords ? ` at [${coords.x},${coords.y}]` : '';
@@ -953,7 +986,10 @@ async function executeMetaTool(
         // Strategy 1: Use the LLM's chosen strategy
         try {
           const uuid = await findElement(mcp, strategy as any, selector);
-          const clickResult = await mcp.callTool('appium_click', { elementUUID: uuid });
+          const clickResult = await mcp.callTool('appium_gesture', {
+            action: 'tap',
+            elementUUID: uuid,
+          });
           if (!isMCPError(clickResult)) {
             return { success: true, message: `Clicked "${selector.slice(0, 60)}" via ${strategy}` };
           }
@@ -974,7 +1010,10 @@ async function executeMetaTool(
         for (const fb of fallbackStrategies) {
           try {
             const uuid = await findElement(mcp, fb.s as any, fb.v);
-            const clickResult = await mcp.callTool('appium_click', { elementUUID: uuid });
+            const clickResult = await mcp.callTool('appium_gesture', {
+              action: 'tap',
+              elementUUID: uuid,
+            });
             if (!isMCPError(clickResult)) {
               return {
                 success: true,
@@ -991,7 +1030,10 @@ async function executeMetaTool(
         if (isVisionLocateEnabled()) {
           try {
             const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
-            const clickResult = await mcp.callTool('appium_click', { elementUUID: visionUuid });
+            const clickResult = await mcp.callTool('appium_gesture', {
+              action: 'tap',
+              elementUUID: visionUuid,
+            });
             if (!isMCPError(clickResult)) {
               const coords = parseAIElementCoords(visionUuid);
               const coordInfo = coords ? ` at [${coords.x},${coords.y}]` : '';
@@ -1029,6 +1071,191 @@ async function executeMetaTool(
         };
       }
 
+      case 'find_and_long_press': {
+        const isVisionModeLongPress = Config.AGENT_MODE === 'vision';
+        const lpSelector = args.selector as string;
+        const lpBounds = args.bounds as string | undefined;
+        const lpTapX = args.tapX as number | undefined;
+        const lpTapY = args.tapY as number | undefined;
+        const lpDuration = (args.duration as number | undefined) ?? 2000;
+        const lpAttempts: string[] = [];
+
+        /**
+         * Long-press at absolute device coordinates via appium_gesture (appium-mcp 1.61+).
+         * appium_gesture action=long_press accepts x/y directly without needing an element UUID.
+         */
+        async function longPressAtCoords(
+          x: number,
+          y: number
+        ): Promise<{ success: boolean; text: string }> {
+          const result = await mcp.callTool('appium_gesture', {
+            action: 'long_press',
+            x,
+            y,
+            duration: lpDuration,
+          });
+          const text =
+            result.content
+              ?.map((c: any) => (c.type === 'text' ? c.text : ''))
+              .filter(Boolean)
+              .join(' ') ?? '';
+          return { success: !isMCPError(result), text };
+        }
+
+        if (isVisionModeLongPress) {
+          // ══ VISION MODE: locate via AI vision, then long-press at coordinates ══
+
+          // Fast path: LLM provided 0-1000 normalized coordinates
+          if (lpTapX != null && lpTapY != null) {
+            const scaled = await scaleLLMCoords(lpTapX, lpTapY);
+            const { success } = await longPressAtCoords(scaled.x, scaled.y);
+            if (success) {
+              return {
+                success: true,
+                message: `Long-pressed "${lpSelector.slice(0, 60)}" via LLM coordinates at [${scaled.x},${scaled.y}]`,
+              };
+            }
+            lpAttempts.push(`llm_coords [${scaled.x},${scaled.y}]: long-press failed`);
+          }
+
+          // Vision locate fallback
+          if (isVisionLocateEnabled()) {
+            try {
+              const visionUuid = await findElementByVision(mcp, lpSelector, currentScreenshot);
+              const coords = parseAIElementCoords(visionUuid);
+              if (coords) {
+                const { success } = await longPressAtCoords(coords.x, coords.y);
+                if (success) {
+                  return {
+                    success: true,
+                    message: `Long-pressed "${lpSelector.slice(0, 60)}" via AI vision at [${coords.x},${coords.y}]`,
+                  };
+                }
+                lpAttempts.push(`ai_vision: long-press failed at [${coords.x},${coords.y}]`);
+              } else {
+                lpAttempts.push('ai_vision: could not parse coordinates from UUID');
+              }
+            } catch (err) {
+              lpAttempts.push(
+                `ai_vision: ${err instanceof Error ? err.message.slice(0, 60) : 'not found'}`
+              );
+            }
+          }
+
+          // Bounds coordinate fallback
+          if (lpBounds) {
+            const coordMatch = lpBounds.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+            if (coordMatch) {
+              const cx = Math.round((parseInt(coordMatch[1]) + parseInt(coordMatch[3])) / 2);
+              const cy = Math.round((parseInt(coordMatch[2]) + parseInt(coordMatch[4])) / 2);
+              const { success } = await longPressAtCoords(cx, cy);
+              if (success) {
+                return {
+                  success: true,
+                  message: `Long-pressed "${lpSelector.slice(0, 60)}" at coordinates [${cx},${cy}]`,
+                };
+              }
+              lpAttempts.push('coordinates: long-press failed');
+            }
+          }
+
+          return {
+            success: false,
+            message: `Long-press failed for "${lpSelector.slice(0, 60)}": ${lpAttempts.join(', ')}`,
+          };
+        }
+
+        // ══ DOM MODE: find element UUID, then long-press ══
+        const lpStrategy = args.strategy as string;
+        const lpDomAttempts: string[] = [];
+
+        // Try the LLM's chosen strategy
+        try {
+          const uuid = await findElement(mcp, lpStrategy as any, lpSelector);
+          const lpResult = await mcp.callTool('appium_gesture', {
+            action: 'long_press',
+            elementUUID: uuid,
+            duration: lpDuration,
+          });
+          if (!isMCPError(lpResult)) {
+            return {
+              success: true,
+              message: `Long-pressed "${lpSelector.slice(0, 60)}" via ${lpStrategy}`,
+            };
+          }
+          lpDomAttempts.push(`${lpStrategy}: long-press failed`);
+        } catch {
+          lpDomAttempts.push(`${lpStrategy}: not found`);
+        }
+
+        // Try alternate strategies
+        const lpFallbackStrategies: Array<{ s: string; v: string }> = [];
+        if (lpStrategy !== 'accessibility id')
+          lpFallbackStrategies.push({ s: 'accessibility id', v: lpSelector });
+        if (lpStrategy !== 'id') lpFallbackStrategies.push({ s: 'id', v: lpSelector });
+
+        for (const fb of lpFallbackStrategies) {
+          try {
+            const uuid = await findElement(mcp, fb.s as any, lpSelector);
+            const lpResult = await mcp.callTool('appium_long_press', {
+              elementUUID: uuid,
+              duration: lpDuration,
+            });
+            if (!isMCPError(lpResult)) {
+              return {
+                success: true,
+                message: `Long-pressed "${lpSelector.slice(0, 60)}" via fallback ${fb.s}`,
+              };
+            }
+            lpDomAttempts.push(`${fb.s}: long-press failed`);
+          } catch {
+            lpDomAttempts.push(`${fb.s}: not found`);
+          }
+        }
+
+        // Vision fallback — extract coords and use coordinate-based long press
+        if (isVisionLocateEnabled()) {
+          try {
+            const visionUuid = await findElementByVision(mcp, lpSelector, currentScreenshot);
+            const coords = parseAIElementCoords(visionUuid);
+            if (coords) {
+              const { success } = await longPressAtCoords(coords.x, coords.y);
+              if (success) {
+                return {
+                  success: true,
+                  message: `Long-pressed "${lpSelector.slice(0, 60)}" via AI vision at [${coords.x},${coords.y}]`,
+                };
+              }
+              lpDomAttempts.push('ai_vision: long-press failed');
+            }
+          } catch {
+            lpDomAttempts.push('ai_vision: not found');
+          }
+        }
+
+        // Bounds coordinate fallback
+        if (lpBounds) {
+          const coordMatch = lpBounds.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+          if (coordMatch) {
+            const cx = Math.round((parseInt(coordMatch[1]) + parseInt(coordMatch[3])) / 2);
+            const cy = Math.round((parseInt(coordMatch[2]) + parseInt(coordMatch[4])) / 2);
+            const { success } = await longPressAtCoords(cx, cy);
+            if (success) {
+              return {
+                success: true,
+                message: `Long-pressed "${lpSelector.slice(0, 60)}" at coordinates [${cx},${cy}]`,
+              };
+            }
+            lpAttempts.push('coordinates: long-press failed');
+          }
+        }
+
+        return {
+          success: false,
+          message: `All strategies failed for long-press "${lpSelector.slice(0, 60)}": ${lpDomAttempts.join(', ')}`,
+        };
+      }
+
       case 'find_and_type': {
         const isVisionModeType = Config.AGENT_MODE === 'vision';
         // In vision mode, force ai_instruction regardless of what the LLM chose
@@ -1062,7 +1289,10 @@ async function executeMetaTool(
             try {
               const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
               // Use appium_click which natively handles ai-element: UUIDs
-              const clickResult = await mcp.callTool('appium_click', { elementUUID: visionUuid });
+              const clickResult = await mcp.callTool('appium_gesture', {
+                action: 'tap',
+                elementUUID: visionUuid,
+              });
               if (!isMCPError(clickResult)) {
                 tappedViaVision = true;
               }
@@ -1090,7 +1320,10 @@ async function executeMetaTool(
           if (!uuid && isVisionLocateEnabled()) {
             try {
               const visionUuid = await findElementByVision(mcp, selector, currentScreenshot);
-              const clickResult = await mcp.callTool('appium_click', { elementUUID: visionUuid });
+              const clickResult = await mcp.callTool('appium_gesture', {
+                action: 'tap',
+                elementUUID: visionUuid,
+              });
               if (!isMCPError(clickResult)) {
                 tappedViaVision = true;
               }
@@ -1110,7 +1343,7 @@ async function executeMetaTool(
           }
         } else if (uuid) {
           // Click the found element to focus/navigate
-          await mcp.callTool('appium_click', { elementUUID: uuid });
+          await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
         } else if (!tappedViaVision) {
           return {
             success: false,
@@ -1166,6 +1399,9 @@ async function executeMetaTool(
         }
         ui.printStepDetail(`activateApp("${appId}")`);
         const launched = await activateAppWithFallback(mcp, appId);
+        if (launched.success && episodicRecorder) {
+          episodicRecorder.setAppId(appId);
+        }
         return {
           success: launched.success,
           message: launched.success ? `Launched ${appId}` : launched.message,
@@ -1188,17 +1424,14 @@ async function executeMetaTool(
             return { success: true, message: 'Pressed Enter' };
           }
         }
-        // Strategy 2: Appium execute script fallback
+        // Strategy 2: Appium press key fallback
         try {
-          await mcp.callTool('appium_execute_script', {
-            script: 'mobile: shell',
-            args: [{ command: 'input', args: ['keyevent', '66'] }],
-          });
+          await mcp.callTool('appium_mobile_press_key', { key: 'ENTER' });
           return { success: true, message: 'Pressed Enter' };
         } catch {
           return {
             success: false,
-            message: 'Failed to press Enter — both ADB and Appium script failed',
+            message: 'Failed to press Enter — both ADB and Appium press_key failed',
           };
         }
       }
@@ -1252,7 +1485,9 @@ function formatArgs(decision: ToolCallDecision): string {
 
   const visionUi =
     Config.AGENT_MODE === 'vision' &&
-    (decision.toolName === 'find_and_click' || decision.toolName === 'find_and_type');
+    (decision.toolName === 'find_and_click' ||
+      decision.toolName === 'find_and_type' ||
+      decision.toolName === 'find_and_long_press');
   if (visionUi && args.selector) {
     const s = String(args.selector);
     const short = s.length > 90 ? `${s.slice(0, 90)}…` : s;
