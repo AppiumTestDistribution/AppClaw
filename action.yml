@@ -279,6 +279,42 @@ runs:
         disable-animations: true
         script: appclaw "${{ inputs.goal }}" --platform android
 
+    # ── iOS — pre-download WebDriverAgent ────────────────────────────────────
+    - name: Download prebuilt WebDriverAgent for iOS simulator
+      if: inputs.platform == 'ios' && inputs.cloud-provider == ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Resolve latest WDA version via GitHub API (authenticated = 5000/hr, no rate-limit risk)
+        WDA_VERSION=$(curl -fsSL \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/appium/WebDriverAgent/releases/latest" \
+          | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))")
+
+        if [ -z "$WDA_VERSION" ]; then
+          echo "::error::Could not resolve latest WDA version from GitHub"
+          exit 1
+        fi
+
+        ARCH=$(uname -m)  # arm64 on macos-14 (Apple Silicon), x86_64 otherwise
+        URL="https://github.com/appium/WebDriverAgent/releases/download/v${WDA_VERSION}/WebDriverAgentRunner-Build-Sim-${ARCH}.zip"
+
+        echo "Downloading prebuilt WDA v${WDA_VERSION} for ${ARCH}..."
+        curl -fsSL "${URL}" -o /tmp/wda.zip
+        unzip -q /tmp/wda.zip -d /tmp/wda
+
+        WDA_APP="/tmp/wda/WebDriverAgentRunner-Runner.app"
+        if [ ! -d "$WDA_APP" ]; then
+          echo "::error::WebDriverAgentRunner-Runner.app not found after extraction"
+          ls -la /tmp/wda/
+          exit 1
+        fi
+
+        echo "APPIUM_MCP_WDA_APP_PATH=${WDA_APP}" >> $GITHUB_ENV
+        echo "WDA pre-downloaded: ${WDA_APP}"
+
     # ── iOS — YAML flow ───────────────────────────────────────────────────────
     - name: Run YAML flow on iOS simulator
       if: inputs.platform == 'ios' && inputs.cloud-provider == '' && inputs.flow != ''
