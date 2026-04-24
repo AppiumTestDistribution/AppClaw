@@ -52,6 +52,16 @@ inputs:
     required: false
     default: '500'
 
+  # ── iOS simulator ────────────────────────────────────────────────────────────
+  ios-simulator-name:
+    description: 'iOS simulator device model to boot (e.g. "iPhone 16", "iPhone 15 Pro"). Default: iPhone 16'
+    required: false
+    default: 'iPhone 16'
+  ios-simulator-os:
+    description: 'iOS version to use when multiple runtimes are available (e.g. "18.4", "17.5"). Default: latest available'
+    required: false
+    default: ''
+
   # ── Android emulator ─────────────────────────────────────────────────────────
   android-api-level:
     description: 'Android emulator API level. Default: 33 (Android 13)'
@@ -315,6 +325,50 @@ runs:
         echo "APPIUM_MCP_WDA_APP_PATH=${WDA_APP}" >> $GITHUB_ENV
         echo "WDA pre-downloaded: ${WDA_APP}"
 
+    # ── iOS — boot simulator ─────────────────────────────────────────────────
+    - name: Boot iOS simulator
+      if: inputs.platform == 'ios' && inputs.cloud-provider == ''
+      shell: bash
+      env:
+        SIM_NAME: ${{ inputs.ios-simulator-name }}
+        SIM_OS: ${{ inputs.ios-simulator-os }}
+      run: |
+        UDID=$(xcrun simctl list devices available -j | python3 - <<'EOF'
+        import sys, json, os, re
+        sim_name = os.environ.get('SIM_NAME', 'iPhone 16').lower()
+        sim_os   = os.environ.get('SIM_OS', '').strip()
+        data = json.load(open('/dev/stdin') if False else sys.stdin)
+        candidates = []
+        for runtime, devs in data['devices'].items():
+            if 'iOS' not in runtime:
+                continue
+            # Extract version string from runtime key, e.g. "com.apple.CoreSimulator.SimRuntime.iOS-18-4" → "18.4"
+            m = re.search(r'iOS[- ]([\d][\d.-]+)', runtime, re.IGNORECASE)
+            ver = m.group(1).replace('-', '.') if m else ''
+            if sim_os and not ver.startswith(sim_os):
+                continue
+            for d in devs:
+                if d.get('isAvailable') and sim_name in d.get('name', '').lower():
+                    candidates.append((ver, d['udid']))
+        if not candidates:
+            sys.exit(1)
+        # Pick highest iOS version
+        candidates.sort(key=lambda x: [int(p) for p in x[0].split('.') if p.isdigit()], reverse=True)
+        print(candidates[0][1])
+        EOF
+        )
+
+        if [ -z "$UDID" ]; then
+          echo "::error::No available iOS simulator matching name='${SIM_NAME}' os='${SIM_OS}'"
+          xcrun simctl list devices available
+          exit 1
+        fi
+
+        echo "Booting simulator $UDID (${SIM_NAME})"
+        xcrun simctl boot "$UDID" 2>/dev/null || true   # already Booted is OK
+        xcrun simctl bootstatus "$UDID" -b               # block until fully booted
+        echo "IOS_SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+
     # ── iOS — YAML flow ───────────────────────────────────────────────────────
     - name: Run YAML flow on iOS simulator
       if: inputs.platform == 'ios' && inputs.cloud-provider == '' && inputs.flow != ''
@@ -329,6 +383,7 @@ runs:
         STEP_DELAY: ${{ inputs.step-delay }}
         PLATFORM: ios
         DEVICE_TYPE: simulator
+        DEVICE_UDID: ${{ env.IOS_SIMULATOR_UDID }}
       run: appclaw --flow "${{ inputs.flow }}" --platform ios
 
     # ── iOS — natural language goal ───────────────────────────────────────────
@@ -345,6 +400,7 @@ runs:
         STEP_DELAY: ${{ inputs.step-delay }}
         PLATFORM: ios
         DEVICE_TYPE: simulator
+        DEVICE_UDID: ${{ env.IOS_SIMULATOR_UDID }}
       run: appclaw "${{ inputs.goal }}" --platform ios
 
     # ── Report ────────────────────────────────────────────────────────────────

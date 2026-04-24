@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./github-action
+      - uses: .
         id: run
         with:
           use-local-build: 'true'
@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./github-action
+      - uses: .
         id: run
         with:
           use-local-build: 'true'
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./github-action
+      - uses: .
         id: run
         with:
           use-local-build: 'true'
