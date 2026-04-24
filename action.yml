@@ -57,6 +57,14 @@ inputs:
     description: 'Enable MCP debug logging (MCP_DEBUG=1). Default: false'
     required: false
     default: 'false'
+  mcp-timeout-ms:
+    description: 'MCP request timeout in milliseconds. Default: 300000'
+    required: false
+    default: '300000'
+  llm-thinking:
+    description: 'Enable LLM extended thinking: on or off. Default: off'
+    required: false
+    default: 'off'
 
   # ── iOS device ───────────────────────────────────────────────────────────────
   ios-device-type:
@@ -213,7 +221,7 @@ runs:
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_API_KEY: ${{ inputs.api-key }}
         LLM_MODEL: ${{ inputs.model }}
-        LLM_THINKING: 'off'
+        LLM_THINKING: ${{ inputs.llm-thinking }}
         AGENT_MODE: ${{ inputs.agent-mode }}
         MAX_STEPS: ${{ inputs.max-steps }}
         STEP_DELAY: ${{ inputs.step-delay }}
@@ -234,7 +242,7 @@ runs:
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_API_KEY: ${{ inputs.api-key }}
         LLM_MODEL: ${{ inputs.model }}
-        LLM_THINKING: 'off'
+        LLM_THINKING: ${{ inputs.llm-thinking }}
         AGENT_MODE: ${{ inputs.agent-mode }}
         MAX_STEPS: ${{ inputs.max-steps }}
         STEP_DELAY: ${{ inputs.step-delay }}
@@ -265,7 +273,7 @@ runs:
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_API_KEY: ${{ inputs.api-key }}
         LLM_MODEL: ${{ inputs.model }}
-        LLM_THINKING: 'off'
+        LLM_THINKING: ${{ inputs.llm-thinking }}
         AGENT_MODE: ${{ inputs.agent-mode }}
         MAX_STEPS: ${{ inputs.max-steps }}
         STEP_DELAY: ${{ inputs.step-delay }}
@@ -287,7 +295,7 @@ runs:
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_API_KEY: ${{ inputs.api-key }}
         LLM_MODEL: ${{ inputs.model }}
-        LLM_THINKING: 'off'
+        LLM_THINKING: ${{ inputs.llm-thinking }}
         AGENT_MODE: ${{ inputs.agent-mode }}
         MAX_STEPS: ${{ inputs.max-steps }}
         STEP_DELAY: ${{ inputs.step-delay }}
@@ -391,7 +399,7 @@ runs:
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_API_KEY: ${{ inputs.api-key }}
         LLM_MODEL: ${{ inputs.model }}
-        LLM_THINKING: 'off'
+        LLM_THINKING: ${{ inputs.llm-thinking }}
         AGENT_MODE: ${{ inputs.agent-mode }}
         MAX_STEPS: ${{ inputs.max-steps }}
         STEP_DELAY: ${{ inputs.step-delay }}
@@ -399,7 +407,7 @@ runs:
         DEVICE_TYPE: ${{ inputs.ios-device-type }}
         DEVICE_UDID: ${{ env.IOS_SIMULATOR_UDID }}
         MCP_DEBUG: ${{ inputs.mcp-debug == 'true' && '1' || '0' }}
-        MCP_TIMEOUT_MS: '300000'
+        MCP_TIMEOUT_MS: ${{ inputs.mcp-timeout-ms }}
       run: appclaw --flow "${{ inputs.flow }}" --platform ios
 
     # ── iOS — natural language goal ───────────────────────────────────────────
@@ -410,7 +418,7 @@ runs:
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_API_KEY: ${{ inputs.api-key }}
         LLM_MODEL: ${{ inputs.model }}
-        LLM_THINKING: 'off'
+        LLM_THINKING: ${{ inputs.llm-thinking }}
         AGENT_MODE: ${{ inputs.agent-mode }}
         MAX_STEPS: ${{ inputs.max-steps }}
         STEP_DELAY: ${{ inputs.step-delay }}
@@ -418,7 +426,7 @@ runs:
         DEVICE_TYPE: ${{ inputs.ios-device-type }}
         DEVICE_UDID: ${{ env.IOS_SIMULATOR_UDID }}
         MCP_DEBUG: ${{ inputs.mcp-debug == 'true' && '1' || '0' }}
-        MCP_TIMEOUT_MS: '300000'
+        MCP_TIMEOUT_MS: ${{ inputs.mcp-timeout-ms }}
       run: appclaw "${{ inputs.goal }}" --platform ios
 
     # ── Report ────────────────────────────────────────────────────────────────
