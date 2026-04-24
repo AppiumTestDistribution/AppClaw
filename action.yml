@@ -73,6 +73,10 @@ inputs:
     default: 'simulator'
 
   # ── iOS simulator ────────────────────────────────────────────────────────────
+  device-udid:
+    description: 'Explicit device/simulator UDID to target. Leave empty to let AppClaw auto-detect.'
+    required: false
+    default: ''
   ios-simulator-name:
     description: 'iOS simulator device model to boot (e.g. "iPhone 16", "iPhone 15 Pro"). Default: iPhone 16'
     required: false
@@ -405,7 +409,7 @@ runs:
         STEP_DELAY: ${{ inputs.step-delay }}
         PLATFORM: ios
         DEVICE_TYPE: ${{ inputs.ios-device-type }}
-        DEVICE_UDID: ${{ env.IOS_SIMULATOR_UDID }}
+        DEVICE_UDID: ${{ inputs.device-udid || env.IOS_SIMULATOR_UDID }}
         MCP_DEBUG: ${{ inputs.mcp-debug == 'true' && '1' || '0' }}
         MCP_TIMEOUT_MS: ${{ inputs.mcp-timeout-ms }}
       run: appclaw --flow "${{ inputs.flow }}" --platform ios
@@ -424,7 +428,7 @@ runs:
         STEP_DELAY: ${{ inputs.step-delay }}
         PLATFORM: ios
         DEVICE_TYPE: ${{ inputs.ios-device-type }}
-        DEVICE_UDID: ${{ env.IOS_SIMULATOR_UDID }}
+        DEVICE_UDID: ${{ inputs.device-udid || env.IOS_SIMULATOR_UDID }}
         MCP_DEBUG: ${{ inputs.mcp-debug == 'true' && '1' || '0' }}
         MCP_TIMEOUT_MS: ${{ inputs.mcp-timeout-ms }}
       run: appclaw "${{ inputs.goal }}" --platform ios
