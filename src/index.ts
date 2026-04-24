@@ -200,7 +200,14 @@ function printHelp(): void {
 }
 
 function parseArgs(): CLIArgs {
-  const args = process.argv.slice(2);
+  // Normalize --flag=value into ['--flag', 'value'] so both forms work
+  const args = process.argv.slice(2).flatMap((arg) => {
+    if (arg.startsWith('--') && arg.includes('=')) {
+      const eq = arg.indexOf('=');
+      return [arg.slice(0, eq), arg.slice(eq + 1)];
+    }
+    return [arg];
+  });
 
   if (args.includes('--help') || args.includes('-h')) {
     printHelp();

@@ -86,6 +86,8 @@ jobs:
           use-local-build: 'true'
           flow: ${{ inputs.flow || 'flows/wdio.yaml' }}
           platform: ios
+          ios-device-type: simulator
+          mcp-debug: 'true'
           provider: gemini
           agent-mode: vision
           api-key: ${{ secrets.LLM_API_KEY }}

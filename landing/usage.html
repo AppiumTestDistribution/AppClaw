@@ -3131,6 +3131,35 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
                 <td>Emulator target: <code>default</code> or <code>google_apis</code></td>
               </tr>
               <tr>
+                <td><code>ios-device-type</code></td>
+                <td>no</td>
+                <td><code>simulator</code></td>
+                <td>iOS device type: <code>simulator</code> or <code>real</code></td>
+              </tr>
+              <tr>
+                <td><code>ios-simulator-name</code></td>
+                <td>no</td>
+                <td><code>iPhone 16</code></td>
+                <td>
+                  iOS simulator model to boot (e.g. <code>iPhone 15</code>, <code>iPad Air</code>)
+                </td>
+              </tr>
+              <tr>
+                <td><code>ios-simulator-os</code></td>
+                <td>no</td>
+                <td><em>latest</em></td>
+                <td>iOS version filter for simulator selection (e.g. <code>18.4</code>)</td>
+              </tr>
+              <tr>
+                <td><code>mcp-debug</code></td>
+                <td>no</td>
+                <td><code>false</code></td>
+                <td>
+                  Enable MCP debug logging (<code>MCP_DEBUG=1</code>). Useful for diagnosing CI
+                  timeouts.
+                </td>
+              </tr>
+              <tr>
                 <td><code>cloud-provider</code></td>
                 <td>no</td>
                 <td><em>local</em></td>

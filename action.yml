@@ -52,6 +52,18 @@ inputs:
     required: false
     default: '500'
 
+  # ── Debug ────────────────────────────────────────────────────────────────────
+  mcp-debug:
+    description: 'Enable MCP debug logging (MCP_DEBUG=1). Default: false'
+    required: false
+    default: 'false'
+
+  # ── iOS device ───────────────────────────────────────────────────────────────
+  ios-device-type:
+    description: 'iOS device type: simulator or real. Default: simulator'
+    required: false
+    default: 'simulator'
+
   # ── iOS simulator ────────────────────────────────────────────────────────────
   ios-simulator-name:
     description: 'iOS simulator device model to boot (e.g. "iPhone 16", "iPhone 15 Pro"). Default: iPhone 16'
@@ -327,7 +339,7 @@ runs:
 
     # ── iOS — boot simulator ─────────────────────────────────────────────────
     - name: Boot iOS simulator
-      if: inputs.platform == 'ios' && inputs.cloud-provider == ''
+      if: inputs.platform == 'ios' && inputs.cloud-provider == '' && inputs.ios-device-type == 'simulator'
       shell: bash
       env:
         SIM_NAME: ${{ inputs.ios-simulator-name }}
@@ -384,8 +396,10 @@ runs:
         MAX_STEPS: ${{ inputs.max-steps }}
         STEP_DELAY: ${{ inputs.step-delay }}
         PLATFORM: ios
-        DEVICE_TYPE: simulator
+        DEVICE_TYPE: ${{ inputs.ios-device-type }}
         DEVICE_UDID: ${{ env.IOS_SIMULATOR_UDID }}
+        MCP_DEBUG: ${{ inputs.mcp-debug == 'true' && '1' || '0' }}
+        MCP_TIMEOUT_MS: '300000'
       run: appclaw --flow "${{ inputs.flow }}" --platform ios
 
     # ── iOS — natural language goal ───────────────────────────────────────────
@@ -401,8 +415,10 @@ runs:
         MAX_STEPS: ${{ inputs.max-steps }}
         STEP_DELAY: ${{ inputs.step-delay }}
         PLATFORM: ios
-        DEVICE_TYPE: simulator
+        DEVICE_TYPE: ${{ inputs.ios-device-type }}
         DEVICE_UDID: ${{ env.IOS_SIMULATOR_UDID }}
+        MCP_DEBUG: ${{ inputs.mcp-debug == 'true' && '1' || '0' }}
+        MCP_TIMEOUT_MS: '300000'
       run: appclaw "${{ inputs.goal }}" --platform ios
 
     # ── Report ────────────────────────────────────────────────────────────────

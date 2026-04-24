@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         id: smoke
         with:
           flow: flows/youtube.yaml
@@ -61,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: ${{ matrix.flow }}
           platform: android
@@ -77,7 +77,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: flows/ios-smoke.yaml
           platform: ios

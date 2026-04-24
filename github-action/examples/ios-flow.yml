@@ -17,9 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: flows/ios-smoke.yaml
           platform: ios
+          ios-simulator-name: 'iPhone 16' # optional: defaults to iPhone 16
+          ios-simulator-os: '18.4' # optional: defaults to latest
           provider: gemini
           api-key: ${{ secrets.LLM_API_KEY }}

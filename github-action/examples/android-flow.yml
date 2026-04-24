@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: flows/youtube.yaml
           platform: android

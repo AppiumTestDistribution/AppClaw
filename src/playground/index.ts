@@ -725,6 +725,7 @@ async function connectToDevice(): Promise<boolean> {
       cliUdid: _deviceArgs.udid ?? null,
       cliDeviceName: _deviceArgs.deviceName ?? null,
       config,
+      alwaysPickDevice: true,
     });
     _resolvedPlatform = deviceResult.platform;
 

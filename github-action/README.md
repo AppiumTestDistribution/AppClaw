@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: flows/login.yaml
           platform: android
@@ -31,7 +31,7 @@ jobs:
 ### Android — run a natural language goal
 
 ```yaml
-- uses: AppiumTestDistribution/AppClaw/github-action@v1
+- uses: AppiumTestDistribution/AppClaw@v1
   with:
     goal: 'Open YouTube, search for Appium 3.0, verify the first result is visible'
     platform: android
@@ -47,10 +47,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: flows/ios-login.yaml
           platform: ios
+          ios-simulator-name: 'iPhone 16' # optional: defaults to iPhone 16
+          ios-simulator-os: '18.4' # optional: defaults to latest
           api-key: ${{ secrets.LLM_API_KEY }}
 ```
 
@@ -72,6 +74,10 @@ jobs:
 | `android-api-level`      |    no    | `33`                 | Android emulator API level (33 = Android 13)                                   |
 | `android-profile`        |    no    | `pixel_6`            | Android AVD hardware profile                                                   |
 | `android-target`         |    no    | `default`            | Emulator target: `default` or `google_apis`                                    |
+| `ios-device-type`        |    no    | `simulator`          | iOS device type: `simulator` or `real`                                         |
+| `ios-simulator-name`     |    no    | `iPhone 16`          | iOS simulator model to boot (e.g. `iPhone 15`, `iPad Air`)                     |
+| `ios-simulator-os`       |    no    | _(latest)_           | iOS version filter for simulator selection (e.g. `18.4`)                       |
+| `mcp-debug`              |    no    | `false`              | Enable MCP debug logging (`MCP_DEBUG=1`). Useful for diagnosing CI timeouts.   |
 | `cloud-provider`         |    no    | _(local)_            | Cloud device provider: `lambdatest`. Leave empty for local emulator/simulator. |
 | `lambdatest-username`    |   no²    | —                    | LambdaTest account username                                                    |
 | `lambdatest-access-key`  |   no²    | —                    | LambdaTest access key                                                          |
@@ -143,7 +149,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: ${{ matrix.flow }}
           platform: android
@@ -160,7 +166,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: flows/ios-login.yaml
           platform: ios
@@ -176,7 +182,7 @@ jobs:
 ### Pin model for cost control
 
 ```yaml
-- uses: AppiumTestDistribution/AppClaw/github-action@v1
+- uses: AppiumTestDistribution/AppClaw@v1
   with:
     flow: flows/smoke.yaml
     platform: android
@@ -187,7 +193,7 @@ jobs:
 ### Pin AppClaw version
 
 ```yaml
-- uses: AppiumTestDistribution/AppClaw/github-action@v1
+- uses: AppiumTestDistribution/AppClaw@v1
   with:
     flow: flows/smoke.yaml
     platform: android
@@ -198,7 +204,7 @@ jobs:
 ### Use report path in a downstream step
 
 ```yaml
-- uses: AppiumTestDistribution/AppClaw/github-action@v1
+- uses: AppiumTestDistribution/AppClaw@v1
   id: appclaw
   with:
     flow: flows/login.yaml
@@ -212,7 +218,7 @@ jobs:
 ### Vision mode (screenshot-based AI)
 
 ```yaml
-- uses: AppiumTestDistribution/AppClaw/github-action@v1
+- uses: AppiumTestDistribution/AppClaw@v1
   with:
     flow: flows/onboarding.yaml
     platform: android
@@ -232,7 +238,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: AppiumTestDistribution/AppClaw/github-action@v1
+      - uses: AppiumTestDistribution/AppClaw@v1
         with:
           flow: flows/full-regression.yaml
           platform: android

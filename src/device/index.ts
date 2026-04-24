@@ -28,6 +28,11 @@ export interface DeviceSetupArgs {
   cliDeviceName: string | null;
   config: AppClawConfig;
   /**
+   * Always show the device picker even when a single device is available or the platform
+   * is pre-selected. Used by playground mode so the user always gets to choose a device.
+   */
+  alwaysPickDevice?: boolean;
+  /**
    * Extra Appium capabilities merged into the session for this specific device.
    * Used by parallel runners to assign unique ports per worker:
    * - Android: `appium:systemPort`, `appium:mjpegServerPort`, `appium:mjpegScreenshotUrl`
@@ -93,7 +98,9 @@ export async function setupDevice(
   // so the user can choose which device they want. Only auto-select when explicitly set.
   const explicitDevice = !!(udid || deviceName);
   const explicitPlatform = !!(args.cliPlatform || args.config.PLATFORM);
-  const forceDevicePicker = !explicitDevice && !explicitPlatform;
+  // Force picker when: no device/platform specified interactively, OR caller explicitly requests it
+  const forceDevicePicker =
+    (!explicitDevice && !explicitPlatform) || (!!args.alwaysPickDevice && !explicitDevice);
 
   const selection = await discoverAndSelectDevice(
     mcp,
