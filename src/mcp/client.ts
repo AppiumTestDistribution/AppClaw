@@ -1,9 +1,33 @@
+import { createRequire } from 'module';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { MCPClient, MCPConfig, MCPToolResult, MCPToolInfo } from './types.js';
 import { theme } from '../ui/terminal.js';
 import { VERSION } from '../version.js';
+
+/**
+ * Resolve the appium-mcp binary.
+ *
+ * Prefer the locally-installed package (bundled as a dependency) so the
+ * MCP server starts immediately — no npm download at connect time.
+ * The MCP SDK's initialize handshake has a hardcoded 60 s timeout that
+ * fires before npx can download a missing package in slow CI environments.
+ *
+ * Falls back to npx for backwards compatibility (e.g. very old global installs
+ * that pre-date appium-mcp being a listed dependency).
+ */
+function resolveAppiumMcp(): { command: string; args: string[] } {
+  try {
+    const req = createRequire(import.meta.url);
+    const bin = req.resolve('appium-mcp');
+    return { command: 'node', args: [bin] };
+  } catch {
+    return { command: 'npx', args: ['--yes', 'appium-mcp@1.67.0'] };
+  }
+}
+
+const appiumMcp = resolveAppiumMcp();
 
 /** Tools that produce verbose output we don't want to log */
 const QUIET_TOOLS = new Set(['appium_get_page_source', 'appium_screenshot', 'appium_list_apps']);
@@ -49,9 +73,8 @@ async function connectClient(config: MCPConfig): Promise<Client> {
       `${process.env.HOME}/Library/Android/sdk`;
 
     const transport = new StdioClientTransport({
-      command: 'npx',
-      // --yes: auto-confirm installation without prompting (avoids consuming MCP stdin as "y/n" answer)
-      args: ['--yes', 'appium-mcp@1.67.0'],
+      command: appiumMcp.command,
+      args: appiumMcp.args,
       env: {
         ...process.env,
         ANDROID_HOME: androidHome,

@@ -37,6 +37,7 @@
     "deploy:landing": "npm run deploy --prefix landing"
   },
   "dependencies": {
+    "appium-mcp": "^1.67.0",
     "@ai-sdk/anthropic": "^1.0.0",
     "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/openai": "^1.0.0",

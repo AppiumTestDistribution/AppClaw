@@ -99,22 +99,51 @@ function parseJsonLenient(text: string): unknown {
     /* continue */
   }
 
+  // Repair: LLMs sometimes omit the closing quote on a JSON key name before ':',
+  // emitting  "key:[value]  instead of  "key":[value]
+  // The regex only fires at key positions (after '{' or ',') so it cannot corrupt
+  // string values that happen to contain a colon.
+  const repaired = cleaned.replace(/(?<=[{,]\s*)"([A-Za-z_][A-Za-z0-9_]*):/g, '"$1":');
+  try {
+    return JSON.parse(repaired);
+  } catch {
+    /* continue */
+  }
+
   // Lenient path: extract the first balanced JSON object/array substring.
+  // Build `starts` with string-context awareness so that '[' or '{' characters
+  // inside string values are not mistaken for the start of a JSON structure.
+  // (Without this, a malformed key like "key:[926,357] would cause the inner '[' to
+  // be treated as a start, and [926,357] would be returned instead of the real object.)
   const starts: number[] = [];
-  for (let i = 0; i < cleaned.length; i++) {
-    const ch = cleaned[i];
-    if (ch === '{' || ch === '[') starts.push(i);
+  {
+    let inStr = false;
+    let esc = false;
+    for (let i = 0; i < repaired.length; i++) {
+      const ch = repaired[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '"') {
+        inStr = true;
+        continue;
+      }
+      if (ch === '{' || ch === '[') starts.push(i);
+    }
   }
 
   for (const start of starts) {
-    const open = cleaned[start];
+    const open = repaired[start];
     const close = open === '{' ? '}' : ']';
     let depth = 0;
     let inString = false;
     let escaped = false;
 
-    for (let i = start; i < cleaned.length; i++) {
-      const ch = cleaned[i];
+    for (let i = start; i < repaired.length; i++) {
+      const ch = repaired[i];
 
       if (inString) {
         if (escaped) {
@@ -136,7 +165,7 @@ function parseJsonLenient(text: string): unknown {
       if (ch === close) depth--;
 
       if (depth === 0) {
-        const candidate = cleaned.slice(start, i + 1);
+        const candidate = repaired.slice(start, i + 1);
         try {
           return JSON.parse(candidate);
         } catch {
