@@ -39,11 +39,7 @@ export function convertMCPToolsToAITools(
 
 /** MCP tools the agent should never call directly */
 export const EXCLUDED_MCP_TOOLS = new Set([
-  'create_session',
-  'delete_session',
-  'list_sessions',
-  'selectSession',
-  'select_session',
+  'appium_session_management',
   'select_device',
   'prepare_ios_simulator',
   // AI code-gen tools — not relevant to device control

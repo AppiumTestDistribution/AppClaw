@@ -65,7 +65,10 @@ export async function createPlatformSession(
   }
 
   try {
-    const sessionResult = await mcp.callTool('create_session', args);
+    const sessionResult = await mcp.callTool('appium_session_management', {
+      action: 'create',
+      ...args,
+    });
     const resultText = extractText(sessionResult);
 
     if (resultText.toLowerCase().includes('error') || resultText.toLowerCase().includes('failed')) {
@@ -151,7 +154,10 @@ async function createLambdaTestSession(
   };
 
   try {
-    const sessionResult = await mcp.callTool('create_session', args);
+    const sessionResult = await mcp.callTool('appium_session_management', {
+      action: 'create',
+      ...args,
+    });
     const resultText = extractText(sessionResult);
 
     if (resultText.toLowerCase().includes('error') || resultText.toLowerCase().includes('failed')) {

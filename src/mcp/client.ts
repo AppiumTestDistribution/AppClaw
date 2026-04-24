@@ -51,7 +51,7 @@ async function connectClient(config: MCPConfig): Promise<Client> {
     const transport = new StdioClientTransport({
       command: 'npx',
       // --yes: auto-confirm installation without prompting (avoids consuming MCP stdin as "y/n" answer)
-      args: ['--yes', 'appium-mcp@1.61.0'],
+      args: ['--yes', 'appium-mcp@1.67.0'],
       env: {
         ...process.env,
         ANDROID_HOME: androidHome,

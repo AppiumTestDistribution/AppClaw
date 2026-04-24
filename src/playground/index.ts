@@ -1218,7 +1218,7 @@ export async function runPlayground(deviceArgs?: PlaygroundDeviceArgs): Promise<
 async function cleanup(): Promise<void> {
   if (state.mcp) {
     try {
-      await state.mcp.callTool('delete_session', {});
+      await state.mcp.callTool('appium_session_management', { action: 'delete' });
     } catch {
       /* ignore — session may already be gone */
     }

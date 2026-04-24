@@ -746,7 +746,7 @@ async function main() {
         },
       });
       try {
-        await mcp.callTool('delete_session', {});
+        await mcp.callTool('appium_session_management', { action: 'delete' });
       } catch {
         /* ignore */
       }
@@ -760,7 +760,7 @@ async function main() {
         data: { success: false, stepsExecuted: 0, stepsTotal: 0, reason: msg },
       });
       try {
-        await mcp.callTool('delete_session', {});
+        await mcp.callTool('appium_session_management', { action: 'delete' });
       } catch {
         /* ignore */
       }
@@ -1156,7 +1156,7 @@ async function main() {
 
     if (recorder) recorder.save(allDone);
     try {
-      await mcpClient.callTool('delete_session', {});
+      await mcpClient.callTool('appium_session_management', { action: 'delete' });
     } catch {
       /* ignore */
     }
@@ -1170,7 +1170,7 @@ async function main() {
     });
     ui.printError('Fatal error', err?.message ?? String(err));
     try {
-      await mcpClient.callTool('delete_session', {});
+      await mcpClient.callTool('appium_session_management', { action: 'delete' });
     } catch {
       /* ignore */
     }

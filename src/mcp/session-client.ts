@@ -17,10 +17,9 @@ import type { MCPClient, MCPToolResult, MCPToolInfo } from './types.js';
  * These must NOT receive a sessionId injection.
  */
 const PRE_SESSION_TOOLS = new Set([
-  'create_session',
+  'appium_session_management',
   'select_device',
   'delete_all_sessions',
-  'list_sessions',
 ]);
 
 export class SessionScopedMCPClient implements MCPClient {
