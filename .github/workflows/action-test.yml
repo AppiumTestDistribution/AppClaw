@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Use the local action definition (same repo, same commit)
-      - uses: .
+      - uses: ./
         id: run
         with:
           flow: ${{ github.event.inputs.flow || 'flows/youtube.yaml' }}
@@ -61,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: .
+      - uses: ./
         id: run
         with:
           goal: 'Open YouTube app and verify the home feed is visible'
@@ -84,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: .
+      - uses: ./
         id: run
         with:
           flow: ${{ github.event.inputs.flow || 'flows/youtube.yaml' }}
