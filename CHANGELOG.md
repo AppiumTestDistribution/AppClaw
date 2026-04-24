@@ -1,3 +1,9 @@
+## [1.2.1](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.2.0...v1.2.1) (2026-04-24)
+
+### Bug Fixes
+
+* update docs ([d55a5e3](https://github.com/AppiumTestDistribution/AppClaw/commit/d55a5e3117b9628a065fe48c5392ed1be739424d))
+
 ## [1.2.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.1.0...v1.2.0) (2026-04-24)
 
 ### Features
