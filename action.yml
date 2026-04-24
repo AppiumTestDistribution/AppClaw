@@ -333,16 +333,18 @@ runs:
         SIM_NAME: ${{ inputs.ios-simulator-name }}
         SIM_OS: ${{ inputs.ios-simulator-os }}
       run: |
-        UDID=$(xcrun simctl list devices available -j | python3 - <<'EOF'
-        import sys, json, os, re
+        xcrun simctl list devices available -j > /tmp/simctl_devices.json
+
+        UDID=$(python3 <<'EOF'
+        import json, os, re, sys
         sim_name = os.environ.get('SIM_NAME', 'iPhone 16').lower()
         sim_os   = os.environ.get('SIM_OS', '').strip()
-        data = json.load(open('/dev/stdin') if False else sys.stdin)
+        data = json.load(open('/tmp/simctl_devices.json'))
         candidates = []
         for runtime, devs in data['devices'].items():
             if 'iOS' not in runtime:
                 continue
-            # Extract version string from runtime key, e.g. "com.apple.CoreSimulator.SimRuntime.iOS-18-4" → "18.4"
+            # Extract version from runtime key, e.g. "com.apple.CoreSimulator.SimRuntime.iOS-18-4" → "18.4"
             m = re.search(r'iOS[- ]([\d][\d.-]+)', runtime, re.IGNORECASE)
             ver = m.group(1).replace('-', '.') if m else ''
             if sim_os and not ver.startswith(sim_os):
