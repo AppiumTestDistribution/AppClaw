@@ -106,6 +106,18 @@ export function normalizeStructured(raw: unknown, index: number): FlowStep | nul
       };
     }
 
+    // ── Multi-key: zoom { scale, target? } ──
+    if (keys.includes('zoom') || (keys.includes('scale') && !keys.includes('from'))) {
+      const scaleVal = o.zoom !== undefined ? Number(o.zoom) : Number(o.scale);
+      if (!Number.isFinite(scaleVal) || scaleVal <= 0) {
+        throw new Error(
+          `Step ${index + 1}: zoom scale must be a positive number (e.g. 2.0 = zoom in 2x, 0.5 = zoom out)`
+        );
+      }
+      const target = o.target != null ? String(o.target).trim() : undefined;
+      return { kind: 'zoom', scale: scaleVal, ...(target ? { target } : {}) };
+    }
+
     // ── Multi-key: drag { from, to } ──
     if (keys.includes('from') && keys.includes('to')) {
       const duration = o.duration != null ? Number(o.duration) : undefined;
@@ -194,6 +206,15 @@ export function normalizeStructured(raw: unknown, index: number): FlowStep | nul
       );
     }
     if (k === 'tap') return { kind: 'tap', label: String(v) };
+    if (k === 'zoom') {
+      const scale = Number(v);
+      if (!Number.isFinite(scale) || scale <= 0) {
+        throw new Error(
+          `Step ${index + 1}: zoom scale must be a positive number (e.g. 2.0 = zoom in 2x, 0.5 = zoom out)`
+        );
+      }
+      return { kind: 'zoom', scale };
+    }
     if (k === 'type') return { kind: 'type', text: String(v) };
     if (k === 'assert' || k === 'verify' || k === 'check') {
       return { kind: 'assert', text: String(v) };

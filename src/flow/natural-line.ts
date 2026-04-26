@@ -157,6 +157,31 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     return { kind: 'swipe', direction, ...(repeat && repeat > 1 ? { repeat } : {}), verbatim };
   }
 
+  // "zoom in [on X]" / "zoom out [on X]" / "pinch in [on X]" / "pinch out [on X]"
+  // "zoom in 2x [on X]" / "zoom out 50% [on X]" / "zoom in the map" (no "on/into")
+  const zoomMatch = t.match(
+    /^(?:zoom|pinch)\s+(in|out)(?:\s+(\d+(?:\.\d+)?)\s*(?:x|times?|%)?)?(?:\s+(?:(?:on|into)\s+)?(?:the\s+)?(.+))?$/i
+  );
+  if (zoomMatch) {
+    const direction = zoomMatch[1].toLowerCase();
+    const rawFactor = zoomMatch[2] ? Number(zoomMatch[2]) : undefined;
+    const target = zoomMatch[3] ? trimPunct(zoomMatch[3].trim()) : undefined;
+    // Determine scale: zoom in > 1, zoom out < 1
+    let scale: number;
+    if (rawFactor !== undefined) {
+      const isPercent = zoomMatch[0].match(/\d+\s*%/);
+      if (isPercent) {
+        // "zoom out 50%" → scale = 0.5, "zoom in 200%" → scale = 2.0
+        scale = direction === 'out' ? rawFactor / 100 : rawFactor / 100;
+      } else {
+        // "zoom in 2x" → scale = 2.0, "zoom out 2x" → scale = 0.5
+        scale = direction === 'out' ? 1 / rawFactor : rawFactor;
+      }
+    } else {
+      scale = direction === 'out' ? 0.5 : 2.0;
+    }
+    return { kind: 'zoom', scale, ...(target ? { target } : {}), verbatim };
+  }
   // ── waitUntil: "wait until screen is loaded", "wait until <text> is visible/gone" ──
   // Also: "wait 5s until ..." / "wait 10 seconds until ..."
 

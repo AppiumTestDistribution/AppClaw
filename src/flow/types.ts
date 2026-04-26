@@ -72,6 +72,13 @@ export type FlowStep =
   | ({ kind: 'home' } & Verbatim)
   | ({ kind: 'swipe'; direction: 'up' | 'down' | 'left' | 'right'; repeat?: number } & Verbatim)
   | ({
+      kind: 'zoom';
+      /** > 1 = zoom in (pinch open), < 1 = zoom out (pinch close). e.g. 2.0 = 2x zoom in, 0.5 = zoom out */
+      scale: number;
+      /** Optional label of the element to zoom on. If omitted, zooms on the center of the screen. */
+      target?: string;
+    } & Verbatim)
+  | ({
       kind: 'drag';
       from: string;
       to: string;

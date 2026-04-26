@@ -148,6 +148,8 @@ function stepLabel(step: FlowStep): string {
       return 'goHome';
     case 'swipe':
       return `swipe ${step.direction}`;
+    case 'zoom':
+      return `zoom ${step.scale >= 1 ? 'in' : 'out'} (${step.scale}x)${step.target ? ` on "${step.target}"` : ''}`;
     case 'drag':
       return `drag "${step.from}" to "${step.to}"`;
     case 'assert':
@@ -1012,6 +1014,68 @@ export async function executeStep(
       return {
         success: true,
         message: count > 1 ? `Swiped ${dir} ${count} times` : `Swiped ${dir}`,
+      };
+    }
+    case 'zoom': {
+      // Resolve optional target to coordinates/UUID for pinch_zoom.
+      // Vision mode: use df-vision to locate the element by description.
+      // DOM mode: parse page source and find element UUID.
+      let elementUUID: string | undefined;
+      if (step.target) {
+        try {
+          if (isVisionMode() || isVisionLocateEnabled()) {
+            // Vision path: locate element → get synthetic ai-element UUID with coordinates
+            const visionUuid = await findElementByVision(mcp, step.target);
+            if (visionUuid) elementUUID = visionUuid;
+          } else {
+            // DOM path: parse page source → find element UUID
+            const { findByIdStrategies: zoomFindById } = await import('../agent/element-finder.js');
+            const pageSource = await getPageSource(mcp);
+            const { detectPlatform: zoomDetectPlatform } = await import('../perception/screen.js');
+            const { parseAndroidPageSource: zoomParseAndroid } =
+              await import('../perception/android-parser.js');
+            const { parseIOSPageSource: zoomParseIOS } =
+              await import('../perception/ios-parser.js');
+            const platform = zoomDetectPlatform(pageSource);
+            const elements =
+              platform === 'android' ? zoomParseAndroid(pageSource) : zoomParseIOS(pageSource);
+            const scored = elements
+              .map((el) => ({ el, s: scoreTapMatch(el, step.target!) }))
+              .filter((x) => x.s >= 0)
+              .sort((a, b) => a.s - b.s);
+            const pick = scored[0]?.el;
+            if (pick) {
+              elementUUID =
+                (await zoomFindById(mcp, pick.accessibilityId || pick.id, pick.text)) ?? undefined;
+            }
+          }
+        } catch {
+          // Non-fatal: fall back to screen-center zoom
+        }
+      }
+
+      let pinchArgs: Record<string, unknown> = { action: 'pinch_zoom', scale: step.scale };
+      if (elementUUID && !isAIElement(elementUUID)) {
+        // Only pass real Appium element UUIDs — ai-element: synthetic UUIDs are not
+        // in Appium's element cache and will cause a 404 in the pinch handler.
+        pinchArgs.elementUUID = elementUUID;
+      }
+
+      const zoomResult = await mcp.callTool('appium_gesture', pinchArgs);
+      const zoomText =
+        zoomResult.content
+          ?.map((c: { type: string; text?: string }) => (c.type === 'text' ? c.text : ''))
+          .join('') ?? '';
+      const zoomFailed =
+        zoomText.toLowerCase().includes('failed') || zoomText.toLowerCase().includes('error');
+      if (zoomFailed) {
+        return { success: false, message: zoomText.slice(0, 200) };
+      }
+      const direction = step.scale >= 1 ? 'in' : 'out';
+      const targetDesc = step.target ? ` on "${step.target}"` : '';
+      return {
+        success: true,
+        message: `Zoomed ${direction} (scale=${step.scale})${targetDesc}`,
       };
     }
     case 'drag': {
