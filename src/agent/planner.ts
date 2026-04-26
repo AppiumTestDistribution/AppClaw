@@ -36,6 +36,8 @@ export interface SubGoal {
   dependsOn?: number;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   result?: string;
+  /** The actual goal text that was executed (may differ from `goal` if the orchestrator rewrote it) */
+  executedAs?: string;
 }
 
 export interface PlannerResult {
@@ -399,7 +401,10 @@ Your job is to decide ONE of three actions:
 - Sub-goal is "Open Settings" but Settings is already open (DOM shows Settings screen elements)
 - Sub-goal is "Navigate to WiFi settings" but WiFi settings are already visible in DOM
 - Sub-goal is "Enter email address" but the address is already present in the field in the DOM
+- Sub-goal is "Search/navigate/filter to reach X" but X is ALREADY VISIBLE on screen — the method of getting there is irrelevant, skip it
 Only skip when there is CONCRETE evidence in the DOM/screenshot — never skip based on assumptions.
+
+KEY INSIGHT: Always evaluate whether the DESIRED OUTCOME of a sub-goal is already present on screen, not just whether the specific action was taken. The method (search, navigate, filter, scroll) is irrelevant if the end result is already achieved.
 
 **rewrite** — The sub-goal needs adaptation because the screen state is different than expected. For example:
 - Sub-goal is "Navigate to X" but X is already visible — rewrite to the actual action needed
@@ -414,6 +419,7 @@ Rules:
 - Read the DOM carefully to understand what screen the device is currently showing
 - Check for blockers: Is a keyboard visible? Is an autocomplete dropdown open? Is a dialog showing?
 - Be aggressive about skipping — if the screen already shows the desired state, skip
+- Evaluate OUTCOMES, not actions: if the desired result of a step is already on screen, skip — regardless of whether the specific action (search, navigate, filter, scroll) was taken
 - When rewriting, make the new goal specific to what ACTUALLY needs to happen from the current screen
 - CRITICAL: When rewriting, READ THE DOM and reference the SPECIFIC element to interact with by its text/desc from the DOM. Do NOT give vague instructions.
 - NEVER rewrite a sub-goal to include work from ALREADY COMPLETED sub-goals. Only cover what THIS sub-goal needs to do.

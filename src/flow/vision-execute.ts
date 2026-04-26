@@ -403,6 +403,25 @@ function preCheck(instruction: string): PreCheckResult | null {
       };
   }
 
+  // 5c. zoom / pinch — "zoom in [Nx] [on/into] [the] X", "zoom out [on X]", "pinch in/out [on X]"
+  // "on/into" is optional so "zoom in the map" works as well as "zoom in on the map"
+  const zoomMatch = t.match(
+    /^(?:zoom|pinch)\s+(in|out)(?:\s+(\d+(?:\.\d+)?)\s*(?:x|times?|%)?)?(?:\s+(?:(?:on|into)\s+)?(?:the\s+)?(.+))?$/i
+  );
+  if (zoomMatch) {
+    const direction = zoomMatch[1].toLowerCase();
+    const rawFactor = zoomMatch[2] ? Number(zoomMatch[2]) : undefined;
+    const target = zoomMatch[3] ? zoomMatch[3].replace(/[.!?]+$/g, '').trim() : undefined;
+    let scale: number;
+    if (rawFactor !== undefined) {
+      const isPercent = zoomMatch[0].match(/\d+\s*%/);
+      scale = isPercent ? rawFactor / 100 : direction === 'out' ? 1 / rawFactor : rawFactor;
+    } else {
+      scale = direction === 'out' ? 0.5 : 2.0;
+    }
+    return { step: { kind: 'zoom', scale, ...(target ? { target } : {}), verbatim: t } };
+  }
+
   // 6. Visibility assert — any instruction starting with an assert/verify verb,
   //    or "is X visible?" pattern. Pass the full instruction to the vision model
   //    as-is — let the LLM interpret what to check instead of brittle regex parsing.
@@ -472,8 +491,12 @@ export async function visionExecute(
   // ── Pre-check: non-visual instructions ──
   const pre = preCheck(instruction);
   if (pre?.step) {
-    // scrollAssert and waitUntil need executeStep for their polling/scroll logic
-    if (pre.step.kind === 'scrollAssert' || pre.step.kind === 'waitUntil') {
+    // These step kinds need executeStep for their device gesture / polling logic
+    if (
+      pre.step.kind === 'scrollAssert' ||
+      pre.step.kind === 'waitUntil' ||
+      pre.step.kind === 'zoom'
+    ) {
       return { step: pre.step, result: { success: false, message: '__needs_executeStep__' } };
     }
     // Other pre-check steps — let caller fall through to classifyInstruction → executeStep

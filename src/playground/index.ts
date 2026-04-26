@@ -90,6 +90,8 @@ function stepAction(step: FlowStep): string {
       return 'type';
     case 'swipe':
       return 'swipe';
+    case 'zoom':
+      return 'zoom';
     case 'wait':
       return 'wait';
     case 'waitUntil':
@@ -128,6 +130,8 @@ function stepTarget(step: FlowStep): string {
       return `"${step.text}"${step.target ? ` → ${step.target}` : ''}`;
     case 'swipe':
       return step.direction;
+    case 'zoom':
+      return `${step.scale >= 1 ? 'in' : 'out'} (${step.scale}x)${step.target ? ` on "${step.target}"` : ''}`;
     case 'wait':
       return `${step.seconds}s`;
     case 'waitUntil':
@@ -170,6 +174,8 @@ function spinnerDetail(step: FlowStep): string {
       return 'typing into the field…';
     case 'swipe':
       return 'swiping the screen…';
+    case 'zoom':
+      return `zooming ${step.scale >= 1 ? 'in' : 'out'}…`;
     case 'scrollAssert':
       return 'scanning the screen…';
     case 'assert':
@@ -260,6 +266,10 @@ function stepToYaml(step: FlowStep): unknown {
       return `type "${step.text}"`;
     case 'swipe':
       return `swipe ${step.direction}`;
+    case 'zoom':
+      return step.target
+        ? `zoom ${step.scale >= 1 ? 'in' : 'out'} ${step.scale}x on ${step.target}`
+        : `zoom ${step.scale >= 1 ? 'in' : 'out'} ${step.scale}x`;
     case 'wait':
       return `wait ${step.seconds} s`;
     case 'waitUntil':

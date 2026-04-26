@@ -56,6 +56,15 @@ const stepSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('getInfo'), query: z.string() }),
   z.object({ kind: z.literal('done'), message: z.string().optional() }),
   z.object({ kind: z.literal('launchApp') }),
+  z.object({
+    kind: z.literal('zoom'),
+    scale: z
+      .number()
+      .describe(
+        'Scale factor: > 1 = zoom in, < 1 = zoom out. e.g. 2.0 = 2x zoom in, 0.5 = zoom out'
+      ),
+    target: z.string().optional().describe('Optional element label to zoom on'),
+  }),
 ]);
 
 const SYSTEM_PROMPT =
@@ -71,6 +80,8 @@ const SYSTEM_PROMPT =
   `- "wait <N> seconds" → wait\n` +
   `- "drag/slide/move X to Y" → drag (from=X, to=Y)\n` +
   `- "swipe/scroll <direction>" → swipe\n` +
+  `- "zoom in [Nx] [on/into/the <element>]" → zoom (scale > 1), "zoom out [on <element>]" → zoom (scale < 1). e.g. "zoom in the map", "zoom in 2x on the image"\n` +
+  `- "pinch in/out [on/into/the <element>]" → zoom\n` +
   `- "verify/check/assert <text>" → assert\n` +
   `- "scroll until <text> visible" → scrollAssert\n` +
   `- "go back" → back, "go home" → home\n` +

@@ -958,13 +958,13 @@ async function main() {
           const prevGoal = executor.all[subGoalIdx - 1];
           const completedGoalsList = executor.all
             .filter((sg) => sg.status === 'completed')
-            .map((sg) => `${sg.goal} → ${sg.result}`);
+            .map((sg) => `${sg.executedAs ?? sg.goal} → ${sg.result}`);
 
           const [readiness, decision] = await Promise.all([
             prevGoal
               ? assessScreenReadiness(
                   plannerModel,
-                  prevGoal.goal,
+                  prevGoal.executedAs ?? prevGoal.goal,
                   subGoal.goal,
                   orchestratorDom,
                   thinkingOptions,
@@ -1051,6 +1051,9 @@ async function main() {
           enrichedGoal += `\n- Once YOUR sub-goal is achieved, call "done" IMMEDIATELY. Do NOT continue to the next step.`;
         }
       }
+
+      // Track the actual goal being executed so reconciliation uses the rewritten goal, not the original
+      subGoal.executedAs = effectiveGoal;
 
       emitJson({
         event: 'goal_start',

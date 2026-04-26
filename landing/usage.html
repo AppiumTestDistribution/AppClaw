@@ -3453,10 +3453,10 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
           <div class="section-breadcrumb">App Guides <span>/</span> Overview</div>
           <h2>What are App Guides?</h2>
           <p>
-            App Guides (AppGuides) are per-app knowledge snippets injected directly into the
-            agent's context window at the start of every automation run. They encode navigation
-            patterns, gesture shortcuts, and common action paths for a specific app — so the agent
-            never needs to rediscover them by trial and error.
+            App Guides (AppGuides) are per-app knowledge snippets injected directly into the agent's
+            context window at the start of every automation run. They encode navigation patterns,
+            gesture shortcuts, and common action paths for a specific app — so the agent never needs
+            to rediscover them by trial and error.
           </p>
 
           <div class="callout callout-tip">
@@ -3483,7 +3483,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
               <div class="code-block-dots"><span></span><span></span><span></span></div>
               <span class="code-block-label">System prompt injection (simplified)</span>
             </div>
-            <pre>APP_GUIDE (WhatsApp):
+            <pre>
+APP_GUIDE (WhatsApp):
 
 ## WhatsApp Navigation
 - Bottom tabs: Chats | Updates | Communities | Calls
@@ -3493,14 +3494,15 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
 ## Messaging
 - Open a chat → type in the message bar at the bottom → send via arrow icon
 - Attach media: paperclip icon next to message bar
-- Voice note: long-press the microphone icon</pre>
+- Voice note: long-press the microphone icon</pre
+            >
           </div>
 
           <h3>Resolution order</h3>
           <ol>
             <li>
-              <strong>Custom guide</strong> —
-              <code>.appclaw/guides/&lt;appId&gt;.md</code> (highest priority, overrides built-ins)
+              <strong>Custom guide</strong> — <code>.appclaw/guides/&lt;appId&gt;.md</code> (highest
+              priority, overrides built-ins)
             </li>
             <li><strong>Built-in guide</strong> — bundled guides for 10 common apps</li>
             <li>
@@ -3515,7 +3517,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
           <h2>Built-in Guides</h2>
           <p>
             AppClaw ships with guides for the most commonly automated apps on both Android and iOS.
-            These activate automatically when AppClaw detects the matching package name or bundle ID.
+            These activate automatically when AppClaw detects the matching package name or bundle
+            ID.
           </p>
 
           <table class="cmd-table">
@@ -3586,7 +3589,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
               <div class="code-block-dots"><span></span><span></span><span></span></div>
               <span class="code-block-label">APP_GUIDE (WhatsApp)</span>
             </div>
-            <pre>## WhatsApp Navigation
+            <pre>
+## WhatsApp Navigation
 - Bottom tabs: Chats | Updates | Communities | Calls
 - New chat: floating pencil/message icon (bottom-right)
 - Search: magnifying-glass icon at the top of Chats
@@ -3601,7 +3605,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
 - Star a message: long-press message → star icon
 - Forward: long-press message → forward arrow
 - Delete: long-press message → trash icon
-- Group info: tap the group name at the top of the chat</pre>
+- Group info: tap the group name at the top of the chat</pre
+            >
           </div>
 
           <h3>Example: YouTube Guide</h3>
@@ -3610,7 +3615,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
               <div class="code-block-dots"><span></span><span></span><span></span></div>
               <span class="code-block-label">APP_GUIDE (YouTube)</span>
             </div>
-            <pre>## YouTube Navigation
+            <pre>
+## YouTube Navigation
 - Bottom nav: Home | Shorts | + (upload) | Subscriptions | Library
 - Search: magnifying-glass icon (top-right)
 - Tap a video thumbnail to play; double-tap left/right to seek ±10 s
@@ -3622,7 +3628,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
 ## Playback
 - Full screen: rotate device or tap the expand icon (bottom-right of player)
 - Quality: tap ⋮ inside player → Quality
-- Captions: tap CC icon inside player</pre>
+- Captions: tap CC icon inside player</pre
+            >
           </div>
         </section>
 
@@ -3638,8 +3645,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
           <div class="callout callout-tip">
             <div class="callout-title">Custom guides always win</div>
             <p>
-              If a custom guide exists for an app ID, it replaces the built-in entirely. To extend
-              a built-in guide, copy its contents into your custom file and add your own sections.
+              If a custom guide exists for an app ID, it replaces the built-in entirely. To extend a
+              built-in guide, copy its contents into your custom file and add your own sections.
             </p>
           </div>
 
@@ -3658,7 +3665,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
               <div class="code-block-dots"><span></span><span></span><span></span></div>
               <span class="code-block-label">.appclaw/guides/com.myapp.android.md</span>
             </div>
-            <pre>## Main Navigation
+            <pre>
+## Main Navigation
 - Bottom tabs: Home | Search | Orders | Profile
 - Hamburger menu (top-left) → categories and account settings
 
@@ -3669,7 +3677,8 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
 
 ## Product Search
 - Tap the search bar at the top; supports filters: Brand | Price | Rating
-- Long-press any product thumbnail to preview without navigating away</pre>
+- Long-press any product thumbnail to preview without navigating away</pre
+            >
           </div>
 
           <p>
