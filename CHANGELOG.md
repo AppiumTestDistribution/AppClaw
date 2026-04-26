@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.2.1...v1.3.0) (2026-04-26)
+
+### Features
+
+* add zoom in and out support ([#23](https://github.com/AppiumTestDistribution/AppClaw/issues/23)) ([0e98ec3](https://github.com/AppiumTestDistribution/AppClaw/commit/0e98ec3e5eec4ba3b58460dd67e856f61b4ac717))
+
 ## [1.2.1](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.2.0...v1.2.1) (2026-04-24)
 
 ### Bug Fixes
