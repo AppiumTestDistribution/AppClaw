@@ -70,6 +70,13 @@ export interface GeneratedFlow {
   journey: string;
 }
 
+/** A screenshot captured during device crawling */
+export interface ScreenshotData {
+  filename: string;
+  base64: string;
+  mimeType: string;
+}
+
 /** Explorer agent configuration */
 export interface ExplorerConfig {
   prd: string;
