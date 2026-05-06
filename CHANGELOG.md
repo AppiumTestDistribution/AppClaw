@@ -1,3 +1,9 @@
+## [1.3.2](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.1...v1.3.2) (2026-05-06)
+
+### Bug Fixes
+
+* ios taps for vision ([3828711](https://github.com/AppiumTestDistribution/AppClaw/commit/3828711930df50e68fa3a43bb9b5a5738cf4568d))
+
 ## [1.3.1](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.0...v1.3.1) (2026-05-03)
 
 ### Bug Fixes
