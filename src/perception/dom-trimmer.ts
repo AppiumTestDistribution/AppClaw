@@ -14,6 +14,13 @@ interface TrimmedNode {
   tag: string;
   attrs: Record<string, string>;
   score: number;
+  platform: 'android' | 'ios';
+  /** 1-based position among all elements with the same primary selector (only set for duplicates) */
+  domPos?: number;
+  /** The xpath attribute name used to build the positional xpath ('content-desc', 'text', 'name', 'label') */
+  xpathAttrName?: string;
+  /** The selector value used for the positional xpath */
+  xpathKey?: string;
 }
 
 /** Result of trimDOM — compact XML plus pre-computed element counts. */
@@ -60,6 +67,25 @@ export function trimDOM(
     walkIOS(parsed, nodes);
   }
 
+  // Detect duplicate elements (same primary selector in DOM order) and annotate with
+  // positional xpath so the LLM can precisely target a specific occurrence.
+  const keyCount = new Map<string, number>();
+  for (const node of nodes) {
+    const sel = getPrimarySelector(node);
+    if (sel) keyCount.set(sel.key, (keyCount.get(sel.key) ?? 0) + 1);
+  }
+  const keyPos = new Map<string, number>();
+  for (const node of nodes) {
+    const sel = getPrimarySelector(node);
+    if (sel && (keyCount.get(sel.key) ?? 0) > 1) {
+      const pos = (keyPos.get(sel.key) ?? 0) + 1;
+      keyPos.set(sel.key, pos);
+      node.domPos = pos;
+      node.xpathAttrName = sel.attrName;
+      node.xpathKey = sel.key;
+    }
+  }
+
   // Sort by relevance score and take top N
   nodes.sort((a, b) => b.score - a.score);
   const top = nodes.slice(0, maxElements);
@@ -75,10 +101,15 @@ export function trimDOM(
 
   // Build compact XML with element numbering
   const lines = top.map((node, i) => {
-    const attrs = Object.entries(node.attrs)
+    const attrs = { ...node.attrs };
+    // Add positional xpath for duplicate elements so the LLM can select precisely
+    if (node.domPos !== undefined && node.xpathKey && node.xpathAttrName) {
+      attrs.xpath = `(//*[@${node.xpathAttrName}=${xpathString(node.xpathKey)}])[${node.domPos}]`;
+    }
+    const attrStr = Object.entries(attrs)
       .map(([k, v]) => `${k}="${escapeXml(v)}"`)
       .join(' ');
-    return `<${node.tag} idx="${i + 1}" ${attrs}/>`;
+    return `<${node.tag} idx="${i + 1}" ${attrStr}/>`;
   });
 
   return {
@@ -182,7 +213,7 @@ function walkAndroid(node: any, result: TrimmedNode[], parentContext: string = '
         attrs.in = parentContext;
       }
 
-      result.push({ tag, attrs, score });
+      result.push({ tag, attrs, score, platform: 'android' });
     }
 
     walkChildrenAndroid(node, result, childContext);
@@ -278,7 +309,7 @@ function walkIOS(node: any, result: TrimmedNode[], parentContext: string = ''): 
         attrs.in = parentContext;
       }
 
-      result.push({ tag, attrs, score });
+      result.push({ tag, attrs, score, platform: 'ios' });
     }
 
     walkChildrenIOS(node, result, childContext);
@@ -308,4 +339,33 @@ function escapeXml(str: string): string {
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+/**
+ * Return the primary selector key and the corresponding raw Appium XML attribute name
+ * for a trimmed node. Used to detect and annotate duplicate elements.
+ */
+function getPrimarySelector(
+  node: TrimmedNode
+): { key: string; attrName: string } | null {
+  if (node.platform === 'android') {
+    if (node.attrs.desc) return { key: node.attrs.desc, attrName: 'content-desc' };
+    if (node.attrs.text) return { key: node.attrs.text, attrName: 'text' };
+  } else {
+    if (node.attrs.name) return { key: node.attrs.name, attrName: 'name' };
+    if (node.attrs.text) return { key: node.attrs.text, attrName: 'label' };
+  }
+  return null;
+}
+
+/**
+ * Produce a quoted xpath string literal, handling values that contain single quotes.
+ * xpath 1.0 has no escape sequence for quotes, so we use concat() when needed.
+ */
+function xpathString(value: string): string {
+  if (!value.includes("'")) return `'${value}'`;
+  if (!value.includes('"')) return `"${value}"`;
+  // Contains both quote types: split around single quotes and concat
+  const parts = value.split("'").map((p) => `'${p}'`).join(`, "'", `);
+  return `concat(${parts})`;
 }
