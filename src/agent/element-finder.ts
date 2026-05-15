@@ -56,10 +56,10 @@ export async function findByIdStrategies(
     if (uuid) return uuid;
   }
 
-  // 3. Try finding by visible text (xpath) — useful when id/accessibilityId are generic
+  // 3. Try finding by visible text (xpath) — [1] ensures the first DOM match when duplicates exist
   if (text) {
     const escapedText = text.replace(/'/g, "\\'");
-    const uuid = await findElement(mcp, 'xpath', `//*[@text='${escapedText}']`).catch(() => null);
+    const uuid = await findElement(mcp, 'xpath', `(//*[@text='${escapedText}'])[1]`).catch(() => null);
     if (uuid) return uuid;
   }
 

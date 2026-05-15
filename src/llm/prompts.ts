@@ -36,6 +36,7 @@ HOW TO INTERACT (DOM MODE)
    Example: strategy="id", selector="com.google.android.gm:id/compose_button"
 
 **How to pick:** Look at the DOM element:
+- Has xpath="..."? → Use **xpath** with that exact value (it uniquely identifies the element when duplicates exist)
 - Has desc="X"? → Use accessibility id with "X"
 - Has rid="Y"? → Use id with "Y"
 - Has only text="Z"? → Use accessibility id with "Z"
