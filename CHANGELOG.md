@@ -1,3 +1,10 @@
+## [1.3.4](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.3...v1.3.4) (2026-05-15)
+
+### Bug Fixes
+
+* improve locator scoring logic ([ba6ef85](https://github.com/AppiumTestDistribution/AppClaw/commit/ba6ef85a709288331621dceb2b86b91b5422a520))
+* improve locator scoring logic ([855f9d6](https://github.com/AppiumTestDistribution/AppClaw/commit/855f9d6097c6418c0d5223868aa1545754406bc7))
+
 ## [1.3.3](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.2...v1.3.3) (2026-05-06)
 
 ### Bug Fixes
