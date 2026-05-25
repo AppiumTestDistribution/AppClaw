@@ -54,7 +54,10 @@ declare module 'appclaw/agent-runtime' {
     fill(target: AgentTarget, text: string): Promise<AgentActionResult>;
     longpress(target: AgentTarget, duration?: number): Promise<AgentActionResult>;
     swipe(direction: 'up' | 'down' | 'left' | 'right'): Promise<AgentActionResult>;
-    swipeElement(target: AgentTarget, direction: 'up' | 'down' | 'left' | 'right'): Promise<AgentActionResult>;
+    swipeElement(
+      target: AgentTarget,
+      direction: 'up' | 'down' | 'left' | 'right'
+    ): Promise<AgentActionResult>;
     pressKey(key: 'BACK' | 'HOME' | 'ENTER'): Promise<AgentActionResult>;
     getText(target: AgentTarget): Promise<AgentActionResult>;
     getAttrs(target: AgentTarget): Promise<AgentActionResult>;

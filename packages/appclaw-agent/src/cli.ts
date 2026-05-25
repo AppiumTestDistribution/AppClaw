@@ -3,19 +3,19 @@ import { helpText, VERSION, workflowText } from './help.js';
 import { parseInvocation } from './parser.js';
 
 const c = {
-  reset:   '\x1b[0m',
-  bold:    '\x1b[1m',
-  dim:     '\x1b[2m',
-  green:   '\x1b[32m',
-  red:     '\x1b[31m',
-  cyan:    '\x1b[36m',
-  yellow:  '\x1b[33m',
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  green: '\x1b[32m',
+  red: '\x1b[31m',
+  cyan: '\x1b[36m',
+  yellow: '\x1b[33m',
   magenta: '\x1b[35m',
 };
 
 function colorOutput(session: string | undefined, ok: boolean, message: string, output?: string) {
   const icon = ok ? `${c.green}✔${c.reset}` : `${c.red}✘${c.reset}`;
-  const tag  = session ? ` ${c.cyan}[${session}]${c.reset}` : '';
+  const tag = session ? ` ${c.cyan}[${session}]${c.reset}` : '';
   if (output) process.stdout.write(`${c.dim}${output}${c.reset}\n`);
   process.stdout.write(`${icon}${tag} ${message}\n`);
 }

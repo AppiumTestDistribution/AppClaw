@@ -3745,7 +3745,9 @@ APP_GUIDE (WhatsApp):
         <!-- AGENT CLI                                    -->
         <!-- ============================================ -->
         <section id="agent-cli-overview" class="reveal">
-          <h2>Agent CLI <code style="font-size:0.7em;vertical-align:middle">appclaw-agent</code></h2>
+          <h2>
+            Agent CLI <code style="font-size: 0.7em; vertical-align: middle">appclaw-agent</code>
+          </h2>
           <p>
             <code>appclaw-agent</code> is a deterministic terminal CLI designed for AI coding agents
             — Claude Code, Gemini CLI, Codex CLI, and any agent with terminal access. It exposes
@@ -3757,8 +3759,8 @@ APP_GUIDE (WhatsApp):
             <div class="callout-title">Who this is for</div>
             <p>
               Use <code>appclaw-agent</code> when an AI coding agent needs to drive a mobile device
-              as part of a larger task — writing a test, verifying a UI, or exploring an app.
-              The agent issues terminal commands; AppClaw handles the device session.
+              as part of a larger task — writing a test, verifying a UI, or exploring an app. The
+              agent issues terminal commands; AppClaw handles the device session.
             </p>
           </div>
 
@@ -3804,7 +3806,9 @@ APP_GUIDE (WhatsApp):
         <section id="agent-cli-install" class="reveal">
           <div class="section-breadcrumb">Agent CLI <span>/</span> Installation</div>
           <h2>Installation</h2>
-          <p>Install globally so <code>appclaw-agent</code> is available in any terminal session.</p>
+          <p>
+            Install globally so <code>appclaw-agent</code> is available in any terminal session.
+          </p>
 
           <div class="code-block">
             <div class="code-block-header">
@@ -3842,8 +3846,8 @@ APP_GUIDE (WhatsApp):
           <div class="section-breadcrumb">Agent CLI <span>/</span> Workflow</div>
           <h2>Workflow</h2>
           <p>
-            Every session follows the same five-step pattern. Re-snapshot after every
-            state-changing action — refs are invalidated when the screen changes.
+            Every session follows the same five-step pattern. Re-snapshot after every state-changing
+            action — refs are invalidated when the screen changes.
           </p>
 
           <div class="code-block">
@@ -3904,7 +3908,10 @@ APP_GUIDE (WhatsApp):
           <h3>Session management</h3>
           <table class="cmd-table">
             <thead>
-              <tr><th>Command</th><th>Description</th></tr>
+              <tr>
+                <th>Command</th>
+                <th>Description</th>
+              </tr>
             </thead>
             <tbody>
               <tr>
@@ -3925,7 +3932,10 @@ APP_GUIDE (WhatsApp):
           <h3>Inspection</h3>
           <table class="cmd-table">
             <thead>
-              <tr><th>Command</th><th>Description</th></tr>
+              <tr>
+                <th>Command</th>
+                <th>Description</th>
+              </tr>
             </thead>
             <tbody>
               <tr>
@@ -3946,7 +3956,10 @@ APP_GUIDE (WhatsApp):
           <h3>Interaction</h3>
           <table class="cmd-table">
             <thead>
-              <tr><th>Command</th><th>Description</th></tr>
+              <tr>
+                <th>Command</th>
+                <th>Description</th>
+              </tr>
             </thead>
             <tbody>
               <tr>
@@ -3971,12 +3984,24 @@ APP_GUIDE (WhatsApp):
           <h3>Hardware keys</h3>
           <table class="cmd-table">
             <thead>
-              <tr><th>Command</th><th>Description</th></tr>
+              <tr>
+                <th>Command</th>
+                <th>Description</th>
+              </tr>
             </thead>
             <tbody>
-              <tr><td><code>back --json</code></td><td>Press the hardware Back button</td></tr>
-              <tr><td><code>home --json</code></td><td>Press the hardware Home button</td></tr>
-              <tr><td><code>enter --json</code></td><td>Press the Enter / Return key</td></tr>
+              <tr>
+                <td><code>back --json</code></td>
+                <td>Press the hardware Back button</td>
+              </tr>
+              <tr>
+                <td><code>home --json</code></td>
+                <td>Press the hardware Home button</td>
+              </tr>
+              <tr>
+                <td><code>enter --json</code></td>
+                <td>Press the Enter / Return key</td>
+              </tr>
             </tbody>
           </table>
 
@@ -3984,8 +4009,8 @@ APP_GUIDE (WhatsApp):
             <div class="callout-title">Always re-snapshot after interaction</div>
             <p>
               Any command that changes screen state (<code>press</code>, <code>fill</code>,
-              <code>scroll</code>, hardware keys) invalidates all current <code>@eN</code> refs.
-              Run <code>snapshot -i --json</code> again before referencing elements.
+              <code>scroll</code>, hardware keys) invalidates all current <code>@eN</code> refs. Run
+              <code>snapshot -i --json</code> again before referencing elements.
             </p>
           </div>
         </section>
@@ -4020,7 +4045,11 @@ APP_GUIDE (WhatsApp):
           </p>
           <table class="cmd-table">
             <thead>
-              <tr><th>Kind</th><th>Syntax</th><th>Best for</th></tr>
+              <tr>
+                <th>Kind</th>
+                <th>Syntax</th>
+                <th>Best for</th>
+              </tr>
             </thead>
             <tbody>
               <tr>
@@ -4098,7 +4127,11 @@ APP_GUIDE (WhatsApp):
           </p>
           <table class="cmd-table">
             <thead>
-              <tr><th>Method</th><th>What it checks</th><th>Use when</th></tr>
+              <tr>
+                <th>Method</th>
+                <th>What it checks</th>
+                <th>Use when</th>
+              </tr>
             </thead>
             <tbody>
               <tr>
