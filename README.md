@@ -377,6 +377,30 @@ This installs two skills:
 
 Skills are auto-discovered if you're working inside a clone of this repo.
 
+## Agent-Driven Device CLI
+
+For Claude Code, Gemini CLI, Codex CLI, and other agents that can run terminal
+commands, install the separate agent-native CLI:
+
+```sh
+npm install -g appclaw-agent
+appclaw-agent help workflow
+```
+
+`appclaw-agent` maintains named device sessions across commands and returns
+compact UI references for deterministic interaction:
+
+```sh
+appclaw-agent --session login open com.example.app --platform android
+appclaw-agent --session login snapshot -i --json
+appclaw-agent --session login press @e1 --json
+appclaw-agent --session login close
+```
+
+Install the `use-appclaw-agent-cli` skill to teach a supported agent this
+workflow. Vision operations are available explicitly through `--vision` when
+AppClaw vision is configured.
+
 ## License
 
 Licensed under the Apache License, Version 2.0. See `LICENSE` for the full text.

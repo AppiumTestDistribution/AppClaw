@@ -12,6 +12,10 @@
     },
     "./cli": {
       "import": "./dist/index.js"
+    },
+    "./agent-runtime": {
+      "import": "./dist/agent-runtime/index.js",
+      "types": "./dist/agent-runtime/index.d.ts"
     }
   },
   "bin": {
