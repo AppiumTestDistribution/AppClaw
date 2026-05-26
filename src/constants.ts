@@ -2,7 +2,7 @@
 export const DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-sonnet-4-20250514',
   openai: 'gpt-4o',
-  gemini: 'gemini-3.1-flash-lite-preview',
+  gemini: 'gemini-3.1-flash-lite',
   groq: 'llama-3.3-70b-versatile',
   ollama: 'llama3.2',
 };
@@ -27,12 +27,12 @@ export const MODEL_PRICING: Record<string, [number, number]> = {
   'gemini-2.0-flash': [0.1, 0.4],
   'gemini-2.0-flash-lite': [0.075, 0.3],
   'gemini-2.5-flash-preview-05-20': [0.15, 0.6],
+  'gemini-3.1-flash-lite': [0.1, 0.4],
   'gemini-1.5-flash': [0.075, 0.3],
   'gemini-1.5-pro': [1.25, 5.0],
   'gemini-2.5-pro-preview-05-06': [1.25, 10.0],
   'gemini-3-flash-preview': [0.5, 3.0],
   'gemini-3-pro-image-preview': [2.0, 12.0],
-  'gemini-3.1-flash-lite-preview': [0.25, 1.5],
   'gemini-3.1-flash-image-preview': [0.5, 3.0],
   'gemini-3.1-flash-live-preview': [0.75, 4.5],
   'gemini-3.1-pro-preview': [2.0, 12.0],
