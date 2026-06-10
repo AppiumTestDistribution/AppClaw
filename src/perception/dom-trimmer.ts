@@ -345,9 +345,7 @@ function escapeXml(str: string): string {
  * Return the primary selector key and the corresponding raw Appium XML attribute name
  * for a trimmed node. Used to detect and annotate duplicate elements.
  */
-function getPrimarySelector(
-  node: TrimmedNode
-): { key: string; attrName: string } | null {
+function getPrimarySelector(node: TrimmedNode): { key: string; attrName: string } | null {
   if (node.platform === 'android') {
     if (node.attrs.desc) return { key: node.attrs.desc, attrName: 'content-desc' };
     if (node.attrs.text) return { key: node.attrs.text, attrName: 'text' };
@@ -366,6 +364,9 @@ function xpathString(value: string): string {
   if (!value.includes("'")) return `'${value}'`;
   if (!value.includes('"')) return `"${value}"`;
   // Contains both quote types: split around single quotes and concat
-  const parts = value.split("'").map((p) => `'${p}'`).join(`, "'", `);
+  const parts = value
+    .split("'")
+    .map((p) => `'${p}'`)
+    .join(`, "'", `);
   return `concat(${parts})`;
 }

@@ -73,7 +73,7 @@ Screenshot-first mode using Stark (df-vision + Gemini) for element location. Req
 ```env
 LLM_PROVIDER=gemini
 LLM_API_KEY=your-gemini-api-key
-LLM_MODEL=gemini-3.1-flash-lite-preview
+LLM_MODEL=gemini-3.1-flash-lite
 AGENT_MODE=vision
 ```
 
@@ -285,7 +285,7 @@ All configuration is via `.env`:
 | **LLM**               |           |                                                                                                       |
 | `LLM_PROVIDER`        | `gemini`  | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`)                                      |
 | `LLM_API_KEY`         | —         | API key for your provider (not used for local Ollama; see `OLLAMA_*` for cloud URL / auth)            |
-| `LLM_MODEL`           | (auto)    | Model override (e.g. `gemini-3.1-flash-lite-preview`, `claude-sonnet-4-20250514`)                     |
+| `LLM_MODEL`           | (auto)    | Model override (e.g. `gemini-3.1-flash-lite`, `claude-sonnet-4-20250514`)                             |
 | `OLLAMA_BASE_URL`     | (default) | Ollama API base URL (e.g. remote or Docker). Empty = `http://127.0.0.1:11434` (`LLM_PROVIDER=ollama`) |
 | `OLLAMA_API_KEY`      | —         | Optional Bearer token for Ollama Cloud or authenticated endpoints (`LLM_PROVIDER=ollama`)             |
 | `AGENT_MODE`          | `vision`  | `dom` (XML locators) or `vision` (screenshot-first)                                                   |
@@ -376,6 +376,30 @@ This installs two skills:
 | `use-appclaw-cli`       | Helps run flows, configure `.env`, set up devices, choose vision providers, and troubleshoot                                   |
 
 Skills are auto-discovered if you're working inside a clone of this repo.
+
+## Agent-Driven Device CLI
+
+For Claude Code, Gemini CLI, Codex CLI, and other agents that can run terminal
+commands, install the separate agent-native CLI:
+
+```sh
+npm install -g appclaw-agent
+appclaw-agent help workflow
+```
+
+`appclaw-agent` maintains named device sessions across commands and returns
+compact UI references for deterministic interaction:
+
+```sh
+appclaw-agent --session login open com.example.app --platform android
+appclaw-agent --session login snapshot -i --json
+appclaw-agent --session login press @e1 --json
+appclaw-agent --session login close
+```
+
+Install the `use-appclaw-agent-cli` skill to teach a supported agent this
+workflow. Vision operations are available explicitly through `--vision` when
+AppClaw vision is configured.
 
 ## License
 

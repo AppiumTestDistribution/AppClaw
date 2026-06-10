@@ -2,20 +2,20 @@
 
 ### Bug Fixes
 
-* improve locator scoring logic ([ba6ef85](https://github.com/AppiumTestDistribution/AppClaw/commit/ba6ef85a709288331621dceb2b86b91b5422a520))
-* improve locator scoring logic ([855f9d6](https://github.com/AppiumTestDistribution/AppClaw/commit/855f9d6097c6418c0d5223868aa1545754406bc7))
+- improve locator scoring logic ([ba6ef85](https://github.com/AppiumTestDistribution/AppClaw/commit/ba6ef85a709288331621dceb2b86b91b5422a520))
+- improve locator scoring logic ([855f9d6](https://github.com/AppiumTestDistribution/AppClaw/commit/855f9d6097c6418c0d5223868aa1545754406bc7))
 
 ## [1.3.3](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.2...v1.3.3) (2026-05-06)
 
 ### Bug Fixes
 
-* update appium-mcp tool calls and fix vscode webview buttons ([4c95d8c](https://github.com/AppiumTestDistribution/AppClaw/commit/4c95d8c2f77cea1c47f93bd5ac0ffee629627de5))
+- update appium-mcp tool calls and fix vscode webview buttons ([4c95d8c](https://github.com/AppiumTestDistribution/AppClaw/commit/4c95d8c2f77cea1c47f93bd5ac0ffee629627de5))
 
 ## [1.3.2](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.1...v1.3.2) (2026-05-06)
 
 ### Bug Fixes
 
-* ios taps for vision ([3828711](https://github.com/AppiumTestDistribution/AppClaw/commit/3828711930df50e68fa3a43bb9b5a5738cf4568d))
+- ios taps for vision ([3828711](https://github.com/AppiumTestDistribution/AppClaw/commit/3828711930df50e68fa3a43bb9b5a5738cf4568d))
 
 ## [1.3.1](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.0...v1.3.1) (2026-05-03)
 

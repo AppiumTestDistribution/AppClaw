@@ -22,7 +22,7 @@ export function getStarkVisionModel(): string {
   if (Config.LLM_PROVIDER === 'gemini' && Config.LLM_MODEL.trim()) {
     return Config.LLM_MODEL.trim();
   }
-  return 'gemini-3.1-flash-lite-preview';
+  return 'gemini-3.1-flash-lite';
 }
 
 /**

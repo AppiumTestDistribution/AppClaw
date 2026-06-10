@@ -1,4 +1,5 @@
 import { createRequire } from 'module';
+import { dirname, join } from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -20,10 +21,12 @@ import { VERSION } from '../version.js';
 function resolveAppiumMcp(): { command: string; args: string[] } {
   try {
     const req = createRequire(import.meta.url);
-    const bin = req.resolve('appium-mcp');
+    // Resolve via package.json (always exported) then navigate to the bin
+    const pkgJson = req.resolve('appium-mcp/package.json');
+    const bin = join(dirname(pkgJson), 'dist', 'index.js');
     return { command: 'node', args: [bin] };
   } catch {
-    return { command: 'npx', args: ['--yes', 'appium-mcp@1.67.0'] };
+    return { command: 'npx', args: ['--yes', 'appium-mcp@1.77.0'] };
   }
 }
 

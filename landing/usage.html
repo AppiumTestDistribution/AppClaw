@@ -1154,6 +1154,29 @@
             <li><a href="#appguide-custom">Custom Guides</a></li>
           </ul>
         </div>
+
+        <div class="sidebar-group open">
+          <button class="sidebar-heading" aria-expanded="true">
+            Agent CLI
+            <svg
+              class="sidebar-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <ul>
+            <li><a href="#agent-cli-overview">Overview</a></li>
+            <li><a href="#agent-cli-install">Installation</a></li>
+            <li><a href="#agent-cli-workflow">Workflow</a></li>
+            <li><a href="#agent-cli-commands">Command Reference</a></li>
+            <li><a href="#agent-cli-selectors">Selectors &amp; Refs</a></li>
+            <li><a href="#agent-cli-vision">Vision</a></li>
+          </ul>
+        </div>
       </aside>
 
       <!-- CONTENT -->
@@ -3713,6 +3736,418 @@ APP_GUIDE (WhatsApp):
               <tr>
                 <td>Keep it short (under 500 tokens)</td>
                 <td>Guides are injected on every step — brevity reduces cost</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- AGENT CLI                                    -->
+        <!-- ============================================ -->
+        <section id="agent-cli-overview" class="reveal">
+          <h2>
+            Agent CLI <code style="font-size: 0.7em; vertical-align: middle">appclaw-agent</code>
+          </h2>
+          <p>
+            <code>appclaw-agent</code> is a deterministic terminal CLI designed for AI coding agents
+            — Claude Code, Gemini CLI, Codex CLI, and any agent with terminal access. It exposes
+            named device sessions through simple JSON-output commands so the host agent can inspect
+            and operate a real Android or iOS device without writing any automation code.
+          </p>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Who this is for</div>
+            <p>
+              Use <code>appclaw-agent</code> when an AI coding agent needs to drive a mobile device
+              as part of a larger task — writing a test, verifying a UI, or exploring an app. The
+              agent issues terminal commands; AppClaw handles the device session.
+            </p>
+          </div>
+
+          <h3>How it compares</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th><code>appclaw</code></th>
+                <th><code>appclaw-agent</code></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Audience</td>
+                <td>Developers &amp; QA engineers</td>
+                <td>AI coding agents</td>
+              </tr>
+              <tr>
+                <td>Reasoning</td>
+                <td>Built-in LLM agent loop</td>
+                <td>Handled by the host agent</td>
+              </tr>
+              <tr>
+                <td>Output</td>
+                <td>Rich terminal UI</td>
+                <td>Structured JSON</td>
+              </tr>
+              <tr>
+                <td>Sessions</td>
+                <td>One goal per invocation</td>
+                <td>Named, persistent across calls</td>
+              </tr>
+              <tr>
+                <td>LLM key required</td>
+                <td>Yes</td>
+                <td>No (vision commands only)</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="agent-cli-install" class="reveal">
+          <div class="section-breadcrumb">Agent CLI <span>/</span> Installation</div>
+          <h2>Installation</h2>
+          <p>
+            Install globally so <code>appclaw-agent</code> is available in any terminal session.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">npm</span> install -g appclaw-agent</pre>
+          </div>
+
+          <p>
+            Verify the install and read the built-in workflow guide — agents should run this before
+            starting any session:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">appclaw-agent</span> help workflow</pre>
+          </div>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">For Claude Code users</div>
+            <p>
+              Drop a <code>use-appclaw-agent-cli</code> skill in your project's
+              <code>.claude/skills/</code> directory. Claude Code will automatically use
+              <code>appclaw-agent</code> for any mobile automation task — no extra configuration
+              needed.
+            </p>
+          </div>
+        </section>
+
+        <section id="agent-cli-workflow" class="reveal">
+          <div class="section-breadcrumb">Agent CLI <span>/</span> Workflow</div>
+          <h2>Workflow</h2>
+          <p>
+            Every session follows the same five-step pattern. Re-snapshot after every state-changing
+            action — refs are invalidated when the screen changes.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="c"># 1. Open a named session</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> login <span class="k">open</span> com.example.app <span class="fl">--platform</span> android
+
+<span class="c"># 2. Inspect actionable UI elements</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> login snapshot <span class="fl">-i</span> <span class="fl">--json</span>
+
+<span class="c"># 3. Interact using a ref or stable selector</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> login fill @e1 <span class="s">"test@example.com"</span> <span class="fl">--json</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> login press @e2 <span class="fl">--json</span>
+
+<span class="c"># 4. Re-snapshot to get fresh refs</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> login snapshot <span class="fl">-i</span> <span class="fl">--json</span>
+
+<span class="c"># 5. Verify visually, then close</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> login screenshot /tmp/screen.png
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> login close</pre>
+          </div>
+
+          <h3>Session persistence</h3>
+          <p>
+            A user-local daemon owns active sessions. Separate terminal invocations sharing the same
+            <code>--session</code> name continue operating on the same screen — you don't lose the
+            device connection between commands.
+          </p>
+
+          <h3>JSON output</h3>
+          <p>
+            All commands accept <code>--json</code> and return a structured response the host agent
+            can parse directly:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">JSON response</span>
+            </div>
+            <pre><span class="p">{</span>
+  <span class="k">"ok"</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+  <span class="k">"session"</span><span class="p">:</span> <span class="s">"login"</span><span class="p">,</span>
+  <span class="k">"message"</span><span class="p">:</span> <span class="s">"Snapshot contains 12 element(s)"</span><span class="p">,</span>
+  <span class="k">"output"</span><span class="p">:</span> <span class="s">"@e1 [EditText] \"Email\" id=\"com.example:id/email\"\n..."</span><span class="p">,</span>
+  <span class="k">"data"</span><span class="p">: {</span> <span class="s">"elements"</span><span class="p">: [</span> <span class="p">...</span> <span class="p">]</span> <span class="p">}</span>
+<span class="p">}</span></pre>
+          </div>
+        </section>
+
+        <section id="agent-cli-commands" class="reveal">
+          <div class="section-breadcrumb">Agent CLI <span>/</span> Command Reference</div>
+          <h2>Command Reference</h2>
+
+          <h3>Session management</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>open &lt;appId&gt; --platform android|ios</code></td>
+                <td>Open an app and start a named session</td>
+              </tr>
+              <tr>
+                <td><code>close</code></td>
+                <td>Close the session and release the device</td>
+              </tr>
+              <tr>
+                <td><code>help workflow</code></td>
+                <td>Print the recommended agent workflow guide</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Inspection</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>snapshot -i --json</code></td>
+                <td>List all interactive elements with refs, types, and locators</td>
+              </tr>
+              <tr>
+                <td><code>screenshot &lt;path&gt;</code></td>
+                <td>Save a screenshot to disk for visual verification</td>
+              </tr>
+              <tr>
+                <td><code>is visible &lt;selector&gt; --json</code></td>
+                <td>DOM check — element exists in hierarchy (not a visibility guarantee)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Interaction</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>press &lt;ref|selector&gt; --json</code></td>
+                <td>Tap an element</td>
+              </tr>
+              <tr>
+                <td><code>fill &lt;ref|selector&gt; "text" --json</code></td>
+                <td>Type text into an input field</td>
+              </tr>
+              <tr>
+                <td><code>scroll down|up --json</code></td>
+                <td>Scroll the screen</td>
+              </tr>
+              <tr>
+                <td><code>scroll &lt;ref&gt; down|up --json</code></td>
+                <td>Scroll within a specific container element</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Hardware keys</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>back --json</code></td>
+                <td>Press the hardware Back button</td>
+              </tr>
+              <tr>
+                <td><code>home --json</code></td>
+                <td>Press the hardware Home button</td>
+              </tr>
+              <tr>
+                <td><code>enter --json</code></td>
+                <td>Press the Enter / Return key</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Always re-snapshot after interaction</div>
+            <p>
+              Any command that changes screen state (<code>press</code>, <code>fill</code>,
+              <code>scroll</code>, hardware keys) invalidates all current <code>@eN</code> refs. Run
+              <code>snapshot -i --json</code> again before referencing elements.
+            </p>
+          </div>
+        </section>
+
+        <section id="agent-cli-selectors" class="reveal">
+          <div class="section-breadcrumb">Agent CLI <span>/</span> Selectors &amp; Refs</div>
+          <h2>Selectors &amp; Refs</h2>
+          <p>
+            There are two ways to target an element: <strong>snapshot refs</strong> (short-lived)
+            and <strong>stable selectors</strong> (durable across snapshots).
+          </p>
+
+          <h3>Snapshot refs (<code>@eN</code>)</h3>
+          <p>
+            Every <code>snapshot -i --json</code> response includes short refs like
+            <code>@e1</code>, <code>@e2</code>, etc. Use these for immediate actions on the current
+            screen — they're fast to write but expire as soon as the screen changes.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">appclaw-agent</span> <span class="fl">--session</span> s1 press @e3 <span class="fl">--json</span></pre>
+          </div>
+
+          <h3>Stable selectors</h3>
+          <p>
+            Stable selectors survive re-snapshots and are safe to store in test scripts. Three
+            selector kinds are supported:
+          </p>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Kind</th>
+                <th>Syntax</th>
+                <th>Best for</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Resource ID</td>
+                <td><code>id="com.example:id/login_btn"</code></td>
+                <td>Most reliable — stable across app versions</td>
+              </tr>
+              <tr>
+                <td>Accessibility ID</td>
+                <td><code>accessibility="Sign in"</code></td>
+                <td>Good fallback when IDs are absent</td>
+              </tr>
+              <tr>
+                <td>Text</td>
+                <td><code>text="Sign in"</code></td>
+                <td>Quick targeting when label is unique</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="c"># Using resource ID</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> s1 press <span class="s">'id="com.example:id/login_btn"'</span> <span class="fl">--json</span>
+
+<span class="c"># Using accessibility ID</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> s1 press <span class="s">'accessibility="Sign in"'</span> <span class="fl">--json</span>
+
+<span class="c"># Using visible text</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> s1 press <span class="s">'text="Sign in"'</span> <span class="fl">--json</span></pre>
+          </div>
+        </section>
+
+        <section id="agent-cli-vision" class="reveal">
+          <div class="section-breadcrumb">Agent CLI <span>/</span> Vision</div>
+          <h2>Vision</h2>
+          <p>
+            When AppClaw's vision API is configured, you can describe elements in plain English
+            instead of providing a selector. Use <code>--vision</code> only for genuinely visual
+            operations where a DOM selector isn't available or reliable.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="c"># Tap by visual description</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> s1 press <span class="fl">--vision</span> <span class="s">"cart icon in the top right"</span>
+
+<span class="c"># Assert something is visible on screen</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> s1 is visible <span class="fl">--vision</span> <span class="s">"order confirmed message"</span> <span class="fl">--json</span>
+
+<span class="c"># Read a value from the screen</span>
+<span class="k">appclaw-agent</span> <span class="fl">--session</span> s1 get info <span class="fl">--vision</span> <span class="s">"displayed total"</span> <span class="fl">--json</span></pre>
+          </div>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Screenshot fallback</div>
+            <p>
+              When vision is not configured, <code>--vision</code> commands automatically capture a
+              screenshot and return its path in <code>screenshotPath</code>. The host agent can then
+              read the image to answer the question visually — no API key required.
+            </p>
+          </div>
+
+          <h3>Visual assertions vs DOM checks</h3>
+          <p>
+            DOM checks confirm an element exists in the hierarchy — not that it is rendered on
+            screen. An element can be in the DOM but scrolled off-screen or hidden. Always use a
+            screenshot for pass/fail assertions:
+          </p>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>What it checks</th>
+                <th>Use when</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>screenshot</code> + visual read</td>
+                <td>What is actually rendered</td>
+                <td>Pass/fail assertions (preferred)</td>
+              </tr>
+              <tr>
+                <td><code>is visible &lt;selector&gt;</code></td>
+                <td>Element exists in DOM hierarchy</td>
+                <td>Presence check only, not visibility</td>
+              </tr>
+              <tr>
+                <td><code>is visible --vision</code></td>
+                <td>Element visible on rendered screen</td>
+                <td>When vision API is configured</td>
               </tr>
             </tbody>
           </table>

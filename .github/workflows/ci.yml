@@ -18,10 +18,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install dependencies
-        run: npm install --no-package-lock
+        run: npm ci
 
       - name: Format check (Prettier)
         run: npm run format:check
@@ -43,13 +43,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: vscode-extension/package-lock.json
 
       - name: Install dependencies
         working-directory: vscode-extension
-        run: npm ci
+        run: npm install --no-package-lock
 
       - name: Build
         working-directory: vscode-extension
