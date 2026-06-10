@@ -411,7 +411,9 @@ async function flowTypeText(
     if (!target) {
       const visionUuid = await findByVision(mcp, 'text input field, search box, or editable area');
       if (visionUuid && !isAIElement(visionUuid)) {
-        await mcp.callTool('appium_set_value', { elementUUID: visionUuid, text: '' }).catch(() => {});
+        await mcp
+          .callTool('appium_set_value', { elementUUID: visionUuid, text: '' })
+          .catch(() => {});
         const setResult = await mcp.callTool('appium_set_value', { elementUUID: visionUuid, text });
         const setText =
           setResult.content

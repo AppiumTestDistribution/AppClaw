@@ -16,10 +16,7 @@ import type { MCPClient, MCPToolResult, MCPToolInfo } from './types.js';
  * Tools that operate before or outside a specific session.
  * These must NOT receive a sessionId injection.
  */
-const PRE_SESSION_TOOLS = new Set([
-  'appium_session_management',
-  'select_device',
-]);
+const PRE_SESSION_TOOLS = new Set(['appium_session_management', 'select_device']);
 
 export class SessionScopedMCPClient implements MCPClient {
   readonly sessionId: string;

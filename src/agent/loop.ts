@@ -1360,7 +1360,9 @@ async function executeMetaTool(
 
         // Clear existing text if we have an active element
         if (activeUuid) {
-          await mcp.callTool('appium_set_value', { elementUUID: activeUuid, text: '' }).catch(() => {});
+          await mcp
+            .callTool('appium_set_value', { elementUUID: activeUuid, text: '' })
+            .catch(() => {});
         }
 
         // Always use W3C Actions — works on local and cloud, Android and iOS
