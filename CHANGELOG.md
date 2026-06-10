@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.4...v1.4.0) (2026-06-10)
+
+### Features
+
+* agent cli ([#28](https://github.com/AppiumTestDistribution/AppClaw/issues/28)) ([76be5dc](https://github.com/AppiumTestDistribution/AppClaw/commit/76be5dc3a0746e2772676e644200b30df5e1693d))
+
 ## [1.3.4](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.3...v1.3.4) (2026-05-15)
 
 ### Bug Fixes
