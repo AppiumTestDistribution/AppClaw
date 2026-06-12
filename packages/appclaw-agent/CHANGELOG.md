@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/AppiumTestDistribution/AppClaw/compare/appclaw-agent-v1.0.0...appclaw-agent-v1.0.1) (2026-06-12)
+
+### Bug Fixes
+
+* procedural memory matching ([6fdb812](https://github.com/AppiumTestDistribution/AppClaw/commit/6fdb812e0c6a7a737cd7c77b4e5829b3db58ac86))
+
 ## 1.0.0 (2026-06-10)
 
 ### Features
