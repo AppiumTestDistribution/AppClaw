@@ -234,11 +234,25 @@ export function buildUserMessage(context: AgentContext): string {
     parts.push(`\n${context.failedOnScreen}`);
   }
 
+  // ── Procedural memory: plan from a past successful run ─
+  // A full ordered recipe for this goal, when one exists. Injected before
+  // episodic hints so the LLM sees the structure first, then individual moves.
+  if (context.procedurePlan) {
+    parts.push(`\n${context.procedurePlan}`);
+  }
+
   // ── Episodic memory: past experience ─────────────────
   // Inject relevant trajectories from previous successful runs
   // BEFORE the DOM so the LLM sees proven strategies first.
   if (context.pastExperience) {
     parts.push(`\n${context.pastExperience}`);
+  }
+
+  // ── Rolling run summary ──────────────────────────────
+  // Long runs accumulate 30+ noisy LAST_ACTION_RESULTs; this compacts the
+  // earliest ones into a couple of bullets so context stays focused.
+  if (context.runSummary) {
+    parts.push(`\nRUN_SUMMARY (earlier actions in this run):\n${context.runSummary}`);
   }
 
   // ── AppGuide: per-app navigation knowledge ────────────

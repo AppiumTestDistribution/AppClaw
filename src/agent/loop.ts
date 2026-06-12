@@ -18,6 +18,7 @@ import { getScreenState } from '../perception/screen.js';
 import { diffScreen, computePerceptionHash } from '../perception/screen-diff.js';
 import { createStuckDetector } from './stuck.js';
 import { shouldPreferVisionLocateTap } from './vision-tap-policy.js';
+import { RunSummary } from './run-summary.js';
 import { createRecoveryEngine } from './recovery.js';
 import { askUser, classifyHITLRequest } from './human-in-the-loop.js';
 import { tapAtCoordinates, isAIElement, parseAIElementCoords } from './element-finder.js';
@@ -34,6 +35,14 @@ import * as ui from '../ui/terminal.js';
 import { EpisodicRecorder } from '../memory/recorder.js';
 import { loadStore } from '../memory/store.js';
 import { retrieveTrajectories, formatExperienceForPrompt } from '../memory/retriever.js';
+import {
+  loadProcedures,
+  retrieveProcedure,
+  getBestProcedureCandidate,
+  getProcedureInjectionThreshold,
+  formatProcedureForPrompt,
+  type ProcedureEntry,
+} from '../memory/procedures.js';
 import {
   extractScreenLabels,
   extractGoalKeywords,
@@ -127,6 +136,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   const stuck = createStuckDetector();
   const recovery = createRecoveryEngine();
   const history: StepRecord[] = [];
+  const runSummary = new RunSummary({ everyNSteps: Config.RUN_SUMMARY_EVERY_N_STEPS });
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalCachedTokens = 0;
@@ -151,21 +161,43 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   const deviceUdid = await detectDeviceUdid();
   // ── Episodic Memory ──────────────────────────────────
   // Cross-session trajectory store: remembers winning actions from previous runs.
+  //
+  // Use the clean displayGoal (e.g. "Tap the search icon") rather than the
+  // enriched orchestrator goal (which contains CONTEXT/IMPORTANT blocks and
+  // sub-goal summaries). Extracting keywords from the enriched text produces
+  // junk tokens like "context", "overall", "goal", which poison both the
+  // procedural fingerprint and the trajectory keywords.
+  const cleanGoal = options.displayGoal ?? goal;
   const episodicEnabled = Config.EPISODIC_MEMORY === 'on';
   const episodicStorePath = Config.EPISODIC_MEMORY_PATH || undefined;
+  const procedureStorePath = Config.PROCEDURAL_MEMORY_PATH || undefined;
+  const memoryNamespace = Config.APPCLAW_MEMORY_NAMESPACE;
   const episodicRecorder = episodicEnabled
-    ? new EpisodicRecorder(goal, detectedPlatform, Config.AGENT_MODE, episodicStorePath)
+    ? new EpisodicRecorder(cleanGoal, detectedPlatform, Config.AGENT_MODE, {
+        storePath: episodicStorePath,
+        procedureStorePath,
+        namespace: memoryNamespace,
+      })
     : undefined;
   // Seed recorder with known app ID from orchestrator
   if (episodicRecorder && options.appId) {
     episodicRecorder.setAppId(options.appId);
   }
   const episodicStore = episodicEnabled ? loadStore(episodicStorePath) : undefined;
-  const goalKeywords = episodicEnabled ? extractGoalKeywords(goal) : [];
+  const procedureStore = episodicEnabled ? loadProcedures(procedureStorePath) : undefined;
+  const goalKeywords = episodicEnabled ? extractGoalKeywords(cleanGoal) : [];
+
+  // Lazy-resolved procedural memory: looked up once the appId is known,
+  // then re-injected into every step's prompt.
+  let procedureEntry: ProcedureEntry | undefined;
+  let procedurePlanText: string | undefined;
 
   if (episodicEnabled && mcpDebug) {
     const entryCount = episodicStore?.entries.length ?? 0;
-    ui.printAgentBullet(`Episodic memory: ON (${entryCount} stored trajectories)`);
+    const procCount = procedureStore?.entries.length ?? 0;
+    ui.printAgentBullet(
+      `Episodic memory: ON — ${entryCount} trajectories, ${procCount} procedures (namespace=${memoryNamespace})`
+    );
   }
 
   ui.printGoalStart(options.displayGoal ?? goal, maxSteps);
@@ -386,6 +418,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       const matches = retrieveTrajectories(episodicStore, {
         platform: screen.platform,
         appId: episodicRecorder.currentAppId || '',
+        namespace: memoryNamespace,
+        appVersion: episodicRecorder.getAppVersion(),
         currentScreenLabels: screenLabels,
         goalKeywords,
         agentMode: Config.AGENT_MODE,
@@ -398,6 +432,42 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
           ui.printAgentBullet(
             `Episodic memory: injecting ${matches.length} past experience(s) (score: ${matches[0].score.toFixed(2)})`
           );
+        }
+      }
+
+      // Procedural memory: resolve once the appId is known, then keep
+      // injecting the same plan into every step's context.
+      if (!procedureEntry && procedureStore && episodicRecorder.currentAppId) {
+        const procedureQuery = {
+          namespace: memoryNamespace,
+          platform: screen.platform,
+          appId: episodicRecorder.currentAppId,
+          appVersion: episodicRecorder.getAppVersion(),
+          goalKeywords,
+          agentMode: Config.AGENT_MODE,
+        };
+        const match = retrieveProcedure(procedureStore, procedureQuery);
+        if (match) {
+          procedureEntry = match.entry;
+          procedurePlanText = formatProcedureForPrompt(procedureEntry);
+          episodicRecorder.trackInjectedProcedure(procedureEntry.id);
+          ui.printInfo(
+            `Procedural memory: injecting ${procedureEntry.steps.length}-step plan ` +
+              `(score ${match.score.toFixed(2)}, succeeded ${procedureEntry.successCount}x, namespace=${memoryNamespace})`
+          );
+        } else if (mcpDebug) {
+          const best = getBestProcedureCandidate(procedureStore, procedureQuery);
+          if (best) {
+            const threshold = getProcedureInjectionThreshold(best);
+            ui.printAgentBullet(
+              `Procedural memory: best candidate below threshold ` +
+                `(${best.score.toFixed(2)} < ${threshold.toFixed(2)}, keywords=${best.entry.goalKeywords.join(',')})`
+            );
+          } else {
+            ui.printAgentBullet(
+              `Procedural memory: no candidate for app=${episodicRecorder.currentAppId}, namespace=${memoryNamespace}`
+            );
+          }
         }
       }
     }
@@ -421,6 +491,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       }
     }
 
+    const runSummaryText = runSummary.update(history);
+
     const context: AgentContext = {
       goal,
       step,
@@ -435,6 +507,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       editableCount: screen.editableCount,
       failedOnScreen,
       pastExperience,
+      procedurePlan: procedurePlanText,
+      runSummary: runSummaryText,
       appGuide,
     };
 

@@ -53,6 +53,10 @@ export interface AgentContext {
   failedOnScreen?: string;
   /** Episodic memory: relevant past experience from previous successful runs */
   pastExperience?: string;
+  /** Procedural memory: ordered plan from a past successful run for the same goal */
+  procedurePlan?: string;
+  /** Rolling summary of earlier actions in this run, compressed to keep context small */
+  runSummary?: string;
   /** AppGuide: per-app navigation knowledge injected when a known app is in the foreground */
   appGuide?: string;
 }

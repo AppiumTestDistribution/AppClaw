@@ -13,6 +13,14 @@ import { computeSemanticFingerprint } from './fingerprint.js';
 const MIN_SCORE = 0.25;
 
 /**
+ * Hygiene: suppress retrieval of trajectories with only a single success that
+ * are older than 7 days. The store keeps them (a future run could promote
+ * them), but they stop being surfaced to the LLM — these are most likely
+ * one-shot dialog dismissals rather than reusable patterns.
+ */
+const SINGLE_USE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
  * Jaccard similarity between two sorted string arrays.
  * |A ∩ B| / |A ∪ B|
  */
@@ -44,10 +52,25 @@ export function retrieveTrajectories(
 
   const scored: TrajectoryMatch[] = [];
 
+  const queryNs = query.namespace ?? 'default';
+
   for (const entry of store.entries) {
-    // Hard filters: platform and app must match
+    // Hard filters: namespace, platform, and app must match
+    if ((entry.namespace ?? 'default') !== queryNs) continue;
     if (entry.platform !== query.platform) continue;
     if (entry.appId !== query.appId) continue;
+
+    // Hard filter: if both sides know the app version and they differ, skip.
+    // When either side is unknown, allow through (legacy-safe).
+    if (query.appVersion && entry.appVersion && entry.appVersion !== query.appVersion) {
+      continue;
+    }
+
+    // Hygiene filter: a one-time success older than the grace window is
+    // probably a one-shot dialog dismissal, not a reusable pattern.
+    if (entry.successCount < 2 && Date.now() - entry.timestamp > SINGLE_USE_GRACE_MS) {
+      continue;
+    }
 
     // Prefer same agent mode but don't exclude cross-mode matches
     const modeBonus = entry.agentMode === query.agentMode ? 1.0 : 0.7;

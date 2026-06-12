@@ -134,6 +134,25 @@ const envSchema = z.object({
   /** Override path for episodic memory store. Empty = ~/.appclaw/trajectories.json */
   EPISODIC_MEMORY_PATH: z.string().default(''),
 
+  /**
+   * Namespace scoping for episodic + procedural memory. Use to isolate stores
+   * across users, CI lanes, branches, or test suites so memories never bleed
+   * between contexts. Default "default" preserves single-user behavior.
+   */
+  APPCLAW_MEMORY_NAMESPACE: z.string().default('default'),
+
+  /**
+   * Override path for procedural memory store. Empty = ~/.appclaw/procedures.json.
+   * Multi-step recipes recorded from successful runs and replayed as plans.
+   */
+  PROCEDURAL_MEMORY_PATH: z.string().default(''),
+
+  /**
+   * Rolling run summary: compress the agent's action history every N steps to
+   * keep long runs (30+ steps) within the LLM context budget. 0 disables.
+   */
+  RUN_SUMMARY_EVERY_N_STEPS: z.coerce.number().default(8),
+
   // ── Cloud provider ──────────────────────────────────────────────────────────
 
   /** Cloud provider for remote device execution. Empty = local (default). */

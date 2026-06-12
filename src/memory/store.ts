@@ -22,6 +22,11 @@ function getStorePath(overridePath?: string): string {
   return join(DEFAULT_STORE_DIR, DEFAULT_STORE_FILE);
 }
 
+/** Resolved trajectory store path (respects EPISODIC_MEMORY_PATH overrides). */
+export function getTrajectoryStorePath(overridePath?: string): string {
+  return getStorePath(overridePath);
+}
+
 /** Load the trajectory store from disk. Returns empty store if not found. */
 export function loadStore(overridePath?: string): TrajectoryStore {
   const path = getStorePath(overridePath);
@@ -29,6 +34,11 @@ export function loadStore(overridePath?: string): TrajectoryStore {
     const raw = readFileSync(path, 'utf-8');
     const parsed = JSON.parse(raw);
     if (parsed?.version === 1 && Array.isArray(parsed.entries)) {
+      // Backfill: pre-namespace entries are treated as "default" namespace so
+      // they remain retrievable for users on the default namespace.
+      for (const entry of parsed.entries as TrajectoryEntry[]) {
+        if (!entry.namespace) entry.namespace = 'default';
+      }
       return parsed as TrajectoryStore;
     }
   } catch {
@@ -77,12 +87,15 @@ export function addTrajectory(
   // Check for existing match — same app, screen, and tool action.
   // For vision mode, selectors are natural-language descriptions that vary
   // between runs (e.g., "search icon top right" vs "magnifying glass icon top right corner").
-  // Match on: platform + app + screen fingerprint + tool name (NOT exact selector).
+  // Match on: namespace + platform + app + appVersion + screen fingerprint + tool name (NOT exact selector).
   // When a match is found, keep the selector with the highest successCount.
+  const entryNs = entry.namespace ?? 'default';
   const existing = store.entries.find(
     (e) =>
+      (e.namespace ?? 'default') === entryNs &&
       e.platform === entry.platform &&
       e.appId === entry.appId &&
+      (e.appVersion ?? '') === (entry.appVersion ?? '') &&
       e.screenFingerprint === entry.screenFingerprint &&
       e.action.toolName === entry.action.toolName
   );
@@ -112,8 +125,11 @@ export function addTrajectory(
   };
   store.entries.push(full);
 
-  // Evict if over per-app limit
-  const appEntries = store.entries.filter((e) => e.appId === entry.appId);
+  // Evict if over per-(namespace,app) limit. Scoping eviction by namespace
+  // prevents a chatty namespace from pushing another's entries out.
+  const appEntries = store.entries.filter(
+    (e) => e.appId === entry.appId && (e.namespace ?? 'default') === entryNs
+  );
   if (appEntries.length > MAX_ENTRIES_PER_APP) {
     // Sort by effective confidence, remove the weakest
     appEntries.sort((a, b) => getEffectiveConfidence(a) - getEffectiveConfidence(b));

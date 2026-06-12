@@ -1055,6 +1055,24 @@ async function main() {
       // Track the actual goal being executed so reconciliation uses the rewritten goal, not the original
       subGoal.executedAs = effectiveGoal;
 
+      // ── App-ID propagation (Fix B) ────────────────────
+      // If we still don't know the target app, try to extract it from the
+      // current sub-goal text. The planner often produces a sub-goal like
+      // "Launch the YouTube app" even when the user's original goal didn't
+      // contain "open|launch|start". Resolving here means every subsequent
+      // sub-goal can stamp recorder entries with a real appId.
+      if (!journeyAppId) {
+        const { extractAppIdFromText } = await import('./memory/fingerprint.js');
+        journeyAppId =
+          extractAppIdFromText(effectiveGoal) ||
+          (() => {
+            const m = effectiveGoal.match(
+              /(?:open|launch|start|use|in)\s+(?:the\s+)?(\w[\w\s]*?)(?:\s+app|\s+and\b|$)/i
+            );
+            return m ? (appResolver.resolve(m[1].trim()) ?? undefined) : undefined;
+          })();
+      }
+
       emitJson({
         event: 'goal_start',
         data: { goal: effectiveGoal, subGoalIndex: subGoalIdx, totalSubGoals: executor.all.length },
@@ -1113,6 +1131,34 @@ async function main() {
         journeyInputTokens += result.totalTokens.input;
         journeyOutputTokens += result.totalTokens.output;
         journeyCost += result.totalTokens.cost;
+      }
+
+      // ── App-ID propagation (Fix B, continued) ─────────
+      // After each sub-goal, harvest the appId from any launch_app call or
+      // from a com.X.Y pattern in step results / final reason. This lets the
+      // very first sub-goal ("Launch the YouTube app") establish the app for
+      // every sub-goal that follows.
+      if (!journeyAppId) {
+        const { extractAppIdFromText } = await import('./memory/fingerprint.js');
+        for (const step of result.history) {
+          const launchAppId = step.decision?.args?.appId;
+          if (
+            step.decision?.toolName === 'launch_app' &&
+            typeof launchAppId === 'string' &&
+            launchAppId
+          ) {
+            journeyAppId = launchAppId;
+            break;
+          }
+          const fromResult = extractAppIdFromText(step.result ?? '');
+          if (fromResult) {
+            journeyAppId = fromResult;
+            break;
+          }
+        }
+        if (!journeyAppId) {
+          journeyAppId = extractAppIdFromText(result.reason ?? '') ?? journeyAppId;
+        }
       }
 
       emitJson({
