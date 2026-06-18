@@ -566,6 +566,7 @@ export async function visionExecute(
     const visResponse = await client.isElementVisible(imageBase64, visQuery, true);
     logTiming('isElementVisible', Math.round(performance.now() - t0));
     let visible = false;
+    let explanation: string | undefined;
     try {
       const parsed = JSON.parse(
         visResponse
@@ -574,6 +575,7 @@ export async function visionExecute(
           .trim()
       );
       visible = parsed.conditionSatisfied === true;
+      if (typeof parsed.explanation === 'string') explanation = parsed.explanation.trim();
     } catch {
       visible = /\btrue\b/i.test(visResponse) && !/\bfalse\b/i.test(visResponse);
     }
@@ -582,8 +584,8 @@ export async function visionExecute(
       result: {
         success: visible,
         message: visible
-          ? `Assertion passed (via vision)`
-          : `Assertion failed: not verified on screen`,
+          ? `Assertion passed (via vision)${explanation ? ` — ${explanation}` : ''}`
+          : `Assertion failed: ${explanation || 'not verified on screen'}`,
       },
     };
   }
@@ -788,6 +790,7 @@ export async function visionExecute(
     const visResponse = await client.isElementVisible(imageBase64, assertTarget, true);
     logTiming('isElementVisible', Math.round(performance.now() - t2));
     let visible = false;
+    let explanation: string | undefined;
     const visJsonStr = visResponse
       .replace(/^```(?:json)?\s*\n?/i, '')
       .replace(/\n?```\s*$/i, '')
@@ -795,6 +798,7 @@ export async function visionExecute(
     try {
       const parsed = JSON.parse(visJsonStr);
       visible = parsed.conditionSatisfied === true;
+      if (typeof parsed.explanation === 'string') explanation = parsed.explanation.trim();
     } catch {
       visible = /\btrue\b/i.test(visResponse) && !/\bfalse\b/i.test(visResponse);
     }
@@ -803,8 +807,8 @@ export async function visionExecute(
       result: {
         success: visible,
         message: visible
-          ? `Assertion passed (via vision)`
-          : `Assertion failed: not verified on screen`,
+          ? `Assertion passed (via vision)${explanation ? ` — ${explanation}` : ''}`
+          : `Assertion failed: ${explanation || 'not verified on screen'}`,
       },
     };
   }

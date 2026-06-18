@@ -49,6 +49,17 @@ const envSchema = z.object({
 
   MAX_STEPS: z.coerce.number().default(30),
   STEP_DELAY: z.coerce.number().default(500),
+
+  /**
+   * Implicit wait for element readiness before an action (tap/type/verify/scroll)
+   * is performed. The target is polled until it is present on screen or this
+   * budget is exhausted — so callers don't need explicit `wait`/`wait until …`
+   * steps between actions. Default 10 s. Set to 0 to disable implicit waiting
+   * (single-shot, fail-fast). Applies to both DOM and vision modes.
+   */
+  WAIT_TIMEOUT: z.coerce.number().default(10_000),
+  /** Poll cadence (ms) for the implicit wait above. Default 300 ms. */
+  WAIT_INTERVAL: z.coerce.number().default(300),
   MAX_ELEMENTS: z.coerce.number().default(40),
   MAX_HISTORY_STEPS: z.coerce.number().default(10),
   /** Milliseconds before an LLM request is aborted. Default 60 s. Set to 0 to disable. */
@@ -56,6 +67,14 @@ const envSchema = z.object({
 
   VISION_MODE: z.enum(['always', 'fallback', 'never']).default('fallback'),
   LOG_DIR: z.string().default('logs'),
+
+  /**
+   * Default directory for exported SDK test specs (from `--export` and the
+   * playground's `/export <name>.test.ts`). Bare filenames land here; paths
+   * with a directory component (e.g. `./tests/foo.test.ts` or `/abs/path`)
+   * are used verbatim. Override per-run via the `--export-dir` CLI flag.
+   */
+  EXPORT_DIR: z.string().default('.appclaw/exports'),
 
   /** Gemini API key for Stark vision (optional if GEMINI_API_KEY is set). */
   STARK_VISION_API_KEY: z.string().default(''),

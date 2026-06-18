@@ -17,6 +17,8 @@ export interface PreprocessResult {
   message?: string;
   /** Resolved package / bundle ID when action is 'launch' */
   appId?: string;
+  /** Human-friendly app name as the user wrote it (e.g. "YouTube") — useful for replay/test export */
+  appName?: string;
 }
 
 /**
@@ -50,6 +52,7 @@ export async function preprocessAction(
           action: 'launch',
           message: `Launched ${appName} (${packageId})`,
           appId: packageId,
+          appName,
         };
       }
       return { handled: false };
@@ -81,6 +84,7 @@ export async function preprocessAction(
           action: 'launch',
           message: `Launched ${appName} (${packageId})`,
           appId: packageId,
+          appName,
         };
       }
       return { handled: false };

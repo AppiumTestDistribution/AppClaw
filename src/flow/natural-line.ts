@@ -242,14 +242,31 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     return { kind: 'wait', seconds: 2, verbatim };
   }
 
+  // "wait/sleep/pause [for] <N> [unit]" — time-delay wait.
+  // Accepts the full set of natural English unit phrasings (singular + plural,
+  // long + short). Listed longest-first so the regex engine matches greedily.
+  // Without `second` (singular) in this list, `wait for 1 second` falls through
+  // to the LLM parser, which can mis-classify it as `waitUntil "1 second" visible`.
   const waitMatch = t.match(
-    /^(?:wait|sleep|pause)(?:\s+for)?\s+(\d+(?:\.\d+)?)\s*(s|sec|seconds|ms|milliseconds)?$/i
+    /^(?:wait|sleep|pause)(?:\s+for)?\s+(\d+(?:\.\d+)?)\s*(milliseconds|millisecond|seconds|second|minutes|minute|hours|hour|ms|sec|min|hr|h|s)?$/i
   );
   if (waitMatch) {
     const n = Number(waitMatch[1]);
     if (!Number.isFinite(n) || n < 0) return null;
     const unit = (waitMatch[2] ?? 's').toLowerCase();
-    const seconds = unit.startsWith('m') ? n / 1000 : n;
+    // Order matters: check `ms`/`milli` before generic `m*` (minute) prefixes,
+    // and `min` before generic `m*` for the same reason. Without this, `1 minute`
+    // would be (mis)interpreted as 1 millisecond by the old `startsWith('m')` check.
+    let seconds: number;
+    if (unit === 'ms' || unit.startsWith('milli')) {
+      seconds = n / 1000;
+    } else if (unit.startsWith('min')) {
+      seconds = n * 60;
+    } else if (unit.startsWith('h')) {
+      seconds = n * 3600;
+    } else {
+      seconds = n; // s | sec | second(s) | unitless default
+    }
     return { kind: 'wait', seconds, verbatim };
   }
 

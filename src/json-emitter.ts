@@ -72,6 +72,7 @@ export type JsonEvent =
         workers?: unknown[];
       };
     }
+  | { event: 'export'; data: { path: string } }
   | { event: 'error'; data: { message: string; detail?: string } }
   | { event: 'done'; data: { success: boolean; totalSteps: number; totalCost?: number } };
 

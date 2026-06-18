@@ -44,7 +44,12 @@ import type { RunArtifactCollector } from '../report/writer.js';
 import { lastVisionScreenshot } from './vision-execute.js';
 import { resolveAppId } from '../agent/preprocessor.js';
 import { pngDimensionsFromBase64 } from '../vision/png-dimensions.js';
-import { getCachedScreenSize, getScreenSizeForStark } from '../vision/window-size.js';
+import {
+  getCachedScreenSize,
+  getScreenSizeForStark,
+  getDevicePlatform,
+} from '../vision/window-size.js';
+import type { ScrollDistance } from '../sdk/types.js';
 import chalk from 'chalk';
 import * as ui from '../ui/terminal.js';
 import { resetVisionTokens, getVisionTokens } from '../vision/vision-token-tracker.js';
@@ -91,6 +96,66 @@ const DEFAULT_TAP_POLL_MS = 300;
 export interface FlowTapPollOptions {
   maxAttempts: number;
   intervalMs: number;
+}
+
+/** Per-step scroll/swipe overrides threaded down from the SDK's run() options. */
+export interface ScrollControl {
+  /** Override the repeat count (swipe) / max scroll attempts (scroll-until). */
+  times?: number;
+  /** Override how far each scroll/swipe travels. */
+  distance?: ScrollDistance;
+}
+
+/** Fraction of the screen each scroll/swipe spans. `medium` matches appium-mcp's default (~0.6). */
+const SCROLL_DISTANCE_FRACTION: Record<ScrollDistance, number> = {
+  short: 0.3,
+  medium: 0.6,
+  full: 0.9,
+};
+
+/**
+ * Compute custom start/end coordinates for a distance-controlled scroll/swipe.
+ *
+ * appium-mcp's plain `scroll`/`swipe` actions take a `direction` and use a fixed
+ * ~60% span — `scrollDistance` is honoured only by `scroll_to_element`. So to
+ * vary the distance we pass explicit coordinates instead of a direction.
+ *
+ * Because appium-mcp internally FLIPS the vertical direction on Android (its
+ * scrollbar convention) and that flip only runs in the direction-based path, we
+ * replicate it here so AppClaw's "swipe down = reveal content below" convention
+ * is preserved when we drive by coordinates.
+ *
+ * Returns null when the screen size isn't cached yet — callers fall back to the
+ * direction-based gesture.
+ */
+function scrollCoordsForDistance(
+  mcp: MCPClient,
+  direction: 'up' | 'down' | 'left' | 'right',
+  distance: ScrollDistance
+): { x: number; y: number; endX: number; endY: number } | null {
+  const size = getCachedScreenSize(mcp);
+  if (!size) return null;
+  const { width, height } = size;
+  const fraction = SCROLL_DISTANCE_FRACTION[distance];
+  const centerX = Math.floor(width / 2);
+  const centerY = Math.floor(height / 2);
+  const isVertical = direction === 'up' || direction === 'down';
+
+  let dir = direction;
+  if (isVertical && getDevicePlatform(mcp) === 'android') {
+    dir = direction === 'up' ? 'down' : 'up';
+  }
+
+  if (isVertical) {
+    const half = Math.floor((height * fraction) / 2);
+    return dir === 'up'
+      ? { x: centerX, y: centerY + half, endX: centerX, endY: centerY - half }
+      : { x: centerX, y: centerY - half, endX: centerX, endY: centerY + half };
+  }
+  const half = Math.floor((width * fraction) / 2);
+  return dir === 'left'
+    ? { x: centerX + half, y: centerY, endX: centerX - half, endY: centerY }
+    : { x: centerX - half, y: centerY, endX: centerX + half, endY: centerY };
 }
 
 export interface RunYamlFlowResult {
@@ -292,27 +357,50 @@ async function tapByLabel(
   poll: FlowTapPollOptions
 ): Promise<ActionResult> {
   // ── Vision-first mode: skip DOM entirely ──
+  // Poll the full budget so the element is implicitly waited for until it
+  // renders (or the wait budget is exhausted) — no explicit `wait` needed.
   if (isVisionMode()) {
-    for (let attempt = 0; attempt <= 2; attempt++) {
+    for (let attempt = 0; attempt < poll.maxAttempts; attempt++) {
       const visionTap = await tryTapByVision(mcp, label);
       if (visionTap) return visionTap;
-      if (attempt < 2) await sleep(poll.intervalMs);
+      if (attempt + 1 < poll.maxAttempts) {
+        ui.printAgentBullet(
+          `auto-wait: "${label}" not located by vision yet — re-capturing screenshot ` +
+            `(attempt ${attempt + 2}/${poll.maxAttempts}, every ${poll.intervalMs}ms)`
+        );
+        await sleep(poll.intervalMs);
+      }
     }
     return { success: false, message: `No matching element for "${label}" (vision mode)` };
   }
 
   // ── DOM mode: DOM-first with vision fallback ──
-  // If the first attempt finds zero DOM matches, skip further polls and
-  // fall through to vision immediately (the element isn't text-based).
+  // Poll the full budget — a "no_match" means the element hasn't rendered YET,
+  // so we keep re-checking (implicit wait) instead of bailing on the first miss.
+  // On the FIRST no_match we try vision once: catches icon-only elements that
+  // are already on screen (no text to match) without burning the whole wait
+  // budget on DOM polls before falling over to vision.
+  let triedVisionEarly = false;
   for (let attempt = 0; attempt < poll.maxAttempts; attempt++) {
     const domTap = await tryTapByLabelOnDom(mcp, label);
-    if (domTap === 'no_match') break; // not in DOM at all — skip to vision
-    if (domTap) return domTap;
+    if (domTap && domTap !== 'no_match') return domTap;
+    if (domTap === 'no_match' && !triedVisionEarly && isVisionLocateEnabled()) {
+      triedVisionEarly = true;
+      const visionTap = await tryTapByVision(mcp, label);
+      if (visionTap) return visionTap;
+    }
     if (attempt + 1 < poll.maxAttempts) {
+      const why = domTap === 'no_match' ? 'not in page source yet' : 'found but not yet tappable';
+      ui.printAgentBullet(
+        `auto-wait: "${label}" ${why} — re-reading page source ` +
+          `(attempt ${attempt + 2}/${poll.maxAttempts}, every ${poll.intervalMs}ms)`
+      );
       await sleep(poll.intervalMs);
     }
   }
 
+  // Last resort: one more vision attempt after the wait budget is exhausted
+  // (the element may have only just rendered on the final DOM poll).
   if (isVisionLocateEnabled()) {
     ui.printAgentBullet(`"${label}" not found in page source, trying vision…`);
     const visionTap = await tryTapByVision(mcp, label);
@@ -375,12 +463,13 @@ async function flowTypeText(
   mcp: MCPClient,
   text: string,
   target?: string,
-  deviceUdid?: string
+  deviceUdid?: string,
+  poll: FlowTapPollOptions = { maxAttempts: 10, intervalMs: 300 }
 ): Promise<ActionResult> {
   if (mcpDebug) ui.printAgentBullet(`[type] text="${text}", target=${target ?? '(none)'}`);
-  // ── If a target field is specified, tap it first to focus ──
+  // ── If a target field is specified, tap it first to focus (implicit wait) ──
   if (target) {
-    const tapResult = await tapByLabel(mcp, target, { maxAttempts: 10, intervalMs: 300 });
+    const tapResult = await tapByLabel(mcp, target, poll);
     if (!tapResult.success) {
       return { success: false, message: `Could not find target field "${target}" to type into` };
     }
@@ -772,8 +861,10 @@ async function scrollUntilVisible(
   text: string,
   direction: 'up' | 'down' | 'left' | 'right',
   maxScrolls: number,
-  poll: FlowTapPollOptions
+  poll: FlowTapPollOptions,
+  distance?: ScrollDistance
 ): Promise<ActionResult> {
+  const customCoords = distance ? scrollCoordsForDistance(mcp, direction, distance) : null;
   const visionFirst = isVisionMode();
   const useVision = isVisionLocateEnabled();
 
@@ -799,7 +890,10 @@ async function scrollUntilVisible(
   }
 
   for (let scroll = 0; scroll < maxScrolls; scroll++) {
-    await mcp.callTool('appium_gesture', { action: 'scroll', direction });
+    await mcp.callTool('appium_gesture', {
+      action: 'scroll',
+      ...(customCoords ? customCoords : { direction }),
+    });
     await sleep(800);
 
     if (await isVisible()) {
@@ -926,7 +1020,8 @@ export async function executeStep(
   meta: FlowMeta,
   appResolver: AppResolver | undefined,
   tapPoll: FlowTapPollOptions,
-  deviceUdid?: string
+  deviceUdid?: string,
+  scroll?: ScrollControl
 ): Promise<ActionResult> {
   // Vision mode: natural language steps (verbatim set) use visionExecute with the original
   // instruction — same path as the playground — for precise context-aware element location.
@@ -937,11 +1032,31 @@ export async function executeStep(
     (step.kind === 'tap' || step.kind === 'type' || step.kind === 'assert')
   ) {
     const { visionExecute } = await import('./vision-execute.js');
-    const vr = await visionExecute(mcp, step.verbatim, appResolver, deviceUdid);
-    if (vr && vr.result.message !== '__needs_executeStep__') {
-      return vr.result;
+    // Implicit wait: re-capture the screen and re-locate until the element is
+    // found or the poll budget is exhausted. Mirrors tapByLabel's DOM polling so
+    // vision-mode actions also wait for not-yet-rendered elements (e.g. a screen
+    // that's still loading) instead of failing on the first single-shot attempt.
+    for (let attempt = 0; attempt < tapPoll.maxAttempts; attempt++) {
+      const vr = await visionExecute(mcp, step.verbatim, appResolver, deviceUdid);
+      // null = no vision API key, or needs executeStep — fall through to DOM path.
+      if (!vr || vr.result.message === '__needs_executeStep__') break;
+      // Found (or a get-info answer) → done. Get-info questions never retry.
+      if (vr.result.success || vr.isGetInfo) return vr.result;
+      // Not located yet — wait a beat and re-observe, unless the budget is spent.
+      if (attempt + 1 < tapPoll.maxAttempts) {
+        ui.printAgentBullet(
+          `auto-wait: "${step.verbatim}" not on screen yet — re-capturing screenshot ` +
+            `(attempt ${attempt + 2}/${tapPoll.maxAttempts}, every ${tapPoll.intervalMs}ms)`
+        );
+        await sleep(tapPoll.intervalMs);
+        continue;
+      }
+      ui.printAgentBullet(
+        `auto-wait: gave up on "${step.verbatim}" after ${tapPoll.maxAttempts} attempts ` +
+          `(~${Math.round((tapPoll.maxAttempts * tapPoll.intervalMs) / 1000)}s)`
+      );
+      return vr.result; // budget exhausted — return the last (failed) result
     }
-    // null = no vision API key, or needs executeStep — fall through
   }
 
   switch (step.kind) {
@@ -983,7 +1098,7 @@ export async function executeStep(
     case 'longPress':
       return longPressByLabel(mcp, step.label, step.duration);
     case 'type':
-      return flowTypeText(mcp, step.text, step.target, deviceUdid);
+      return flowTypeText(mcp, step.text, step.target, deviceUdid, tapPoll);
     case 'enter':
       return pressEnterKey(mcp);
     case 'back':
@@ -994,13 +1109,18 @@ export async function executeStep(
       return { success: true, message: 'Home' };
     case 'swipe': {
       const dir = step.direction;
-      const count = step.repeat ?? 1;
+      const count = scroll?.times ?? step.repeat ?? 1;
       const gestureAction = dir === 'left' || dir === 'right' ? 'swipe' : 'scroll';
+      // Distance control: appium-mcp ignores scrollDistance for plain scroll/swipe,
+      // so a custom distance is driven by explicit start/end coordinates instead.
+      const customCoords = scroll?.distance
+        ? scrollCoordsForDistance(mcp, dir, scroll.distance)
+        : null;
       let lastError = '';
       for (let i = 0; i < count; i++) {
         const result = await mcp.callTool('appium_gesture', {
           action: gestureAction,
-          direction: dir,
+          ...(customCoords ? customCoords : { direction: dir }),
         });
         const text =
           result.content
@@ -1013,9 +1133,10 @@ export async function executeStep(
         }
         if (i < count - 1) await sleep(300);
       }
+      const distanceNote = scroll?.distance ? ` (${scroll.distance})` : '';
       return {
         success: true,
-        message: count > 1 ? `Swiped ${dir} ${count} times` : `Swiped ${dir}`,
+        message: (count > 1 ? `Swiped ${dir} ${count} times` : `Swiped ${dir}`) + distanceNote,
       };
     }
     case 'zoom': {
@@ -1191,7 +1312,14 @@ export async function executeStep(
     case 'assert':
       return assertTextVisible(mcp, step.text, tapPoll);
     case 'scrollAssert':
-      return scrollUntilVisible(mcp, step.text, step.direction, step.maxScrolls, tapPoll);
+      return scrollUntilVisible(
+        mcp,
+        step.text,
+        step.direction,
+        scroll?.times ?? step.maxScrolls,
+        tapPoll,
+        scroll?.distance
+      );
     case 'getInfo': {
       const infoApiKey = getStarkVisionApiKey();
       const infoBaseUrl = getStarkVisionBaseUrl();

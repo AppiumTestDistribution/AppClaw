@@ -9,6 +9,7 @@ describe('SDK E2E — teardown after use', () => {
       apiKey: process.env.LLM_API_KEY,
       platform: 'android',
       video: true,
+      mcpDebug: false,
     });
 
     await app.run('open YouTube app');
@@ -18,8 +19,7 @@ describe('SDK E2E — teardown after use', () => {
     await app.run('wait 2 seconds');
     await app.run('click on the first result from the list');
     await app.run('wait 3 seconds');
-    await app.run('scroll down 2 times');
-    await app.run('verify if the screen has video uploaded by TestMu AI');
-    await app.teardown();
+    await app.run('scroll down 3 times');
+    await app.verify('check the screen has video uploaded by IBM');
   }, 90000);
 });
