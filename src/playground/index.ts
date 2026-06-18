@@ -8,7 +8,7 @@
  */
 
 import readline from 'node:readline';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import chalk from 'chalk';
 import { stringify } from 'yaml';
@@ -19,11 +19,12 @@ import { extractText } from '../mcp/tools.js';
 import { setupDevice } from '../device/index.js';
 import { AppResolver } from '../agent/app-resolver.js';
 import { tryParseNaturalFlowLine } from '../flow/natural-line.js';
-import { resolveNaturalStep } from '../flow/llm-parser.js';
-import { visionExecute } from '../flow/vision-execute.js';
+import { runOneInstruction, DEFAULT_MIN_MATCH_SCORE } from '../flow/run-instruction.js';
 import { resetVisionTokens, getVisionTokens } from '../vision/vision-token-tracker.js';
 import { MODEL_PRICING, DEFAULT_MODELS } from '../constants.js';
 import { getStarkVisionModel } from '../vision/locate-enabled.js';
+import { generateSdkTestFromInstructions } from '../sdk/goal-export.js';
+import { stepAction, stepTarget, printStepResult } from '../ui/step-printer.js';
 import type { FlowStep, FlowMeta } from '../flow/types.js';
 import type { MCPClient } from '../mcp/types.js';
 import {
@@ -39,7 +40,7 @@ import {
 import * as ui from '../ui/terminal.js';
 import Table from 'cli-table3';
 
-import { executeStep, type FlowTapPollOptions } from '../flow/run-yaml-flow.js';
+// executeStep / FlowTapPollOptions are now consumed by src/flow/run-instruction.js
 import { loadStore, getTrajectoryStorePath } from '../memory/store.js';
 import { loadProcedures, getProceduresStorePath } from '../memory/procedures.js';
 
@@ -77,87 +78,8 @@ function llmCost(inputTokens: number, outputTokens: number): number {
 
 // ─── Formatting helpers ─────────────────────────────────
 
-/** Short action word for a step kind */
-function stepAction(step: FlowStep): string {
-  switch (step.kind) {
-    case 'launchApp':
-      return 'launch';
-    case 'openApp':
-      return 'open';
-    case 'tap':
-      return 'tap';
-    case 'longPress':
-      return 'longpress';
-    case 'type':
-      return 'type';
-    case 'swipe':
-      return 'swipe';
-    case 'zoom':
-      return 'zoom';
-    case 'wait':
-      return 'wait';
-    case 'waitUntil':
-      return 'wait';
-    case 'enter':
-      return 'enter';
-    case 'back':
-      return 'back';
-    case 'home':
-      return 'home';
-    case 'assert':
-      return 'assert';
-    case 'scrollAssert':
-      return 'scroll';
-    case 'drag':
-      return 'drag';
-    case 'getInfo':
-      return 'info';
-    case 'done':
-      return 'done';
-  }
-}
-
-/** Target description for a step */
-function stepTarget(step: FlowStep): string {
-  switch (step.kind) {
-    case 'launchApp':
-      return 'app';
-    case 'openApp':
-      return step.query;
-    case 'tap':
-      return `"${step.label}"`;
-    case 'longPress':
-      return `"${step.label}"${step.duration != null ? ` (${step.duration}ms)` : ''}`;
-    case 'type':
-      return `"${step.text}"${step.target ? ` → ${step.target}` : ''}`;
-    case 'swipe':
-      return step.direction;
-    case 'zoom':
-      return `${step.scale >= 1 ? 'in' : 'out'} (${step.scale}x)${step.target ? ` on "${step.target}"` : ''}`;
-    case 'wait':
-      return `${step.seconds}s`;
-    case 'waitUntil':
-      if (step.condition === 'screenLoaded') return `screen loaded (${step.timeoutSeconds}s)`;
-      if (step.condition === 'gone') return `"${step.text}" gone (${step.timeoutSeconds}s)`;
-      return `"${step.text}" visible (${step.timeoutSeconds}s)`;
-    case 'enter':
-      return '';
-    case 'back':
-      return '';
-    case 'home':
-      return '';
-    case 'assert':
-      return `"${step.text}"`;
-    case 'scrollAssert':
-      return `"${step.text}" ${step.direction} ×${step.maxScrolls}`;
-    case 'drag':
-      return `"${step.from}" → "${step.to}"`;
-    case 'getInfo':
-      return `"${step.query}"`;
-    case 'done':
-      return step.message ?? '';
-  }
-}
+// `stepAction` and `stepTarget` live in src/ui/step-printer.ts so the SDK's
+// StepRunner can use the same formatting. Imported below from that module.
 
 function stepToDisplay(step: FlowStep, index: number): string {
   const num = theme.brand(`${(index + 1).toString().padStart(2)}.`);
@@ -205,24 +127,6 @@ function spinnerDetail(step: FlowStep): string {
   }
 }
 
-function printStepResult(stepNum: number, step: FlowStep, success: boolean, message: string): void {
-  const action = stepAction(step);
-  const target = stepTarget(step);
-  const icon = success ? theme.success('✓') : theme.error('✗');
-
-  const actionBadge = success
-    ? chalk.bgHex('#7C6FFF').white.bold(` ${action} `)
-    : chalk.bgRed.white.bold(` ${action} `);
-
-  const statusDot = success ? chalk.green('●') : chalk.red('●');
-
-  // Compact single block
-  console.log(`  ${icon} ${theme.dim(`#${stepNum}`)} ${actionBadge} ${theme.white(target)}`);
-  if (message) {
-    console.log(`    ${statusDot} ${success ? theme.success(message) : theme.error(message)}`);
-  }
-}
-
 function printStepSuccess(stepNum: number, step: FlowStep, message: string): void {
   printStepResult(stepNum, step, true, message);
 }
@@ -234,17 +138,11 @@ function printStepFail(stepNum: number, step: FlowStep, message: string): void {
 /**
  * Minimum matchScore (1-10) required to execute a tap in the playground.
  * Below this threshold, vision found a loose match — show suggestion but don't execute.
+ *
+ * Re-exported from `src/flow/run-instruction.ts` so the SDK and playground share
+ * one source of truth (used to be defined twice, leading to drift risk).
  */
-const MIN_MATCH_SCORE = 4;
-
-/**
- * Build a helpful suggestion when a tap is not found or matched loosely.
- * Only used as a fallback when vResult.closestMatch is not available.
- */
-function buildVisionSuggestion(instruction: string, resolvedLabel: string): string | null {
-  if (!resolvedLabel || resolvedLabel === instruction) return null;
-  return `Closest match: "${resolvedLabel}". Try: tap on ${resolvedLabel}`;
-}
+const MIN_MATCH_SCORE = DEFAULT_MIN_MATCH_SCORE;
 
 /** Convert step to YAML — preserve the user's original natural language input. */
 function stepToYaml(step: FlowStep): unknown {
@@ -320,6 +218,55 @@ function buildYamlString(): string {
   return parts.join('\n') + '\n';
 }
 
+/**
+ * Whether the given filename should be exported as a vitest spec (SDK test
+ * format) rather than the default YAML flow format.
+ */
+function isSdkTestFilename(name: string): boolean {
+  return /\.(?:test|spec)\.(?:m|c)?[jt]sx?$/i.test(name) || /\.(?:m|c)?ts$/i.test(name);
+}
+
+/**
+ * Resolve the final on-disk path for an `/export` write — same rules as the
+ * CLI's `--export`. Bare filenames land in the configured directory (EXPORT_DIR);
+ * paths with a directory hint (./tests/foo.test.ts, /abs/...) are used verbatim.
+ *
+ * The configured directory differs by format: SDK tests go to EXPORT_DIR, YAML
+ * flows stay in cwd (mirrors the original playground behaviour).
+ */
+function resolvePlaygroundExportPath(filename: string, asSdkTest: boolean): string {
+  if (path.isAbsolute(filename)) return filename;
+  if (filename.includes('/') || filename.includes(path.sep)) {
+    return path.resolve(process.cwd(), filename);
+  }
+  if (asSdkTest) {
+    const dir = loadConfig().EXPORT_DIR;
+    return path.resolve(process.cwd(), dir, filename);
+  }
+  return path.resolve(process.cwd(), filename);
+}
+
+/**
+ * Build the vitest spec body for the current playground state.
+ * Each recorded step's `verbatim` (the user's original natural-language text)
+ * becomes one `await app.run(...)` call — no translation needed because the
+ * playground already accepts the same syntax that `AppClaw.run()` does.
+ */
+function buildSdkTestString(): string {
+  const instructions = state.steps
+    .map((s) => s.verbatim?.trim())
+    .filter((v): v is string => !!v && v.length > 0);
+  return generateSdkTestFromInstructions({
+    instructions,
+    config: {
+      describeName: state.meta.name || 'Recorded flow',
+      ...(state.meta.platform === 'ios' || state.meta.platform === 'android'
+        ? { platform: state.meta.platform }
+        : {}),
+    },
+  });
+}
+
 function printStepList(): void {
   if (state.steps.length === 0) return;
 
@@ -383,16 +330,9 @@ function printStepList(): void {
   console.log();
 }
 
-// ─── Step execution ─────────────────────────────────────
-
-async function runStepOnDevice(step: FlowStep): Promise<{ success: boolean; message: string }> {
-  if (!state.mcp) {
-    return { success: false, message: 'Not connected to device' };
-  }
-
-  const tapPoll: FlowTapPollOptions = { maxAttempts: 3, intervalMs: 300 };
-  return executeStep(state.mcp, step, state.meta, state.appResolver ?? undefined, tapPoll);
-}
+// Step execution is delegated to runOneInstruction() in src/flow/run-instruction.js.
+// The playground used to have its own runStepOnDevice() wrapper; that became dead
+// code after the shared pipeline refactor.
 
 // ─── Memory inspection ──────────────────────────────────
 
@@ -555,21 +495,29 @@ const COMMANDS: Record<string, { desc: string; run: (arg: string) => Promise<voi
     },
   },
   '/export': {
-    desc: 'Export steps to a YAML file (e.g. /export my-flow.yaml)',
+    desc:
+      'Export steps. YAML by default (e.g. /export my-flow.yaml) or SDK test ' +
+      'by extension (.test.ts/.spec.ts/.ts).',
     run: (arg: string) => {
       if (state.steps.length === 0) {
         console.log(`\n  ${theme.error('✗')} No steps to export.\n`);
         return;
       }
       const filename = arg.trim() || `flow-${Date.now()}.yaml`;
-      const filepath = filename.startsWith('/') ? filename : path.resolve(process.cwd(), filename);
-      const yamlStr = buildYamlString();
-      writeFileSync(filepath, yamlStr, 'utf-8');
+      const asSdkTest = isSdkTestFilename(filename);
+      const filepath = resolvePlaygroundExportPath(filename, asSdkTest);
+      const body = asSdkTest ? buildSdkTestString() : buildYamlString();
+      mkdirSync(path.dirname(filepath), { recursive: true });
+      writeFileSync(filepath, body, 'utf-8');
+      const runHint = asSdkTest
+        ? `vitest run ${path.relative(process.cwd(), filepath)}`
+        : `appclaw --flow ${path.relative(process.cwd(), filepath)}`;
+      const formatLabel = asSdkTest ? 'SDK test (vitest)' : 'YAML flow';
       const exportContent = [
-        `${chalk.green.bold(`${state.steps.length}`)} ${chalk.dim('steps exported')}`,
+        `${chalk.green.bold(`${state.steps.length}`)} ${chalk.dim('steps exported as')} ${chalk.white(formatLabel)}`,
         '',
         `${chalk.dim('File:')} ${chalk.white(filepath)}`,
-        `${chalk.dim('Run:')}  ${chalk.cyan(`appclaw --flow ${path.relative(process.cwd(), filepath)}`)}`,
+        `${chalk.dim('Run:')}  ${chalk.cyan(runHint)}`,
       ].join('\n');
       console.log();
       printBox(exportContent, {
@@ -1016,9 +964,8 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
       if (line.startsWith('/export')) {
         const arg = line.slice(7).trim();
         const filename = arg || `flow-${Date.now()}.yaml`;
-        const filepath = filename.startsWith('/')
-          ? filename
-          : path.resolve(process.cwd(), filename);
+        const asSdkTest = isSdkTestFilename(filename);
+        const filepath = resolvePlaygroundExportPath(filename, asSdkTest);
         if (state.steps.length === 0) {
           emitJson({
             event: 'flow_step',
@@ -1031,8 +978,9 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
             },
           });
         } else {
-          const yamlStr = buildYamlString();
-          writeFileSync(filepath, yamlStr, 'utf-8');
+          const body = asSdkTest ? buildSdkTestString() : buildYamlString();
+          mkdirSync(path.dirname(filepath), { recursive: true });
+          writeFileSync(filepath, body, 'utf-8');
           emitJson({
             event: 'flow_step',
             data: {
@@ -1111,78 +1059,12 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
 
     const stepNum = state.steps.length + 1;
 
-    // Vision mode execution
-    if (state.mcp && Config.AGENT_MODE === 'vision') {
-      try {
-        const vResult = await visionExecute(state.mcp, line, undefined, undefined, {
-          minMatchScore: MIN_MATCH_SCORE,
-        });
-        if (vResult) {
-          if (vResult.isGetInfo) {
-            emitJson({
-              event: 'step',
-              data: {
-                step: stepNum,
-                action: 'getInfo',
-                target: line,
-                success: true,
-                message: vResult.getInfoAnswer || vResult.result.message,
-              },
-            });
-            processing = false;
-            return;
-          }
-          if (vResult.result.message === '__needs_executeStep__') {
-            const execResult = await runStepOnDevice(vResult.step);
-            if (execResult.success) {
-              state.steps.push(vResult.step);
-            }
-            emitJson({
-              event: 'step',
-              data: {
-                step: stepNum,
-                action: vResult.step.kind,
-                target: line,
-                success: execResult.success,
-                message: execResult.message,
-              },
-            });
-            processing = false;
-            return;
-          }
-          if (vResult.result.success) {
-            state.steps.push(vResult.step);
-          }
-          const suggestion =
-            !vResult.result.success && vResult.step.kind === 'tap' && vResult.closestMatch
-              ? `Closest match: "${vResult.closestMatch}". Try: tap on ${vResult.closestMatch}`
-              : null;
-          emitJson({
-            event: 'step',
-            data: {
-              step: stepNum,
-              action: vResult.step.kind,
-              target: line,
-              success: vResult.result.success,
-              message: suggestion
-                ? `${vResult.result.message}\n${suggestion}`
-                : vResult.result.message,
-            },
-          });
-          processing = false;
-          return;
-        }
-      } catch {
-        // Fall through to two-call path
-      }
-    }
-
-    // Two-call fallback: classify → execute
-    let parsed: FlowStep;
-    try {
-      const resolved = await resolveNaturalStep(line);
-      parsed = resolved.step;
-    } catch (err: any) {
+    // ── Per-line execution (JSON mode) ──
+    //
+    // Same pipeline as the interactive REPL — both delegate to runOneInstruction()
+    // so a fix to the instruction pipeline applies to all surfaces at once.
+    // Only the IO layer (emit JSON event vs print to terminal) differs here.
+    if (!state.mcp) {
       emitJson({
         event: 'step',
         data: {
@@ -1190,15 +1072,26 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
           action: 'error',
           target: line,
           success: false,
-          message: `Could not classify: ${err?.message ?? String(err)}`,
+          message: 'Not connected to device',
         },
       });
       processing = false;
       return;
     }
 
-    if (parsed.kind === 'getInfo') {
-      const infoAnswer = await handleGetInfo(parsed.query);
+    // Early-outs for bookkeeping-only steps that don't need device execution.
+    const earlyParse = tryParseNaturalFlowLine(line);
+    if (earlyParse?.kind === 'done') {
+      state.steps.push(earlyParse);
+      emitJson({
+        event: 'step',
+        data: { step: stepNum, action: 'done', target: line, success: true, message: 'recorded' },
+      });
+      processing = false;
+      return;
+    }
+    if (earlyParse?.kind === 'getInfo') {
+      const infoAnswer = await handleGetInfo(earlyParse.query);
       emitJson({
         event: 'step',
         data: {
@@ -1213,8 +1106,58 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
       return;
     }
 
-    if (parsed.kind === 'done') {
-      state.steps.push(parsed);
+    let outcome;
+    try {
+      outcome = await runOneInstruction(state.mcp, line, {
+        appResolver: state.appResolver ?? undefined,
+        minMatchScore: MIN_MATCH_SCORE,
+      });
+    } catch (err: any) {
+      emitJson({
+        event: 'step',
+        data: {
+          step: stepNum,
+          action: 'error',
+          target: line,
+          success: false,
+          message: err?.message ?? String(err),
+        },
+      });
+      processing = false;
+      return;
+    }
+
+    if (outcome.isGetInfo) {
+      emitJson({
+        event: 'step',
+        data: {
+          step: stepNum,
+          action: 'getInfo',
+          target: line,
+          success: true,
+          message: outcome.getInfoAnswer || outcome.result.message,
+        },
+      });
+      processing = false;
+      return;
+    }
+    if (outcome.step.kind === 'getInfo') {
+      const infoAnswer = await handleGetInfo(outcome.step.query);
+      emitJson({
+        event: 'step',
+        data: {
+          step: stepNum,
+          action: 'getInfo',
+          target: line,
+          success: true,
+          message: infoAnswer || 'No answer',
+        },
+      });
+      processing = false;
+      return;
+    }
+    if (outcome.step.kind === 'done') {
+      state.steps.push(outcome.step);
       emitJson({
         event: 'step',
         data: { step: stepNum, action: 'done', target: line, success: true, message: 'recorded' },
@@ -1223,33 +1166,23 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
       return;
     }
 
-    try {
-      const result = await runStepOnDevice(parsed);
-      if (result.success) {
-        state.steps.push(parsed);
-      }
-      emitJson({
-        event: 'step',
-        data: {
-          step: stepNum,
-          action: parsed.kind,
-          target: line,
-          success: result.success,
-          message: result.message,
-        },
-      });
-    } catch (err: any) {
-      emitJson({
-        event: 'step',
-        data: {
-          step: stepNum,
-          action: parsed.kind,
-          target: line,
-          success: false,
-          message: err?.message ?? String(err),
-        },
-      });
+    if (outcome.result.success) {
+      state.steps.push(outcome.step);
     }
+    const suggestion =
+      !outcome.result.success && outcome.step.kind === 'tap' && outcome.closestMatch
+        ? `Closest match: "${outcome.closestMatch}". Try: tap on ${outcome.closestMatch}`
+        : null;
+    emitJson({
+      event: 'step',
+      data: {
+        step: stepNum,
+        action: outcome.step.kind,
+        target: line,
+        success: outcome.result.success,
+        message: suggestion ? `${outcome.result.message}\n${suggestion}` : outcome.result.message,
+      },
+    });
 
     processing = false;
   });
@@ -1459,201 +1392,49 @@ async function processLine(line: string): Promise<void> {
     return;
   }
 
-  // ── Hybrid single-call path (vision mode) ──
-  // In vision mode: screenshot + instruction → one LLM call → classify + locate → execute.
-  // Falls back to two-call path (resolveNaturalStep → executeStep) for non-visual instructions.
-  if (state.mcp && Config.AGENT_MODE === 'vision') {
-    try {
-      ui.startSpinner('Executing', line);
-      resetVisionTokens();
-      const vResult = await visionExecute(state.mcp, line, undefined, undefined, {
-        minMatchScore: MIN_MATCH_SCORE,
-      });
-      ui.stopSpinner();
-
-      if (vResult) {
-        if (vResult.isGetInfo) {
-          const ans = vResult.getInfoAnswer || vResult.result.message;
-          const ansBody = vResult.getInfoExplanation
-            ? `${ans}\n\n${theme.dim(vResult.getInfoExplanation)}`
-            : ans;
-          console.log();
-          printPanel({ title: 'Answer', content: ansBody });
-          const vt = getVisionTokens();
-          if (vt.totalTokens > 0)
-            ui.printStepTokens(
-              vt.inputTokens,
-              vt.outputTokens,
-              vt.cachedTokens || undefined,
-              visionCost(vt.inputTokens, vt.outputTokens),
-              'vision'
-            );
-          console.log();
-          return;
-        }
-
-        if (vResult.result.message === '__needs_executeStep__') {
-          const stepNum = state.steps.length + 1;
-          ui.startSpinner(`[${stepNum}] ${vResult.step.kind}`, spinnerDetail(vResult.step));
-          const execResult = await runStepOnDevice(vResult.step);
-          ui.stopSpinner();
-          if (execResult.success) {
-            state.steps.push(vResult.step);
-            printStepSuccess(stepNum, vResult.step, execResult.message);
-          } else {
-            printStepFail(stepNum, vResult.step, execResult.message);
-            console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
-          }
-          const vt = getVisionTokens();
-          if (vt.totalTokens > 0)
-            ui.printStepTokens(
-              vt.inputTokens,
-              vt.outputTokens,
-              vt.cachedTokens || undefined,
-              visionCost(vt.inputTokens, vt.outputTokens),
-              'vision'
-            );
-          return;
-        }
-
-        const stepNum = state.steps.length + 1;
-        if (vResult.result.success) {
-          state.steps.push(vResult.step);
-          printStepSuccess(stepNum, vResult.step, vResult.result.message);
-        } else {
-          const suggestion =
-            vResult.step.kind === 'tap' && vResult.closestMatch
-              ? `Closest match: "${vResult.closestMatch}". Try: tap on ${vResult.closestMatch}`
-              : null;
-          printStepFail(stepNum, vResult.step, vResult.result.message);
-          if (suggestion) {
-            console.log(`    ${theme.warn(suggestion)}`);
-          }
-          console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
-        }
-        const vt = getVisionTokens();
-        if (vt.totalTokens > 0)
-          ui.printStepTokens(
-            vt.inputTokens,
-            vt.outputTokens,
-            vt.cachedTokens || undefined,
-            visionCost(vt.inputTokens, vt.outputTokens),
-            'vision'
-          );
-        return;
-      }
-    } catch (err: any) {
-      ui.stopSpinner();
-      const errMsg = err?.message ?? String(err);
-      console.log(`  ${theme.dim(`Vision shortcut failed (${errMsg}), falling back…`)}`);
-    }
+  // ── Per-line execution ───────────────────────────────────
+  //
+  // Pipeline (vision-first → regex → LLM → executeStep) lives in
+  // src/flow/run-instruction.ts so the SDK and playground stay in lockstep.
+  // Two early-outs for bookkeeping-only step kinds that don't need to touch
+  // the device (matches the playground's historical behaviour):
+  //   - `done`    → just records the step, no execution
+  //   - `getInfo` → routed to handleGetInfo (a separate vision call)
+  if (!state.mcp) {
+    console.log(`  ${theme.error('✗')} Not connected to device`);
+    return;
   }
-
-  // ── Regex fast path: try parsing without LLM first ──
-  const regexParsed = tryParseNaturalFlowLine(line);
-  if (regexParsed) {
+  const earlyParse = tryParseNaturalFlowLine(line);
+  if (earlyParse?.kind === 'done') {
     const stepNum = state.steps.length + 1;
-    if (regexParsed.kind === 'done') {
-      state.steps.push(regexParsed);
-      printStepSuccess(stepNum, regexParsed, 'recorded');
-      return;
-    }
-    if (regexParsed.kind === 'getInfo') {
-      await handleGetInfo(regexParsed.query);
-      return;
-    }
-    ui.startSpinner(`[${stepNum}] ${regexParsed.kind}`, spinnerDetail(regexParsed));
-    resetVisionTokens();
-    try {
-      const result = await runStepOnDevice(regexParsed);
-      ui.stopSpinner();
-      if (result.success) {
-        state.steps.push(regexParsed);
-        printStepSuccess(stepNum, regexParsed, result.message);
-      } else {
-        printStepFail(stepNum, regexParsed, result.message);
-        console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
-      }
-    } catch (err: any) {
-      ui.stopSpinner();
-      printStepFail(stepNum, regexParsed, err?.message ?? String(err));
-      console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
-    }
+    state.steps.push(earlyParse);
+    printStepSuccess(stepNum, earlyParse, 'recorded');
+    return;
+  }
+  if (earlyParse?.kind === 'getInfo') {
+    await handleGetInfo(earlyParse.query);
     return;
   }
 
-  // ── Two-call fallback: classify via LLM → execute via step runner ──
-  let parsed: FlowStep;
-  let classifyUsage: { inputTokens: number; outputTokens: number; totalTokens: number } | undefined;
+  ui.startSpinner('Executing', line);
+  resetVisionTokens();
+  let outcome;
   try {
-    ui.startSpinner('Classifying', line);
-    const resolved = await resolveNaturalStep(line);
-    parsed = resolved.step;
-    classifyUsage = resolved.usage;
-    ui.stopSpinner();
+    outcome = await runOneInstruction(state.mcp, line, {
+      appResolver: state.appResolver ?? undefined,
+      minMatchScore: MIN_MATCH_SCORE,
+    });
   } catch (err: any) {
     ui.stopSpinner();
-    console.log(
-      `  ${theme.error('✗')} Could not classify: ${theme.dim(err?.message ?? String(err))}`
-    );
+    console.log(`  ${theme.error('✗')} ${theme.dim(`Failed: ${err?.message ?? String(err)}`)}`);
     console.log(
       `    ${theme.dim('Type')} ${theme.info('/help')} ${theme.dim('to see supported patterns')}`
     );
     return;
   }
+  ui.stopSpinner();
 
-  if (parsed.kind === 'getInfo') {
-    await handleGetInfo(parsed.query);
-    if (classifyUsage && classifyUsage.totalTokens > 0)
-      ui.printStepTokens(
-        classifyUsage.inputTokens,
-        classifyUsage.outputTokens,
-        undefined,
-        llmCost(classifyUsage.inputTokens, classifyUsage.outputTokens),
-        'classify'
-      );
-    return;
-  }
-
-  const stepNum = state.steps.length + 1;
-
-  if (parsed.kind === 'done') {
-    state.steps.push(parsed);
-    printStepSuccess(stepNum, parsed, 'recorded');
-    if (classifyUsage && classifyUsage.totalTokens > 0)
-      ui.printStepTokens(
-        classifyUsage.inputTokens,
-        classifyUsage.outputTokens,
-        undefined,
-        llmCost(classifyUsage.inputTokens, classifyUsage.outputTokens),
-        'classify'
-      );
-    return;
-  }
-
-  // Execute on device
-  ui.startSpinner(`[${stepNum}] ${parsed.kind}`, spinnerDetail(parsed));
-
-  resetVisionTokens();
-  try {
-    const result = await runStepOnDevice(parsed);
-    ui.stopSpinner();
-
-    if (result.success) {
-      state.steps.push(parsed);
-      printStepSuccess(stepNum, parsed, result.message);
-    } else {
-      printStepFail(stepNum, parsed, result.message);
-      console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
-    }
-    if (classifyUsage && classifyUsage.totalTokens > 0)
-      ui.printStepTokens(
-        classifyUsage.inputTokens,
-        classifyUsage.outputTokens,
-        undefined,
-        llmCost(classifyUsage.inputTokens, classifyUsage.outputTokens),
-        'classify'
-      );
+  const printVisionTokens = (): void => {
     const vt = getVisionTokens();
     if (vt.totalTokens > 0)
       ui.printStepTokens(
@@ -1663,9 +1444,45 @@ async function processLine(line: string): Promise<void> {
         visionCost(vt.inputTokens, vt.outputTokens),
         'vision'
       );
-  } catch (err: any) {
-    ui.stopSpinner();
-    printStepFail(stepNum, parsed, err?.message ?? String(err));
+  };
+
+  // Vision detected a "what's on screen" question — show the answer panel
+  // and skip the step-recording flow entirely (no device action happened).
+  if (outcome.isGetInfo) {
+    const ans = outcome.getInfoAnswer || outcome.result.message;
+    const ansBody = outcome.getInfoExplanation
+      ? `${ans}\n\n${theme.dim(outcome.getInfoExplanation)}`
+      : ans;
+    console.log();
+    printPanel({ title: 'Answer', content: ansBody });
+    printVisionTokens();
+    console.log();
+    return;
+  }
+
+  // `done` and `getInfo` resolved via the LLM fallback (not by regex above).
+  if (outcome.step.kind === 'getInfo') {
+    await handleGetInfo(outcome.step.query);
+    return;
+  }
+  const stepNum = state.steps.length + 1;
+  if (outcome.step.kind === 'done') {
+    state.steps.push(outcome.step);
+    printStepSuccess(stepNum, outcome.step, 'recorded');
+    return;
+  }
+
+  if (outcome.result.success) {
+    state.steps.push(outcome.step);
+    printStepSuccess(stepNum, outcome.step, outcome.result.message);
+  } else {
+    printStepFail(stepNum, outcome.step, outcome.result.message);
+    if (outcome.step.kind === 'tap' && outcome.closestMatch) {
+      console.log(
+        `    ${theme.warn(`Closest match: "${outcome.closestMatch}". Try: tap on ${outcome.closestMatch}`)}`
+      );
+    }
     console.log(`    ${theme.dim('Step not recorded. Fix and try again.')}`);
   }
+  printVisionTokens();
 }

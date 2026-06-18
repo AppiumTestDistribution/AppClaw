@@ -218,6 +218,25 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
           const appIdFromResult = extractAppIdFromText(lastResult);
           if (appIdFromResult) episodicRecorder.setAppId(appIdFromResult);
         }
+        // Record the preprocessor's action as a synthetic history step so downstream
+        // consumers (session logger, --export, replay) see the launch that actually
+        // happened. Without this, history would start at the LLM's first decision —
+        // typically `done` because the app is already open — and the launch would
+        // be invisible.
+        if (preResult.action === 'launch' && preResult.appId) {
+          history.push({
+            step: 0,
+            action: 'launch_app',
+            decision: {
+              toolName: 'launch_app',
+              // Pass the friendly name when available so test-export emits
+              // `open YouTube app` instead of `open com.google.android.youtube app`.
+              args: { appId: preResult.appId, appName: preResult.appName },
+            },
+            result: preResult.message ?? `Launched ${preResult.appId}`,
+            screenHash: '',
+          });
+        }
         await sleep(1500);
       }
     } catch (err) {

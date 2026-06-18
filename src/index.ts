@@ -75,6 +75,18 @@ interface CLIArgs {
   env: string | null;
   /** Strict YAML parsing — fail on unrecognized steps instead of LLM fallback */
   strict: boolean;
+  /**
+   * When set, write a replayable SDK vitest spec to this path after a goal-mode
+   * run completes. Empty string means "default path" (EXPORT_DIR/<slug>.test.ts).
+   * Null means no export.
+   */
+  exportPath: string | null;
+  /**
+   * Override the directory for exported SDK test specs. Takes precedence over
+   * the EXPORT_DIR env-var default. Ignored when `exportPath` is an absolute
+   * or directory-qualified path.
+   */
+  exportDir: string | null;
 }
 
 function printHelp(): void {
@@ -137,6 +149,15 @@ function printHelp(): void {
   );
   console.log(
     `    ${c.flag('--replay')} ${c.arg('<file>')}              ${c.desc('Replay a recorded session')}`
+  );
+  console.log(
+    `    ${c.flag('--export')} ${c.arg('[path]')}             ${c.desc('Export goal trajectory as a replayable SDK vitest spec')}`
+  );
+  console.log(
+    `                                  ${c.desc('Bare filename → EXPORT_DIR/<name>; with slash → use verbatim')}`
+  );
+  console.log(
+    `    ${c.flag('--export-dir')} ${c.arg('<dir>')}          ${c.desc('Default dir for bare-filename exports (env: EXPORT_DIR)')}`
   );
   console.log();
 
@@ -239,6 +260,8 @@ function parseArgs(): CLIArgs {
   let json = false;
   let env: string | null = null;
   let strict = false;
+  let exportPath: string | null = null;
+  let exportDir: string | null = null;
   const goalParts: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -292,6 +315,17 @@ function parseArgs(): CLIArgs {
       json = true;
     } else if (args[i] === '--strict') {
       strict = true;
+    } else if (args[i] === '--export') {
+      // `--export` alone → default path; `--export <path>` → explicit path.
+      const next = args[i + 1];
+      if (next && !next.startsWith('--')) {
+        exportPath = next;
+        i++;
+      } else {
+        exportPath = '';
+      }
+    } else if (args[i] === '--export-dir') {
+      exportDir = args[++i] ?? null;
     } else {
       goalParts.push(args[i]);
     }
@@ -319,7 +353,39 @@ function parseArgs(): CLIArgs {
     json,
     env,
     strict,
+    exportPath,
+    exportDir,
   };
+}
+
+/** Build a filesystem-safe slug from a goal string for default export paths. */
+function slugForExport(goal: string): string {
+  const slug = goal
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  return slug || 'goal-replay';
+}
+
+/**
+ * Resolve the final on-disk path for a `--export` write.
+ *
+ * Rules (in order of precedence):
+ * - Empty `cliPath` → `<dir>/<slug>.test.ts` (slug derived from the goal).
+ * - `cliPath` is absolute or contains a directory separator → use verbatim.
+ *   This lets users override the configured dir with `--export ./tests/foo.test.ts`.
+ * - `cliPath` is a bare filename (no separators) → `<dir>/<cliPath>`.
+ *
+ * `dir` comes from `--export-dir`, the `EXPORT_DIR` env var, or the default.
+ */
+function resolveExportPath(cliPath: string, dir: string, goal: string): string {
+  const pathMod = require('path') as typeof import('path');
+  if (!cliPath) return pathMod.join(dir, `${slugForExport(goal)}.test.ts`);
+  if (pathMod.isAbsolute(cliPath) || cliPath.includes(pathMod.sep) || cliPath.includes('/')) {
+    return cliPath;
+  }
+  return pathMod.join(dir, cliPath);
 }
 
 async function main() {
@@ -914,6 +980,11 @@ async function main() {
     let journeyOutputTokens = 0;
     let journeyCost = 0;
     const allHistory: any[] = [];
+    // exportHistory keeps only the "final successful attempt" per sub-goal —
+    // recovery steps from failed branches are pruned via keepOnlyFinalAttempt.
+    // Kept separate from allHistory so the session logger still records the
+    // complete trajectory (including exploration) for debugging.
+    const exportHistory: any[] = [];
 
     while (!executor.isDone()) {
       const subGoal = executor.current!;
@@ -1127,13 +1198,20 @@ async function main() {
 
       totalSteps += result.stepsUsed;
       allHistory.push(...result.history);
+      {
+        // Trim each sub-goal's history to its successful final attempt before
+        // appending to the export history. Must happen per-sub-goal: a flat
+        // concatenation would misidentify each sub-goal's accepted `done` as a
+        // "non-last rejected done" and drop everything before it.
+        const { keepOnlyFinalAttempt } = await import('./sdk/goal-export.js');
+        exportHistory.push(...keepOnlyFinalAttempt(result.history));
+      }
       if (result.totalTokens) {
         journeyInputTokens += result.totalTokens.input;
         journeyOutputTokens += result.totalTokens.output;
         journeyCost += result.totalTokens.cost;
       }
 
-      // ── App-ID propagation (Fix B, continued) ─────────
       // After each sub-goal, harvest the appId from any launch_app call or
       // from a com.X.Y pattern in step results / final reason. This lets the
       // very first sub-goal ("Launch the YouTube app") establish the app for
@@ -1211,6 +1289,41 @@ async function main() {
     });
 
     if (recorder) recorder.save(allDone);
+
+    // ─── Export goal trajectory as a replayable SDK vitest spec ───
+    if (cliArgs.exportPath !== null) {
+      try {
+        const { generateSdkTest } = await import('./sdk/goal-export.js');
+        const fsp = await import('fs/promises');
+        const pathMod = await import('path');
+        const exportDir = cliArgs.exportDir ?? config.EXPORT_DIR;
+        const targetPath = resolveExportPath(cliArgs.exportPath, exportDir, goal);
+        const source = generateSdkTest({
+          goal,
+          result: {
+            success: allDone,
+            reason: allDone ? 'All sub-goals completed' : 'Some sub-goals failed',
+            stepsUsed: totalSteps,
+            // Use exportHistory (per-sub-goal trimmed) — this is what makes the
+            // exported test capture only the successful path, not the recovery
+            // dance the agent did when verification rejected an early `done`.
+            history: exportHistory,
+          },
+          config: {
+            provider: config.LLM_PROVIDER,
+            platform: resolvedPlatform,
+            agentMode: config.AGENT_MODE,
+          },
+        });
+        await fsp.mkdir(pathMod.dirname(pathMod.resolve(targetPath)), { recursive: true });
+        await fsp.writeFile(targetPath, source, 'utf8');
+        ui.printInfo(`Exported replay test → ${targetPath}`);
+        emitJson({ event: 'export', data: { path: targetPath } });
+      } catch (err: any) {
+        ui.printWarning(`Failed to export replay test: ${err?.message ?? err}`);
+      }
+    }
+
     try {
       await mcpClient.callTool('appium_session_management', { action: 'delete' });
     } catch {

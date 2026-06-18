@@ -18,6 +18,8 @@ const OPTION_TO_ENV_VAR: Partial<Record<keyof AppClawOptions, string>> = {
   agentMode: 'AGENT_MODE',
   maxSteps: 'MAX_STEPS',
   stepDelay: 'STEP_DELAY',
+  waitTimeout: 'WAIT_TIMEOUT',
+  waitInterval: 'WAIT_INTERVAL',
   mcpTransport: 'MCP_TRANSPORT',
   mcpHost: 'MCP_HOST',
   mcpPort: 'MCP_PORT',

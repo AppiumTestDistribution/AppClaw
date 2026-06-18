@@ -140,6 +140,27 @@ npm start
 npm start "Open Settings"
 ```
 
+**Export a replayable test** — pass `--export` and the agent's trajectory is written as a runnable vitest spec when the goal completes:
+
+```bash
+# Default path: $EXPORT_DIR/<goal-slug>.test.ts (defaults to .appclaw/exports/)
+appclaw --export "Open YouTube and search for Appium 3.0"
+
+# Bare filename → EXPORT_DIR/<name>
+appclaw --export youtube.test.ts "Open YouTube and search for Appium 3.0"
+
+# Path with directory hint → used verbatim
+appclaw --export tests/e2e/youtube.test.ts "Open YouTube"
+
+# Override the directory for one run
+appclaw --export-dir tests/recorded --export youtube.test.ts "Open YouTube"
+
+# Or set it persistently in .env
+echo 'EXPORT_DIR=tests/recorded' >> .env
+```
+
+The export drops the wrong-direction branch when verification rejected a `done`, preserves the auto-launched app as the first step, and translates internal agent tools back to natural language so the generated test reads like English. See the [SDK section](#sdk-typescript--javascript) below for what the test file looks like.
+
 ### YAML flows (no LLM needed)
 
 Run declarative automation steps from a YAML file — fast, repeatable, zero LLM cost:
@@ -236,8 +257,182 @@ Features:
 
 - Type natural-language commands that execute immediately on the device
 - Steps accumulate as you go
-- Export to a YAML flow file anytime
+- Export to a YAML flow file or a runnable SDK test (vitest spec) — format picked from the file extension
 - Slash commands: `/help`, `/steps`, `/export`, `/clear`, `/device`, `/disconnect`
+
+**Export formats** — `/export` dispatches by extension:
+
+```
+> /export my-flow.yaml              # YAML flow (default behaviour)
+> /export tests/youtube.test.ts     # SDK vitest spec
+> /export youtube.test.ts           # bare filename → EXPORT_DIR/youtube.test.ts
+```
+
+Bare filenames for SDK tests land in `EXPORT_DIR` (default `.appclaw/exports`); paths with a directory hint are used verbatim. YAML files stay in the current directory regardless.
+
+### SDK (TypeScript / JavaScript)
+
+Drive a device programmatically from a vitest / jest / mocha test. The SDK exposes the same natural-language layer as the playground, so steps you build interactively can be lifted into a test file as-is.
+
+```ts
+import { AppClaw, AppClawAssertionError } from 'appclaw';
+import { describe, it } from 'vitest';
+import 'dotenv/config';
+
+describe('YouTube smoke', () => {
+  it('searches and verifies a result', async () => {
+    const app = new AppClaw({
+      provider: 'gemini',
+      apiKey: process.env.LLM_API_KEY,
+      platform: 'android',
+      agentMode: 'vision',
+      video: true, // record screen, embed in report
+      mcpDebug: false, // silence appium-mcp stderr noise
+    });
+
+    await app.run('open YouTube app');
+    await app.run('tap search icon');
+    await app.run('type "Appium 3.0"');
+    await app.run('tap first result');
+
+    // Throws AppClawAssertionError on failure — vitest marks the test red.
+    // The error message includes the original claim, the LLM's reason (in
+    // vision mode), and a snapshot of visible texts (in DOM mode).
+    await app.verify('the video by TestMu AI is visible');
+
+    await app.teardown(); // closes the appium session, writes the report
+  }, 120_000);
+});
+```
+
+**Three execution surfaces:**
+
+| Method                           | Use when                                                                                                                                                  |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app.run(instruction, options?)` | One natural-language step. Returns `{ success, action, message }` — does NOT throw on failure. `options` overrides wait/scroll config for this call only. |
+| `app.verify(claim)`              | Assertion. Throws `AppClawAssertionError` so the test framework records a failure.                                                                        |
+| `app.runFlow(path)`              | Execute a YAML flow file end-to-end.                                                                                                                      |
+| `app.runGoal(goal, opts?)`       | Hand the goal to the LLM agent (same as CLI agent mode). Supports `exportPath` (see below).                                                               |
+
+**Recording goal runs as replayable tests** — pass `exportPath` to `runGoal()` and the agent's trajectory is written as a runnable vitest spec when it finishes:
+
+```ts
+await app.runGoal('open YouTube, search for Appium 3.0, play first result', {
+  exportPath: 'tests/e2e/youtube.test.ts',
+});
+```
+
+The exported file replays via `app.run(...)` calls — no LLM cost, no agent loop. The exporter:
+
+- Prepends the synthetic `launch_app` step the preprocessor handled (so the launch isn't missing from the replay)
+- Drops the entire branch before a rejected `done` decision — the recovery path the agent took after a verification failure is the only one preserved
+- Translates internal agent tools (`find_and_click`, `find_and_type`, etc.) back into natural language so the test reads like English
+
+Read the four caveats embedded in the generated file header before running it in CI — replays don't inherit the agent's safety net.
+
+**Per-command overrides** — `app.run()` takes an optional second argument that wins over the instance defaults for that one step. Useful for a slow screen that needs a longer wait, or a tight list that needs a shorter scroll:
+
+```ts
+// Wait up to 20s for this specific (slow-loading) screen
+await app.run('click on Dashboard', { waitTimeout: 20000 });
+
+// Scroll a short distance, up to 5 times, to find an item
+await app.run('scroll down until Karma is visible', { scrollMode: 'short', scrollTimes: 5 });
+
+// A single full-screen swipe
+await app.run('swipe up', { scrollMode: 'full' });
+```
+
+| `RunOptions` field | Purpose                                                                                 |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| `waitTimeout`      | Implicit-wait timeout (ms) for this command's target element. Overrides instance value. |
+| `waitInterval`     | Poll cadence (ms) for this command's implicit wait.                                     |
+| `scrollMode`       | Scroll/swipe distance: `short` (~30%) / `medium` (~60%) / `full` (~90%) of the screen.  |
+| `scrollTimes`      | Repeat count (plain swipe) or max scroll attempts (`scroll … until …`).                 |
+
+`scrollMode` / `scrollTimes` can also be set on the constructor as instance-wide defaults.
+
+**Constructor options** (all optional — env vars fall through):
+
+| Option         | Default       | Purpose                                                                                                                                             |
+| -------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provider`     | `gemini`      | LLM provider (`anthropic` / `openai` / `gemini` / `groq` / `ollama`)                                                                                |
+| `apiKey`       | env           | API key for the chosen provider                                                                                                                     |
+| `model`        | (auto)        | Model ID override                                                                                                                                   |
+| `platform`     | `android`     | Target platform                                                                                                                                     |
+| `deviceUdid`   | (auto)        | Pin to a specific device — required when running tests in parallel                                                                                  |
+| `agentMode`    | `dom`         | `dom` or `vision` — vision-mode `verify()` failures include the LLM's reason                                                                        |
+| `waitTimeout`  | `10000`       | Implicit wait (ms) — each action polls until its target is on screen before acting, so you don't need `wait …` steps between calls. `0` = fail-fast |
+| `waitInterval` | `300`         | Poll cadence (ms) for `waitTimeout`                                                                                                                 |
+| `scrollMode`   | (engine ~60%) | Default scroll/swipe distance: `short` / `medium` / `full`. Override per call via `run()`                                                           |
+| `scrollTimes`  | (parsed)      | Default scroll/swipe repeat / max-scroll count. Override per call via `run()`                                                                       |
+| `video`        | `false`       | Record screen and embed in the auto-generated report                                                                                                |
+| `report`       | `true`        | Write an HTML report to `.appclaw/runs/` on teardown                                                                                                |
+| `mcpDebug`     | env / `false` | Stream `[appium-mcp]` subprocess logs. Overrides `MCP_DEBUG=1`                                                                                      |
+| `silent`       | `false`       | Suppress the per-step `✓ #N tap "label"` log lines. Default off — SDK consumers see device activity to match the playground UX.                     |
+
+**TypeScript types** — the package ships full type declarations (`package.json` → `types: dist/sdk/index.d.ts`), so editors give autocomplete on every option and `tsc` rejects typos before a test runs. The public types are importable by name:
+
+```ts
+import { AppClaw, AppClawStepError, AppClawAssertionError } from 'appclaw';
+import type { AppClawOptions, RunOptions, ScrollDistance, RunResult, FlowResult } from 'appclaw';
+```
+
+Definitions:
+
+```ts
+/** How far each scroll/swipe travels, as a fraction of the screen. */
+type ScrollDistance = 'short' | 'medium' | 'full'; // ~30% / ~60% / ~90%
+
+/** Constructor config — every field optional; unset falls back to env / defaults. */
+interface AppClawOptions {
+  provider?: 'anthropic' | 'openai' | 'gemini' | 'groq' | 'ollama';
+  apiKey?: string;
+  model?: string;
+  platform?: 'android' | 'ios';
+  deviceUdid?: string;
+  agentMode?: 'dom' | 'vision';
+  maxSteps?: number;
+  stepDelay?: number;
+  waitTimeout?: number; // implicit-wait timeout (ms), default 10000
+  waitInterval?: number; // poll cadence (ms), default 300
+  scrollMode?: ScrollDistance;
+  scrollTimes?: number;
+  silent?: boolean;
+  failOnError?: boolean;
+  report?: boolean;
+  reportName?: string;
+  video?: boolean;
+  mcpTransport?: 'stdio' | 'sse';
+  mcpHost?: string;
+  mcpPort?: number;
+  mcpDebug?: boolean;
+}
+
+/** Per-command overrides — the optional 2nd arg to `app.run()`. */
+interface RunOptions {
+  waitTimeout?: number;
+  waitInterval?: number;
+  scrollMode?: ScrollDistance;
+  scrollTimes?: number;
+}
+
+/** Returned by `app.run()`. */
+interface RunResult {
+  success: boolean;
+  action: string; // resolved step kind: tap | type | openApp | swipe | …
+  message: string;
+}
+```
+
+Because `RunOptions` is an `interface`, TypeScript's excess-property check flags a misspelled key (`waitTimout`) and the `ScrollDistance` union rejects an invalid value (`'shrt'`) with a "Did you mean …?" hint — so the options object is fully type-checked, not just `any`:
+
+```ts
+await app.run('swipe up', { scrollMode: 'shrt' }); // ✗ TS error: not assignable to ScrollDistance
+await app.run('swipe up', { waitTimout: 1000 }); // ✗ TS error: unknown property (did you mean waitTimeout?)
+```
+
+> Inside this repo, import from the relative source path (`../src/sdk`) instead of `'appclaw'`.
 
 ### Explorer (PRD-driven test generation)
 
@@ -275,26 +470,31 @@ appclaw --plan "Copy the weather and send it on Slack"
 
 All configuration is via `.env`:
 
-| Variable              | Default   | Description                                                                                           |
-| --------------------- | --------- | ----------------------------------------------------------------------------------------------------- |
-| **Platform**          |           |                                                                                                       |
-| `PLATFORM`            | (prompt)  | Target platform: `android` or `ios`                                                                   |
-| `DEVICE_TYPE`         | (prompt)  | iOS device type: `simulator` or `real`                                                                |
-| `DEVICE_UDID`         | (auto)    | Device UDID — skips device picker                                                                     |
-| `DEVICE_NAME`         | (auto)    | Device name — partial match (e.g. `iPhone 17 Pro`)                                                    |
-| **LLM**               |           |                                                                                                       |
-| `LLM_PROVIDER`        | `gemini`  | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`)                                      |
-| `LLM_API_KEY`         | —         | API key for your provider (not used for local Ollama; see `OLLAMA_*` for cloud URL / auth)            |
-| `LLM_MODEL`           | (auto)    | Model override (e.g. `gemini-3.1-flash-lite`, `claude-sonnet-4-20250514`)                             |
-| `OLLAMA_BASE_URL`     | (default) | Ollama API base URL (e.g. remote or Docker). Empty = `http://127.0.0.1:11434` (`LLM_PROVIDER=ollama`) |
-| `OLLAMA_API_KEY`      | —         | Optional Bearer token for Ollama Cloud or authenticated endpoints (`LLM_PROVIDER=ollama`)             |
-| `AGENT_MODE`          | `vision`  | `dom` (XML locators) or `vision` (screenshot-first)                                                   |
-| **Agent**             |           |                                                                                                       |
-| `MAX_STEPS`           | `30`      | Max steps per goal                                                                                    |
-| `STEP_DELAY`          | `500`     | Milliseconds between steps                                                                            |
-| `LLM_THINKING`        | `off`     | Extended thinking/reasoning (`on` or `off`)                                                           |
-| `LLM_THINKING_BUDGET` | `1024`    | Token budget for extended thinking                                                                    |
-| `SHOW_TOKEN_USAGE`    | `false`   | Print token usage and cost per step                                                                   |
+| Variable              | Default            | Description                                                                                                                                                              |
+| --------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Platform**          |                    |                                                                                                                                                                          |
+| `PLATFORM`            | (prompt)           | Target platform: `android` or `ios`                                                                                                                                      |
+| `DEVICE_TYPE`         | (prompt)           | iOS device type: `simulator` or `real`                                                                                                                                   |
+| `DEVICE_UDID`         | (auto)             | Device UDID — skips device picker                                                                                                                                        |
+| `DEVICE_NAME`         | (auto)             | Device name — partial match (e.g. `iPhone 17 Pro`)                                                                                                                       |
+| **LLM**               |                    |                                                                                                                                                                          |
+| `LLM_PROVIDER`        | `gemini`           | LLM provider (`anthropic`, `openai`, `gemini`, `groq`, `ollama`)                                                                                                         |
+| `LLM_API_KEY`         | —                  | API key for your provider (not used for local Ollama; see `OLLAMA_*` for cloud URL / auth)                                                                               |
+| `LLM_MODEL`           | (auto)             | Model override (e.g. `gemini-3.1-flash-lite`, `claude-sonnet-4-20250514`)                                                                                                |
+| `OLLAMA_BASE_URL`     | (default)          | Ollama API base URL (e.g. remote or Docker). Empty = `http://127.0.0.1:11434` (`LLM_PROVIDER=ollama`)                                                                    |
+| `OLLAMA_API_KEY`      | —                  | Optional Bearer token for Ollama Cloud or authenticated endpoints (`LLM_PROVIDER=ollama`)                                                                                |
+| `AGENT_MODE`          | `vision`           | `dom` (XML locators) or `vision` (screenshot-first)                                                                                                                      |
+| **Agent**             |                    |                                                                                                                                                                          |
+| `MAX_STEPS`           | `30`               | Max steps per goal                                                                                                                                                       |
+| `STEP_DELAY`          | `500`              | Milliseconds between steps                                                                                                                                               |
+| `WAIT_TIMEOUT`        | `10000`            | Implicit wait (ms) for an element to be ready before each SDK action; `0` disables (fail-fast)                                                                           |
+| `WAIT_INTERVAL`       | `300`              | Poll cadence (ms) for `WAIT_TIMEOUT`                                                                                                                                     |
+| `LLM_THINKING`        | `off`              | Extended thinking/reasoning (`on` or `off`)                                                                                                                              |
+| `LLM_THINKING_BUDGET` | `1024`             | Token budget for extended thinking                                                                                                                                       |
+| `SHOW_TOKEN_USAGE`    | `false`            | Print token usage and cost per step                                                                                                                                      |
+| **Output**            |                    |                                                                                                                                                                          |
+| `EXPORT_DIR`          | `.appclaw/exports` | Default directory for `--export` and `/export *.test.ts`. Bare filenames land here; paths with a directory hint are used verbatim. Override per-run with `--export-dir`. |
+| `MCP_DEBUG`           | `0`                | Stream verbose `[appium-mcp]` subprocess logs and per-tool timing. SDK can override via `mcpDebug` option.                                                               |
 
 ## How It Works
 
@@ -346,6 +546,13 @@ Modes:
   --record                        Record goal execution for replay
   --replay <file>                 Replay a recorded session
 
+Export:
+  --export [path]                 Write a replayable vitest spec after a goal run
+                                  Empty: $EXPORT_DIR/<goal-slug>.test.ts
+                                  Bare filename: $EXPORT_DIR/<name>
+                                  Path with slash: used verbatim
+  --export-dir <dir>              Override EXPORT_DIR for this run
+
 Explorer:
   --num-flows <N>                 Number of flows to generate (default: 5)
   --no-crawl                      Skip device crawling (PRD-only generation)
@@ -358,6 +565,7 @@ Environment variables (CI-friendly):
   DEVICE_TYPE       simulator | real
   DEVICE_UDID       Device UDID
   DEVICE_NAME       Device name
+  EXPORT_DIR        Default dir for --export bare filenames (.appclaw/exports)
 ```
 
 ## AI Agent Skills
