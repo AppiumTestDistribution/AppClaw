@@ -1,16 +1,11 @@
 name: Action Self-Test
 
 # Runs the AppClaw GitHub Action against itself to validate it works end-to-end.
-# Triggered when the action definition or its test workflow changes, and on
-# manual dispatch.
+# This is a heavy e2e check (emulator + LLM), so it does NOT run on merge to
+# main — trigger it manually from the Actions tab when the action definition or
+# flows change.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'action.yml'
-      - '.github/workflows/action-test.yml'
-      - 'flows/**'
   workflow_dispatch:
     inputs:
       platform:
