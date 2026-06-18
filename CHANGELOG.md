@@ -1,3 +1,14 @@
+## [1.5.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.4.0...v1.5.0) (2026-06-18)
+
+### Features
+
+* unify appclaw + appclaw-agent releases and make self-test manual ([#30](https://github.com/AppiumTestDistribution/AppClaw/issues/30)) ([5a56a4e](https://github.com/AppiumTestDistribution/AppClaw/commit/5a56a4efde08daba81c95789631a0e2fa8fb631a))
+
+### Bug Fixes
+
+* procedural memory matching ([6fdb812](https://github.com/AppiumTestDistribution/AppClaw/commit/6fdb812e0c6a7a737cd7c77b4e5829b3db58ac86))
+* SDK to make proper typings and add auto wait ([#29](https://github.com/AppiumTestDistribution/AppClaw/issues/29)) ([2b08148](https://github.com/AppiumTestDistribution/AppClaw/commit/2b081484fb62ac773e23e7b1a91d0c4cd0484eda))
+
 ## [1.4.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.3.4...v1.4.0) (2026-06-10)
 
 ### Features

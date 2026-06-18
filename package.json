@@ -1,6 +1,6 @@
 {
   "name": "appclaw",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Agentic AI layer for mobile automation via appium-mcp",
   "type": "module",
   "main": "dist/sdk/index.js",
