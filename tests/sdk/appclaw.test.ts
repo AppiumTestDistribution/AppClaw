@@ -140,9 +140,9 @@ describe('AppClaw — constructor', () => {
     expect(silenceTerminalUI).toHaveBeenCalledOnce();
   });
 
-  test('calls silenceTerminalUI when silent is omitted (default)', () => {
+  test('does NOT call silenceTerminalUI when silent is omitted (default false)', () => {
     new AppClaw({});
-    expect(silenceTerminalUI).toHaveBeenCalledOnce();
+    expect(silenceTerminalUI).not.toHaveBeenCalled();
   });
 
   test('does NOT call silenceTerminalUI when silent is false', () => {
