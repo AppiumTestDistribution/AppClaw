@@ -11,6 +11,12 @@ permissions:
   pull-requests: write
   id-token: write
 
+# Serialize release runs so two quick pushes can't race to push the
+# `chore(release) [skip ci]` commit back to main.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Semantic Release
@@ -26,12 +32,26 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      # Root package (appclaw).
       - name: Install dependencies
         run: npm install --no-package-lock
 
       - name: Build
         run: npm run build
 
+      # appclaw-agent is published in the SAME semantic-release run (see the
+      # @semantic-release/exec plugin in .releaserc.json), locked to the same
+      # version as appclaw. Build it here so its dist/ is ready to publish.
+      - name: Install agent dependencies
+        working-directory: packages/appclaw-agent
+        run: npm install --no-package-lock
+
+      - name: Build agent
+        working-directory: packages/appclaw-agent
+        run: npm run build
+
+      # Single release process → one version, one tag, one push to main for
+      # BOTH packages. No second job, so the "branch is behind" race is gone.
       - name: Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

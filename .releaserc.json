@@ -49,9 +49,22 @@
     ],
     "@semantic-release/npm",
     [
+      "@semantic-release/exec",
+      {
+        "prepare": "npm version ${nextRelease.version} --no-git-tag-version --allow-same-version --prefix packages/appclaw-agent",
+        "publish": "npm publish --prefix packages/appclaw-agent"
+      }
+    ],
+    [
       "@semantic-release/git",
       {
-        "assets": ["package.json", "package-lock.json", "CHANGELOG.md"],
+        "assets": [
+          "package.json",
+          "package-lock.json",
+          "CHANGELOG.md",
+          "packages/appclaw-agent/package.json",
+          "packages/appclaw-agent/package-lock.json"
+        ],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
