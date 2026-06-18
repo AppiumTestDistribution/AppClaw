@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.0...v1.5.1) (2026-06-18)
+
+### Bug Fixes
+
+* publish appclaw-agent in the unified release (use cd, not --prefix) ([#31](https://github.com/AppiumTestDistribution/AppClaw/issues/31)) ([fdf8a33](https://github.com/AppiumTestDistribution/AppClaw/commit/fdf8a3307e3ac2e10fa2f8a1090e1b4b528364ff))
+
 ## [1.5.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.4.0...v1.5.0) (2026-06-18)
 
 ### Features
