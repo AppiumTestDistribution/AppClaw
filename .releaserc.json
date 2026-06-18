@@ -51,8 +51,8 @@
     [
       "@semantic-release/exec",
       {
-        "prepare": "npm version ${nextRelease.version} --no-git-tag-version --allow-same-version --prefix packages/appclaw-agent",
-        "publish": "npm publish --prefix packages/appclaw-agent"
+        "prepare": "cd packages/appclaw-agent && npm version ${nextRelease.version} --no-git-tag-version --allow-same-version",
+        "publish": "cd packages/appclaw-agent && npm publish"
       }
     ],
     [
