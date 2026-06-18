@@ -1,6 +1,6 @@
 {
   "name": "appclaw-agent",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Agent-native terminal CLI for AppClaw mobile automation",
   "type": "module",
   "bin": {

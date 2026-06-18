@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/AppiumTestDistribution/AppClaw/compare/appclaw-agent-v1.0.1...appclaw-agent-v1.0.2) (2026-06-18)
+
+### Bug Fixes
+
+* SDK to make proper typings and add auto wait ([#29](https://github.com/AppiumTestDistribution/AppClaw/issues/29)) ([2b08148](https://github.com/AppiumTestDistribution/AppClaw/commit/2b081484fb62ac773e23e7b1a91d0c4cd0484eda))
+
 ## [1.0.1](https://github.com/AppiumTestDistribution/AppClaw/compare/appclaw-agent-v1.0.0...appclaw-agent-v1.0.1) (2026-06-12)
 
 ### Bug Fixes
