@@ -38,7 +38,7 @@ The interactive and goal-direct paths also accept `--export [path]` (optionally 
 
 Public TypeScript API consumed by external tests (vitest/jest/mocha). Single entry: `import { AppClaw } from 'appclaw'`. Surface:
 
-- `app.run(instruction)` — one natural-language step, non-throwing, returns `{ success, action, message }`
+- `app.run(instruction, options?)` — one natural-language step, non-throwing, returns `{ success, action, message }`. `options` (`RunOptions`) applies per-command overrides for this call only: `waitTimeout`/`waitInterval` (implicit-wait poll budget) and `scrollMode`/`scrollTimes` (scroll/swipe distance + count). Instance-wide defaults for all four live on `AppClawOptions`; per-call values win. Implicit wait: every element-bearing action polls its target until present (DOM re-reads page source, vision re-captures the screenshot) or the budget is exhausted — `WAIT_TIMEOUT`/`WAIT_INTERVAL` env, default 10s/300ms
 - `app.verify(claim)` — assertion. Throws `AppClawAssertionError` on failure (includes `claim`, `result`, and `screenContents` from DOM page-source in DOM mode — in vision mode the LLM's reason is already in `result.message`)
 - `app.runFlow(path)` — wraps the YAML flow engine
 - `app.runGoal(goal, { exportPath?, exportConfig? })` — wraps the agent loop. When `exportPath` is set, the trajectory is filtered with `keepOnlyFinalAttempt()` (drops the branch before any rejected `done`) then rendered as a vitest spec via `generateSdkTest()`

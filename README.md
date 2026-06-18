@@ -371,6 +371,69 @@ await app.run('swipe up', { scrollMode: 'full' });
 | `mcpDebug`     | env / `false` | Stream `[appium-mcp]` subprocess logs. Overrides `MCP_DEBUG=1`                                                                                      |
 | `silent`       | `false`       | Suppress the per-step `✓ #N tap "label"` log lines. Default off — SDK consumers see device activity to match the playground UX.                     |
 
+**TypeScript types** — the package ships full type declarations (`package.json` → `types: dist/sdk/index.d.ts`), so editors give autocomplete on every option and `tsc` rejects typos before a test runs. The public types are importable by name:
+
+```ts
+import { AppClaw, AppClawStepError, AppClawAssertionError } from 'appclaw';
+import type { AppClawOptions, RunOptions, ScrollDistance, RunResult, FlowResult } from 'appclaw';
+```
+
+Definitions:
+
+```ts
+/** How far each scroll/swipe travels, as a fraction of the screen. */
+type ScrollDistance = 'short' | 'medium' | 'full'; // ~30% / ~60% / ~90%
+
+/** Constructor config — every field optional; unset falls back to env / defaults. */
+interface AppClawOptions {
+  provider?: 'anthropic' | 'openai' | 'gemini' | 'groq' | 'ollama';
+  apiKey?: string;
+  model?: string;
+  platform?: 'android' | 'ios';
+  deviceUdid?: string;
+  agentMode?: 'dom' | 'vision';
+  maxSteps?: number;
+  stepDelay?: number;
+  waitTimeout?: number; // implicit-wait timeout (ms), default 10000
+  waitInterval?: number; // poll cadence (ms), default 300
+  scrollMode?: ScrollDistance;
+  scrollTimes?: number;
+  silent?: boolean;
+  failOnError?: boolean;
+  report?: boolean;
+  reportName?: string;
+  video?: boolean;
+  mcpTransport?: 'stdio' | 'sse';
+  mcpHost?: string;
+  mcpPort?: number;
+  mcpDebug?: boolean;
+}
+
+/** Per-command overrides — the optional 2nd arg to `app.run()`. */
+interface RunOptions {
+  waitTimeout?: number;
+  waitInterval?: number;
+  scrollMode?: ScrollDistance;
+  scrollTimes?: number;
+}
+
+/** Returned by `app.run()`. */
+interface RunResult {
+  success: boolean;
+  action: string; // resolved step kind: tap | type | openApp | swipe | …
+  message: string;
+}
+```
+
+Because `RunOptions` is an `interface`, TypeScript's excess-property check flags a misspelled key (`waitTimout`) and the `ScrollDistance` union rejects an invalid value (`'shrt'`) with a "Did you mean …?" hint — so the options object is fully type-checked, not just `any`:
+
+```ts
+await app.run('swipe up', { scrollMode: 'shrt' }); // ✗ TS error: not assignable to ScrollDistance
+await app.run('swipe up', { waitTimout: 1000 }); // ✗ TS error: unknown property (did you mean waitTimeout?)
+```
+
+> Inside this repo, import from the relative source path (`../src/sdk`) instead of `'appclaw'`.
+
 ### Explorer (PRD-driven test generation)
 
 Generate YAML test flows from a PRD or app description — the explorer analyzes the document, optionally crawls the app on-device, and outputs ready-to-run flows:

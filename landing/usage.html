@@ -2157,6 +2157,17 @@
                 <td>Delay between steps in ms (default: 500)</td>
               </tr>
               <tr>
+                <td>WAIT_TIMEOUT</td>
+                <td>
+                  Implicit wait (ms) for an element to be ready before each SDK action (default:
+                  10000; <code>0</code> disables / fail-fast)
+                </td>
+              </tr>
+              <tr>
+                <td>WAIT_INTERVAL</td>
+                <td>Poll cadence (ms) for <code>WAIT_TIMEOUT</code> (default: 300)</td>
+              </tr>
+              <tr>
                 <td>MAX_ELEMENTS</td>
                 <td>Max DOM elements to parse (default: 40)</td>
               </tr>
@@ -2573,6 +2584,66 @@ console<span class="p">.</span>log<span class="p">(</span>result<span class="p">
             </li>
           </ol>
 
+          <h3>Per-command options</h3>
+          <p>
+            <code>run()</code> takes an optional second argument (<code>RunOptions</code>) that
+            overrides the instance defaults <em>for that one call</em> — handy for a slow screen
+            that needs a longer wait, or a tight list that needs a shorter scroll. Every field is
+            optional and falls back to the constructor value, then to the engine default.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="c">// Wait up to 20s for this specific (slow-loading) screen</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'click on Dashboard'</span><span class="p">,</span> <span class="p">{</span> waitTimeout<span class="p">:</span> <span class="m">20000</span> <span class="p">});</span>
+
+<span class="c">// Scroll a short distance, up to 5 times, to find an item</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'scroll down until Karma is visible'</span><span class="p">,</span> <span class="p">{</span> scrollMode<span class="p">:</span> <span class="s">'short'</span><span class="p">,</span> scrollTimes<span class="p">:</span> <span class="m">5</span> <span class="p">});</span>
+
+<span class="c">// A single full-screen swipe</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'swipe up'</span><span class="p">,</span> <span class="p">{</span> scrollMode<span class="p">:</span> <span class="s">'full'</span> <span class="p">});</span></pre>
+          </div>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>RunOptions field</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>waitTimeout</td>
+                <td>number</td>
+                <td>Implicit-wait timeout (ms) for this command's target element</td>
+              </tr>
+              <tr>
+                <td>waitInterval</td>
+                <td>number</td>
+                <td>Poll cadence (ms) for this command's implicit wait</td>
+              </tr>
+              <tr>
+                <td>scrollMode</td>
+                <td><code>ScrollDistance</code></td>
+                <td>
+                  Scroll/swipe distance: <code>'short'</code> | <code>'medium'</code> |
+                  <code>'full'</code>
+                </td>
+              </tr>
+              <tr>
+                <td>scrollTimes</td>
+                <td>number</td>
+                <td>
+                  Repeat count (plain swipe) or max scroll attempts (<code>scroll … until …</code>)
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
           <h3>RunResult shape</h3>
           <table class="cmd-table">
             <thead>
@@ -2920,6 +2991,42 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
                 <td>Delay between steps in milliseconds</td>
               </tr>
               <tr>
+                <td>waitTimeout</td>
+                <td>number</td>
+                <td><code>10000</code></td>
+                <td>
+                  Implicit wait (ms). Every element-bearing action polls its target until it is on
+                  screen before acting, so you don't need <code>wait …</code> steps between calls.
+                  <code>0</code> = fail-fast (single attempt).
+                </td>
+              </tr>
+              <tr>
+                <td>waitInterval</td>
+                <td>number</td>
+                <td><code>300</code></td>
+                <td>Poll cadence (ms) for <code>waitTimeout</code></td>
+              </tr>
+              <tr>
+                <td>scrollMode</td>
+                <td><code>ScrollDistance</code></td>
+                <td>engine (~60%)</td>
+                <td>
+                  Default scroll/swipe distance: <code>'short'</code> (~30%) |
+                  <code>'medium'</code> (~60%) | <code>'full'</code> (~90%) of the screen. Override
+                  per call via <code>run()</code>.
+                </td>
+              </tr>
+              <tr>
+                <td>scrollTimes</td>
+                <td>number</td>
+                <td>parsed</td>
+                <td>
+                  Default scroll/swipe count — repeat count for a plain swipe, or max scroll
+                  attempts for <code>scroll … until …</code>. Override per call via
+                  <code>run()</code>.
+                </td>
+              </tr>
+              <tr>
                 <td>silent</td>
                 <td>boolean</td>
                 <td><code>true</code></td>
@@ -2988,11 +3095,28 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
             <pre><span class="k">import</span> <span class="p">{</span>
   AppClaw<span class="p">,</span>
   <span class="k">type</span> AppClawOptions<span class="p">,</span>   <span class="c">// constructor options</span>
+  <span class="k">type</span> RunOptions<span class="p">,</span>        <span class="c">// per-command second arg to run()</span>
+  <span class="k">type</span> ScrollDistance<span class="p">,</span>    <span class="c">// 'short' | 'medium' | 'full'</span>
   <span class="k">type</span> FlowResult<span class="p">,</span>       <span class="c">// returned by runFlow()</span>
   <span class="k">type</span> RunResult<span class="p">,</span>        <span class="c">// returned by run()</span>
   <span class="k">type</span> AgentResult<span class="p">,</span>      <span class="c">// returned by runGoal()</span>
   <span class="k">type</span> RunYamlFlowOptions <span class="c">// second arg to runFlow()</span>
 <span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span></pre>
+          </div>
+
+          <p>
+            <code>RunOptions</code> is an <code>interface</code>, so TypeScript flags a misspelled
+            key and the <code>ScrollDistance</code> union rejects an invalid value — the options
+            object is fully type-checked, not <code>any</code>:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'swipe up'</span><span class="p">,</span> <span class="p">{</span> scrollMode<span class="p">:</span> <span class="s">'shrt'</span> <span class="p">});</span>  <span class="c">// ✗ not assignable to ScrollDistance</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'swipe up'</span><span class="p">,</span> <span class="p">{</span> waitTimout<span class="p">:</span> <span class="m">1000</span> <span class="p">});</span>   <span class="c">// ✗ unknown property (did you mean waitTimeout?)</span></pre>
           </div>
         </section>
 
