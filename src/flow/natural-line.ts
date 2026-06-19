@@ -143,11 +143,36 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     if (from && to) return { kind: 'drag', from, to, verbatim };
   }
 
-  const swipeMatch = t.match(/^swipe\s+(up|down|left|right)(?:\s+(\d+)\s*(?:times?))?/i);
+  // Plain directional swipe — "swipe right", "swipe to the right", "swipe up 3 times"
+  const swipeMatch = t.match(
+    /^swipe\s+(?:to\s+(?:the\s+)?)?(up|down|left|right)(?:\s+(\d+)\s*(?:times?))?$/i
+  );
   if (swipeMatch) {
     const direction = swipeMatch[1].toLowerCase() as 'up' | 'down' | 'left' | 'right';
     const repeat = swipeMatch[2] ? parseInt(swipeMatch[2], 10) : undefined;
     return { kind: 'swipe', direction, ...(repeat && repeat > 1 ? { repeat } : {}), verbatim };
+  }
+
+  // Element-anchored swipe — "swipe the slider to the right", "swipe X left".
+  // Starts the gesture from the named element instead of the screen center.
+  // Runs AFTER the plain swipe so "swipe right" / "swipe to the right" stay plain.
+  const anchoredSwipeMatch = t.match(
+    /^swipe\s+(?:the\s+)?(.+?)\s+(?:to(?:wards)?\s+(?:the\s+)?)?(up|down|left|right)(?:\s+(\d+)\s*(?:times?))?$/i
+  );
+  if (anchoredSwipeMatch) {
+    const target = trimPunct(stripTextPrefix(anchoredSwipeMatch[1].trim()));
+    const direction = anchoredSwipeMatch[2].toLowerCase() as 'up' | 'down' | 'left' | 'right';
+    const repeat = anchoredSwipeMatch[3] ? parseInt(anchoredSwipeMatch[3], 10) : undefined;
+    // Guard against the target being pure filler ("to", "the") that slipped past.
+    if (target && !/^(?:to|the|towards?)$/i.test(target)) {
+      return {
+        kind: 'swipe',
+        direction,
+        target,
+        ...(repeat && repeat > 1 ? { repeat } : {}),
+        verbatim,
+      };
+    }
   }
 
   const scrollMatch = t.match(/^scroll\s+(up|down|left|right)(?:\s+(\d+)\s*(?:times?))?/i);

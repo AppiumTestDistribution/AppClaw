@@ -11,6 +11,7 @@
  */
 
 import { resolve } from 'path';
+import { config as loadDotenvFile } from 'dotenv';
 import { VERSION } from './version.js';
 import { loadConfig } from './config.js';
 import { createMCPClient } from './mcp/client.js';
@@ -25,7 +26,7 @@ import { parseFlowYamlFile, isSuiteYaml, parseSuiteYamlFile } from './flow/parse
 import { resolveFlowApp } from './flow/types.js';
 import { runYamlFlow } from './flow/run-yaml-flow.js';
 import { runFlowOnDevices, runSuite, printParallelSummary } from './flow/parallel-runner.js';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { loadEnvironmentFile, type VariableBindings } from './flow/variable-resolver.js';
 import {
   decomposeGoal,
@@ -73,6 +74,14 @@ interface CLIArgs {
   json: boolean;
   /** Environment name for variable/secret resolution (e.g. "dev", "staging") */
   env: string | null;
+  /**
+   * Path to a dotenv (`KEY=value`) file to load into `process.env` before the
+   * run starts. Useful for the playground/goal modes when the `.env` lives
+   * outside the current working directory. Values override the process env.
+   * Named `--env-path` (not `--env-file`) to avoid colliding with Node's own
+   * reserved `--env-file` CLI flag.
+   */
+  envFile: string | null;
   /** Strict YAML parsing — fail on unrecognized steps instead of LLM fallback */
   strict: boolean;
   /**
@@ -131,6 +140,9 @@ function printHelp(): void {
   );
   console.log(
     `    ${c.flag('--env')} ${c.arg('<name>')}                 ${c.desc('Environment for variables/secrets (e.g. dev, staging)')}`
+  );
+  console.log(
+    `    ${c.flag('--env-path')} ${c.arg('<path>')}            ${c.desc('Load a dotenv (.env) file into process.env (e.g. path/to/.env)')}`
   );
   console.log(
     `    ${c.flag('--playground')}                    ${c.desc('Interactive REPL for building flows')}`
@@ -196,6 +208,9 @@ function printHelp(): void {
   console.log(`    ${c.comment('# Playground on iOS')}`);
   console.log(`    ${c.example('appclaw --playground --platform ios --device-type simulator')}`);
   console.log();
+  console.log(`    ${c.comment('# Playground with a custom .env file')}`);
+  console.log(`    ${c.example('appclaw --playground --env-path path/to/.env')}`);
+  console.log();
   console.log(`    ${c.comment('# YAML flow on Android')}`);
   console.log(`    ${c.example('appclaw --flow examples/flows/google-search.yaml')}`);
   console.log();
@@ -259,6 +274,7 @@ function parseArgs(): CLIArgs {
   let deviceName: string | null = null;
   let json = false;
   let env: string | null = null;
+  let envFile: string | null = null;
   let strict = false;
   let exportPath: string | null = null;
   let exportDir: string | null = null;
@@ -271,6 +287,10 @@ function parseArgs(): CLIArgs {
       reportPort = parseInt(args[++i] ?? '4173', 10) || 4173;
     } else if (args[i] === '--env') {
       env = args[++i] ?? null;
+    } else if (args[i] === '--env-path') {
+      envFile = args[++i] ?? null;
+    } else if (args[i].startsWith('--env-path=')) {
+      envFile = args[i].slice('--env-path='.length) || null;
     } else if (args[i] === '--record') {
       record = true;
     } else if (args[i] === '--replay') {
@@ -352,6 +372,7 @@ function parseArgs(): CLIArgs {
     deviceName,
     json,
     env,
+    envFile,
     strict,
     exportPath,
     exportDir,
@@ -395,6 +416,22 @@ async function main() {
     silenceTerminalUI();
   }
   await ui.initUI();
+  // Load a custom dotenv file (--env-file) before config is read, so its values
+  // (LLM keys, device settings, secrets, …) populate process.env for this run.
+  // `override: true` lets the explicit file win over an already-loaded cwd .env.
+  if (cliArgs.envFile) {
+    const envFilePath = resolve(process.cwd(), cliArgs.envFile);
+    if (!existsSync(envFilePath)) {
+      ui.printError(`--env-path not found: ${cliArgs.envFile}`, `Resolved to ${envFilePath}`);
+      process.exit(1);
+    }
+    const { error } = loadDotenvFile({ path: envFilePath, override: true, quiet: true });
+    if (error) {
+      ui.printError(`Failed to load --env-path: ${cliArgs.envFile}`, error.message);
+      process.exit(1);
+    }
+    ui.printSetupOk(`Loaded env file: ${cliArgs.envFile}`);
+  }
   const config = loadConfig();
 
   // ─── Report mode (serve execution reports) ──────────────
@@ -462,6 +499,7 @@ async function main() {
         deviceType: cliArgs.deviceType,
         udid: cliArgs.deviceUdid,
         deviceName: cliArgs.deviceName,
+        exportDir: cliArgs.exportDir,
       });
       return;
     }
@@ -470,6 +508,7 @@ async function main() {
       deviceType: cliArgs.deviceType,
       udid: cliArgs.deviceUdid,
       deviceName: cliArgs.deviceName,
+      exportDir: cliArgs.exportDir,
     });
     return;
   }
