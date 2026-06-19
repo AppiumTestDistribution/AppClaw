@@ -158,6 +158,79 @@ function scrollCoordsForDistance(
     : { x: centerX - half, y: centerY, endX: centerX + half, endY: centerY };
 }
 
+/**
+ * Resolve a target label to its on-screen center `[x, y]` in device coordinates,
+ * or null when it can't be located. Vision-first when available (handles
+ * icon-only / unlabeled elements), then falls back to DOM page-source matching.
+ */
+async function resolveTargetCenter(
+  mcp: MCPClient,
+  target: string
+): Promise<[number, number] | null> {
+  if (isVisionMode() || isVisionLocateEnabled()) {
+    try {
+      const visionUuid = await findElementByVision(mcp, target);
+      const coords = parseAIElementCoords(visionUuid);
+      if (coords) return [coords.x, coords.y];
+    } catch {
+      // Fall through to DOM.
+    }
+  }
+  try {
+    const pageSource = await getPageSource(mcp);
+    const platform = detectPlatform(pageSource);
+    const elements =
+      platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
+    const wantsClickable = trailingRoleWord(target) != null;
+    const pick = elements
+      .map((el) => ({ el, s: scoreTapMatch(el, target) }))
+      .filter((x) => x.s >= 0)
+      .map((x) => ({ ...x, eff: x.s + (wantsClickable && !x.el.clickable ? 0.5 : 0) }))
+      .sort((a, b) => {
+        if (a.eff !== b.eff) return a.eff - b.eff;
+        if (a.el.clickable !== b.el.clickable) return a.el.clickable ? -1 : 1;
+        return 0;
+      })[0]?.el;
+    if (pick) return pick.center;
+  } catch {
+    // Fall through.
+  }
+  return null;
+}
+
+/**
+ * Start/end coordinates for an element-anchored swipe: begin at `center` and
+ * move `distance` of the screen toward `direction`. Unlike `scrollCoordsForDistance`,
+ * this is a LITERAL drag (no Android scrollbar flip) — "swipe the slider right"
+ * should move the thumb right, not scroll content.
+ */
+function anchoredSwipeCoords(
+  mcp: MCPClient,
+  center: [number, number],
+  direction: 'up' | 'down' | 'left' | 'right',
+  distance?: ScrollDistance
+): { x: number; y: number; endX: number; endY: number } {
+  const [x, y] = center;
+  const size = getCachedScreenSize(mcp);
+  const fraction = SCROLL_DISTANCE_FRACTION[distance ?? 'medium'];
+  const spanX = Math.floor((size?.width ?? 1080) * fraction);
+  const spanY = Math.floor((size?.height ?? 1920) * fraction);
+  // Only clamp to bounds when the real screen size is known — clamping to the
+  // fallback dims could push the endpoint to the wrong side of the start coord.
+  const clampX = (v: number) => (size ? Math.max(1, Math.min(size.width - 1, v)) : Math.max(1, v));
+  const clampY = (v: number) => (size ? Math.max(1, Math.min(size.height - 1, v)) : Math.max(1, v));
+  switch (direction) {
+    case 'right':
+      return { x, y, endX: clampX(x + spanX), endY: y };
+    case 'left':
+      return { x, y, endX: clampX(x - spanX), endY: y };
+    case 'down':
+      return { x, y, endX: x, endY: clampY(y + spanY) };
+    case 'up':
+      return { x, y, endX: x, endY: clampY(y - spanY) };
+  }
+}
+
 export interface RunYamlFlowResult {
   success: boolean;
   stepsExecuted: number;
@@ -228,28 +301,79 @@ function stepLabel(step: FlowStep): string {
   }
 }
 
-function scoreTapMatch(el: UIElement, needle: string): number {
-  if (el.enabled === false) return -1;
-  const n = needle.toLowerCase();
-  const text = el.text.toLowerCase();
-  const hint = (el.hint ?? '').toLowerCase();
-  const aid = el.accessibilityId.toLowerCase();
-  const id = el.id.toLowerCase();
+/**
+ * Trailing words that name an element's *role* rather than its visible label.
+ * "login button" means "the Login control" — the word "button" is a type hint,
+ * so matching it against element text would wrongly favour a static label like
+ * a header title "Login" over the real (differently-cased) "LOG IN" button.
+ */
+const ROLE_WORDS = new Set([
+  'button',
+  'btn',
+  'field',
+  'input',
+  'textbox',
+  'textfield',
+  'icon',
+  'image',
+  'link',
+  'tab',
+  'option',
+  'item',
+  'menu',
+  'toggle',
+  'switch',
+  'checkbox',
+  'radio',
+  'label',
+  'cell',
+  'row',
+]);
 
-  const fields = [text, hint, aid, id];
-  // Score 0: exact match
-  for (const f of fields) {
-    if (f === n) return 0;
+/** Collapse case + separators so "LOG IN", "log-in" and "login" all compare equal. */
+function squashLabel(s: string): string {
+  return s.toLowerCase().replace(/[\s\-_]+/g, '');
+}
+
+/** The trailing role word of a needle ("login button" → "button"), or null. */
+export function trailingRoleWord(needle: string): string | null {
+  const parts = needle.trim().split(/\s+/);
+  const last = parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+  return last && ROLE_WORDS.has(last) ? last : null;
+}
+
+/** Drop a trailing role word: "login button" → "login". Unchanged when none. */
+function stripRoleWord(needle: string): string {
+  return trailingRoleWord(needle) ? needle.trim().replace(/\s+\S+$/, '') : needle;
+}
+
+export function scoreTapMatch(el: UIElement, needle: string): number {
+  if (el.enabled === false) return -1;
+
+  const fields = [el.text, el.hint ?? '', el.accessibilityId, el.id]
+    .map(squashLabel)
+    .filter((f) => f.length > 0);
+  if (fields.length === 0) return -1;
+
+  // Match against the raw needle AND a role-word-stripped variant
+  // ("login button" → also "login"), separator-insensitively, keeping the best
+  // (lowest) score. Keeping the raw needle means a literal "Radio button" label
+  // still matches exactly when the user types "radio button".
+  const needles = [needle, stripRoleWord(needle)].map(squashLabel).filter((n) => n.length > 0);
+
+  let best = -1;
+  for (const n of needles) {
+    for (const f of fields) {
+      let s = -1;
+      if (f === n)
+        s = 0; // exact
+      else if (n.length >= 2 && f.includes(n))
+        s = 1; // needle inside field
+      else if (f.length >= 2 && n.includes(f)) s = 2; // field inside needle
+      if (s >= 0 && (best === -1 || s < best)) best = s;
+    }
   }
-  // Score 1: needle is inside a field (e.g. needle="Login" in "Login button")
-  for (const f of fields) {
-    if (f.includes(n)) return 1;
-  }
-  // Score 2: field is inside needle (e.g. field="GOT IT" in needle="got it button")
-  for (const f of fields) {
-    if (f && n.includes(f)) return 2;
-  }
-  return -1;
+  return best;
 }
 
 /**
@@ -331,11 +455,17 @@ async function tryTapByLabelOnDom(
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
 
+  // When the user named a tappable role ("...button/link/tab"), an equally-good
+  // but non-clickable text match (e.g. a header title) must not out-rank the
+  // real control. Nudge non-clickable candidates back by half a score level so
+  // they still beat a clearly worse clickable match, but lose ties.
+  const wantsClickable = trailingRoleWord(label) != null;
   const scored = elements
     .map((el) => ({ el, s: scoreTapMatch(el, label) }))
     .filter((x) => x.s >= 0)
+    .map((x) => ({ ...x, eff: x.s + (wantsClickable && !x.el.clickable ? 0.5 : 0) }))
     .sort((a, b) => {
-      if (a.s !== b.s) return a.s - b.s;
+      if (a.eff !== b.eff) return a.eff - b.eff;
       if (a.el.clickable !== b.el.clickable) return a.el.clickable ? -1 : 1;
       return 0;
     });
@@ -444,10 +574,18 @@ async function longPressByLabel(
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
 
+  // Lower score = better match (0 = exact); prefer clickable on ties — same
+  // ranking as the tap path so "long press the X button" disambiguates the same.
+  const wantsClickable = trailingRoleWord(label) != null;
   const scored = elements
     .map((el) => ({ el, s: scoreTapMatch(el, label) }))
     .filter((x) => x.s >= 0)
-    .sort((a, b) => b.s - a.s);
+    .map((x) => ({ ...x, eff: x.s + (wantsClickable && !x.el.clickable ? 0.5 : 0) }))
+    .sort((a, b) => {
+      if (a.eff !== b.eff) return a.eff - b.eff;
+      if (a.el.clickable !== b.el.clickable) return a.el.clickable ? -1 : 1;
+      return 0;
+    });
 
   const pick = scored[0]?.el;
   if (!pick) return { success: false, message: `No matching element for "${label}"` };
@@ -1111,11 +1249,29 @@ export async function executeStep(
       const dir = step.direction;
       const count = scroll?.times ?? step.repeat ?? 1;
       const gestureAction = dir === 'left' || dir === 'right' ? 'swipe' : 'scroll';
+
+      // Element-anchored swipe: when a target is named ("swipe the slider to the
+      // right"), start the gesture from that element's center. Falls back to a
+      // screen-center swipe if the element can't be located.
+      let anchorCoords: { x: number; y: number; endX: number; endY: number } | null = null;
+      let anchored = false;
+      if (step.target) {
+        const center = await resolveTargetCenter(mcp, step.target);
+        if (center) {
+          anchorCoords = anchoredSwipeCoords(mcp, center, dir, scroll?.distance);
+          anchored = true;
+        } else {
+          ui.printAgentBullet(
+            `"${step.target}" not found — swiping ${dir} from screen center instead`
+          );
+        }
+      }
+
       // Distance control: appium-mcp ignores scrollDistance for plain scroll/swipe,
       // so a custom distance is driven by explicit start/end coordinates instead.
-      const customCoords = scroll?.distance
-        ? scrollCoordsForDistance(mcp, dir, scroll.distance)
-        : null;
+      const customCoords =
+        anchorCoords ??
+        (scroll?.distance ? scrollCoordsForDistance(mcp, dir, scroll.distance) : null);
       let lastError = '';
       for (let i = 0; i < count; i++) {
         const result = await mcp.callTool('appium_gesture', {
@@ -1134,9 +1290,11 @@ export async function executeStep(
         if (i < count - 1) await sleep(300);
       }
       const distanceNote = scroll?.distance ? ` (${scroll.distance})` : '';
+      const onNote = anchored ? ` on "${step.target}"` : '';
       return {
         success: true,
-        message: (count > 1 ? `Swiped ${dir} ${count} times` : `Swiped ${dir}`) + distanceNote,
+        message:
+          (count > 1 ? `Swiped ${dir} ${count} times` : `Swiped ${dir}`) + onNote + distanceNote,
       };
     }
     case 'zoom': {

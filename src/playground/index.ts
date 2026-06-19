@@ -240,7 +240,7 @@ function resolvePlaygroundExportPath(filename: string, asSdkTest: boolean): stri
     return path.resolve(process.cwd(), filename);
   }
   if (asSdkTest) {
-    const dir = loadConfig().EXPORT_DIR;
+    const dir = _deviceArgs.exportDir ?? loadConfig().EXPORT_DIR;
     return path.resolve(process.cwd(), dir, filename);
   }
   return path.resolve(process.cwd(), filename);
@@ -496,14 +496,14 @@ const COMMANDS: Record<string, { desc: string; run: (arg: string) => Promise<voi
   },
   '/export': {
     desc:
-      'Export steps. YAML by default (e.g. /export my-flow.yaml) or SDK test ' +
-      'by extension (.test.ts/.spec.ts/.ts).',
+      'Export steps. SDK vitest test by default (e.g. /export my-flow.test.ts) ' +
+      'or YAML flow by extension (.yaml/.yml).',
     run: (arg: string) => {
       if (state.steps.length === 0) {
         console.log(`\n  ${theme.error('✗')} No steps to export.\n`);
         return;
       }
-      const filename = arg.trim() || `flow-${Date.now()}.yaml`;
+      const filename = arg.trim() || `flow-${Date.now()}.test.ts`;
       const asSdkTest = isSdkTestFilename(filename);
       const filepath = resolvePlaygroundExportPath(filename, asSdkTest);
       const body = asSdkTest ? buildSdkTestString() : buildYamlString();
@@ -770,7 +770,7 @@ function printHelp(): void {
 
 function printPlaygroundHeader(): void {
   const content = [
-    appGradient('Execute commands live & export as YAML'),
+    appGradient('Execute commands live & export as an SDK test'),
     '',
     `${theme.dim('Commands run on device immediately.')}`,
     `${theme.dim('Use')} ${theme.info('/yaml')} ${theme.dim('to preview and')} ${theme.info('/export')} ${theme.dim('to save.')}`,
@@ -867,6 +867,12 @@ export interface PlaygroundDeviceArgs {
   deviceType?: 'simulator' | 'real' | null;
   udid?: string | null;
   deviceName?: string | null;
+  /**
+   * Override directory for bare-filename SDK-test exports (`--export-dir`).
+   * Takes precedence over the `EXPORT_DIR` config/env default. Ignored for
+   * paths that already include a directory hint or are absolute.
+   */
+  exportDir?: string | null;
 }
 
 /** Stash device args so connectToDevice can use them */
@@ -963,7 +969,7 @@ export async function runPlaygroundJson(deviceArgs?: PlaygroundDeviceArgs): Prom
       }
       if (line.startsWith('/export')) {
         const arg = line.slice(7).trim();
-        const filename = arg || `flow-${Date.now()}.yaml`;
+        const filename = arg || `flow-${Date.now()}.test.ts`;
         const asSdkTest = isSdkTestFilename(filename);
         const filepath = resolvePlaygroundExportPath(filename, asSdkTest);
         if (state.steps.length === 0) {

@@ -1260,8 +1260,22 @@
                     <td>Environment for variable/secret resolution</td>
                   </tr>
                   <tr>
+                    <td>--env-path &lt;path&gt;</td>
+                    <td>
+                      Load a dotenv (<code>.env</code>) file into the environment for this run
+                    </td>
+                  </tr>
+                  <tr>
                     <td>--playground</td>
                     <td>Launch the interactive REPL for building flows</td>
+                  </tr>
+                  <tr>
+                    <td>--export [path]</td>
+                    <td>Write a replayable SDK vitest spec after a goal completes</td>
+                  </tr>
+                  <tr>
+                    <td>--export-dir &lt;dir&gt;</td>
+                    <td>Directory for bare-filename exports (overrides <code>EXPORT_DIR</code>)</td>
                   </tr>
                   <tr>
                     <td>--record</td>
@@ -1365,6 +1379,33 @@
               <span class="code-block-label">Playground</span>
             </div>
             <pre><span class="k">appclaw</span> <span class="fl">--playground</span> <span class="fl">--platform</span> ios <span class="fl">--device-type</span> simulator</pre>
+          </div>
+          <p>
+            When you're happy with the recorded steps, type <code>/export</code> to save them. By
+            default this writes an <strong>SDK vitest spec</strong> (<code>.test.ts</code>); pass a
+            <code>.yaml</code> filename to export a YAML flow instead.
+          </p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Exporting from the REPL</span>
+            </div>
+            <pre><span class="c"># In the REPL prompt:</span>
+/export                  <span class="c"># → SDK vitest spec (flow-&lt;ts&gt;.test.ts)</span>
+/export login.test.ts    <span class="c"># → SDK vitest spec</span>
+/export login.yaml       <span class="c"># → YAML flow</span></pre>
+          </div>
+          <p>
+            Bare-filename exports land in <code>EXPORT_DIR</code> (default
+            <code>.appclaw/exports</code>). Override it per run with <code>--export-dir</code>, and
+            load a custom <code>.env</code> with <code>--env-path</code>:
+          </p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Playground with overrides</span>
+            </div>
+            <pre><span class="k">appclaw</span> <span class="fl">--playground</span> <span class="fl">--env-path</span> path/to/.env <span class="fl">--export-dir</span> tests/generated</pre>
           </div>
         </section>
 
@@ -1526,7 +1567,8 @@
           <h3>Secrets <code>${secrets.X}</code></h3>
           <p>
             Resolved from shell environment variables at runtime. Always shown as
-            <code>***</code> in logs.
+            <code>***</code> in logs. Use <code>--env-path path/to/.env</code> to load these from a
+            dotenv file outside the working directory (values override the process environment).
           </p>
 
           <h3>Environment File</h3>
@@ -2174,6 +2216,13 @@
               <tr>
                 <td>MAX_HISTORY_STEPS</td>
                 <td>Max action history retained (default: 10)</td>
+              </tr>
+              <tr>
+                <td>EXPORT_DIR</td>
+                <td>
+                  Default directory for bare-filename exports / <code>--export</code> writes
+                  (default: <code>.appclaw/exports</code>). Overridden by <code>--export-dir</code>.
+                </td>
               </tr>
             </tbody>
           </table>

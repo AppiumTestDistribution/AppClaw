@@ -70,7 +70,17 @@ export type FlowStep =
   | ({ kind: 'enter' } & Verbatim)
   | ({ kind: 'back' } & Verbatim)
   | ({ kind: 'home' } & Verbatim)
-  | ({ kind: 'swipe'; direction: 'up' | 'down' | 'left' | 'right'; repeat?: number } & Verbatim)
+  | ({
+      kind: 'swipe';
+      direction: 'up' | 'down' | 'left' | 'right';
+      repeat?: number;
+      /**
+       * Optional label of the element to anchor the swipe on (e.g. a slider
+       * thumb). When set, the gesture starts from that element's center and
+       * moves in `direction`. When omitted, swipes from the screen center.
+       */
+      target?: string;
+    } & Verbatim)
   | ({
       kind: 'zoom';
       /** > 1 = zoom in (pinch open), < 1 = zoom out (pinch close). e.g. 2.0 = 2x zoom in, 0.5 = zoom out */
