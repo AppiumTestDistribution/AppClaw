@@ -1,3 +1,9 @@
+## [1.5.2](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.1...v1.5.2) (2026-06-19)
+
+### Bug Fixes
+
+* finding elements in dom mode ([#32](https://github.com/AppiumTestDistribution/AppClaw/issues/32)) ([37f3928](https://github.com/AppiumTestDistribution/AppClaw/commit/37f3928c062417b2c9bc8850b3c9398e714feade))
+
 ## [1.5.1](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.0...v1.5.1) (2026-06-18)
 
 ### Bug Fixes
