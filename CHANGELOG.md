@@ -1,3 +1,9 @@
+## [1.5.3](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.2...v1.5.3) (2026-06-20)
+
+### Bug Fixes
+
+* update the CLI ([#33](https://github.com/AppiumTestDistribution/AppClaw/issues/33)) ([06492b7](https://github.com/AppiumTestDistribution/AppClaw/commit/06492b7f3fafb95908e3940a9fa337419b7f1fa9))
+
 ## [1.5.2](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.1...v1.5.2) (2026-06-19)
 
 ### Bug Fixes
