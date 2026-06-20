@@ -597,6 +597,30 @@ async function longPressByLabel(
   return { success: true, message: `Long-pressed "${label}" (${duration}ms)` };
 }
 
+/**
+ * Vision: locate a text input field by KIND (not by literal label) and tap to focus it.
+ * Returns true if a field was tapped. A literal label like "search box"/"textbox" rarely
+ * matches a field whose only visible text is a placeholder (e.g. "Search Fox Sports"), so
+ * describing the element kind is far more reliable for the type path.
+ *
+ * When `hint` is given (the user's target field), it's folded into the query so a screen
+ * with several fields still resolves the RIGHT one (e.g. "password field") instead of
+ * blindly grabbing the first input — this keeps the targeted fallback from mis-focusing.
+ */
+async function focusInputFieldByVision(mcp: MCPClient, hint?: string): Promise<boolean> {
+  const query = hint
+    ? `text input field or search box for "${hint}"`
+    : 'text input field, search box, or editable area';
+  const visionUuid = await findByVision(mcp, query);
+  if (!visionUuid) return false;
+  if (isAIElement(visionUuid)) {
+    const coords = parseAIElementCoords(visionUuid);
+    return coords ? await tapAtCoordinates(mcp, coords.x, coords.y) : false;
+  }
+  await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: visionUuid });
+  return true;
+}
+
 async function flowTypeText(
   mcp: MCPClient,
   text: string,
@@ -608,7 +632,12 @@ async function flowTypeText(
   // ── If a target field is specified, tap it first to focus (implicit wait) ──
   if (target) {
     const tapResult = await tapByLabel(mcp, target, poll);
-    if (!tapResult.success) {
+    // Vision mode: a literal label like "search box"/"textbox" usually won't match a field
+    // that only shows a placeholder. Fall back to locating the input field by kind before
+    // giving up, so `type "x" → search box` works the same as the no-target path.
+    const focused =
+      tapResult.success || (isVisionMode() && (await focusInputFieldByVision(mcp, target)));
+    if (!focused) {
       return { success: false, message: `Could not find target field "${target}" to type into` };
     }
     await sleep(Config.CLOUD_PROVIDER ? 1200 : 300); // Cloud needs longer to settle focus
@@ -618,15 +647,7 @@ async function flowTypeText(
   if (isVisionMode()) {
     // If no target was specified, use vision to find and tap an input field
     if (!target) {
-      const visionUuid = await findByVision(mcp, 'text input field, search box, or editable area');
-      if (visionUuid) {
-        if (isAIElement(visionUuid)) {
-          const coords = parseAIElementCoords(visionUuid);
-          if (coords) await tapAtCoordinates(mcp, coords.x, coords.y);
-        } else {
-          await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: visionUuid });
-        }
-      }
+      await focusInputFieldByVision(mcp);
     }
     // Type via W3C Actions — works on local and cloud, Android and iOS
     const sv = await typeViaSetValue(mcp, text);
