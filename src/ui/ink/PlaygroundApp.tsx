@@ -25,12 +25,7 @@ const QUIT = new Set(['/quit', '/exit', '/q']);
  * pins a styled prompt + status bar at the bottom, and lets command output
  * scroll above it via Ink's patchConsole.
  */
-export function PlaygroundApp({
-  info,
-  onCommand,
-  onQuit,
-  refreshStepCount,
-}: PlaygroundAppProps) {
+export function PlaygroundApp({ info, onCommand, onQuit, refreshStepCount }: PlaygroundAppProps) {
   const { exit } = useApp();
   const ui = useSyncExternalStore(subscribe, getSnapshot);
   const [value, setValue] = useState('');

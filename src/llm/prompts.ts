@@ -109,11 +109,11 @@ RULES
 
 1. VERIFY BEFORE DECIDING — before EVERY action, study the screenshot. Ask yourself: "What do I see? What changed? Is there something I need to handle first?" Only then choose your next action.
 2. ONE STEP AT A TIME — do the NEXT logical step only. Don't skip ahead.
-3. AFTER TYPING — after find_and_type, your NEXT action must be based on what the screenshot shows:
-   - Suggestion/dropdown visible? → TAP the correct suggestion. Not done yet.
-   - Chip/pill created (input confirmed)? → You can proceed or call done.
-   - Raw text with no confirmation? → Press ENTER or tap elsewhere to confirm.
-   - NEVER call "done" right after typing. Always verify first.
+3. AFTER TYPING — look at the screenshot, then act based on YOUR GOAL:
+   - Goal is to SELECT / navigate to a specific item (destination, contact, result)? → tap the matching suggestion in the dropdown.
+   - Goal is only to TYPE / SEARCH / enter text (a later step verifies or reads the results)? → do NOT tap a suggestion; once the text or results are visible, call "done".
+   - Raw text not confirmed and no suggestion to pick? → press ENTER.
+   - Don't tap a suggestion/result unless your goal requires choosing one — tapping it can navigate away from the search.
 4. AFTER TAPPING — after find_and_click, check: did the screen change? If it looks the same, your tap may have missed. Try a different description.
 5. OVERLAYS — if anything is covering the screen (dialog, popup, dropdown, suggestions), handle it FIRST.
 6. NO REPETITION — if an action failed, try something DIFFERENT. Never repeat the same failing action.

@@ -1,12 +1,12 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import { COLORS, symbols } from '../theme.js';
 import type { ResultData } from '../store.js';
 
-const W = 64;
-
 /** Final outcome panel — success or failure. Token/cost shown separately. */
 export function ResultBox({ result, durationMs }: { result: ResultData; durationMs: number }) {
+  const { stdout } = useStdout();
+  const W = Math.min((stdout?.columns ?? 80) - 4, 100);
   const ok = result.status === 'success';
   const color = ok ? COLORS.green : COLORS.red;
   const icon = ok ? symbols.check : symbols.cross;
@@ -17,8 +17,8 @@ export function ResultBox({ result, durationMs }: { result: ResultData; duration
       : `${Math.floor(durationMs / 60000)}m ${Math.round((durationMs % 60000) / 1000)}s`;
 
   return (
-    <Box flexDirection="column" marginTop={1} width={W + 4}>
-      <Box borderStyle="round" borderColor={color} flexDirection="column" paddingX={1} width={W + 4}>
+    <Box flexDirection="column" marginTop={1} width={W}>
+      <Box borderStyle="round" borderColor={color} flexDirection="column" paddingX={1} width={W}>
         <Box>
           <Text bold color={color}>
             {icon} {label}

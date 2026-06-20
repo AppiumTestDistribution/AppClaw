@@ -60,6 +60,13 @@ const inkRenderer: UIRenderer = {
     store.startSubGoal(goal, maxSteps);
   },
 
+  printPlan(subGoals, reasoning) {
+    store.plan(
+      subGoals.map((s) => s.goal),
+      reasoning
+    );
+  },
+
   printPlanContext(overallGoal, currentGoal, allGoals, currentIndex) {
     store.setSubGoal(currentIndex, allGoals.length, overallGoal, currentGoal);
   },
@@ -243,20 +250,22 @@ export function activateInk(ctx?: {
   if (instance) return;
   try {
     store.reset();
-    let debug = false;
     if (ctx) {
       const { showSteps, ...runCtx } = ctx;
       store.setRunContext(runCtx);
-      if (showSteps !== undefined) {
-        store.setShowSteps(showSteps);
-        debug = showSteps; // debug mode shows per-step rows
-      }
+      if (showSteps !== undefined) store.setShowSteps(showSteps);
     }
     // Fullscreen (pinned footer, scrolling viewport) on interactive TTYs, but
-    // NOT in debug mode — debug emits raw console.logs that would corrupt the
-    // alternate screen, so it falls back to scrollback rendering.
+    // NOT when EITHER debug flag is set — both emit raw console.logs (MCP traffic
+    // or AppClaw internals) that would corrupt the alternate screen, so debug
+    // falls back to scrollback rendering.
+    const anyDebug =
+      process.env.MCP_DEBUG === '1' ||
+      process.env.MCP_DEBUG === 'true' ||
+      process.env.APPCLAW_DEBUG === '1' ||
+      process.env.APPCLAW_DEBUG === 'true';
     const fullscreen =
-      !debug &&
+      !anyDebug &&
       process.env.APPCLAW_FULLSCREEN !== 'off' &&
       !!process.stdout.isTTY &&
       (process.stdout.rows ?? 0) > 0;

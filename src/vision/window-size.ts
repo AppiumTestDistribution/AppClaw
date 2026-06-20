@@ -193,7 +193,7 @@ export async function getScreenSizeForStark(
     if (modelId) {
       const size = getIOSScreenSizeFromModel(modelId);
       if (size) {
-        if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
+        if (process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true') {
           console.log(
             `        [window-size] iOS model ${modelId} → ${size.width}×${size.height} pts`
           );

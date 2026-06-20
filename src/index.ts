@@ -143,7 +143,7 @@ function printHelp(): void {
     `    ${c.flag('--env')} ${c.arg('<name>')}                 ${c.desc('Environment for variables/secrets (e.g. dev, staging)')}`
   );
   console.log(
-    `    ${c.flag('--env-path')} ${c.arg('<path>')}            ${c.desc('Load a dotenv (.env) file into process.env (e.g. path/to/.env)')}`
+    `    ${c.flag('--env-path')} ${c.arg('<path>')}            ${c.desc('Load a dotenv file into process.env (alias: --env-file, after the script)')}`
   );
   console.log(
     `    ${c.flag('--playground')}                    ${c.desc('Interactive REPL for building flows')}`
@@ -288,10 +288,12 @@ function parseArgs(): CLIArgs {
       reportPort = parseInt(args[++i] ?? '4173', 10) || 4173;
     } else if (args[i] === '--env') {
       env = args[++i] ?? null;
-    } else if (args[i] === '--env-path') {
+    } else if (args[i] === '--env-path' || args[i] === '--env-file') {
+      // `--env-file` is also accepted here: Node only reserves it when it
+      // appears BEFORE the script entry, so after `src/index.ts` it's ours.
       envFile = args[++i] ?? null;
-    } else if (args[i].startsWith('--env-path=')) {
-      envFile = args[i].slice('--env-path='.length) || null;
+    } else if (args[i].startsWith('--env-path=') || args[i].startsWith('--env-file=')) {
+      envFile = args[i].slice(args[i].indexOf('=') + 1) || null;
     } else if (args[i] === '--record') {
       record = true;
     } else if (args[i] === '--replay') {
@@ -423,12 +425,12 @@ async function main() {
   if (cliArgs.envFile) {
     const envFilePath = resolve(process.cwd(), cliArgs.envFile);
     if (!existsSync(envFilePath)) {
-      ui.printError(`--env-path not found: ${cliArgs.envFile}`, `Resolved to ${envFilePath}`);
+      ui.printError(`env file not found: ${cliArgs.envFile}`, `Resolved to ${envFilePath}`);
       process.exit(1);
     }
     const { error } = loadDotenvFile({ path: envFilePath, override: true, quiet: true });
     if (error) {
-      ui.printError(`Failed to load --env-path: ${cliArgs.envFile}`, error.message);
+      ui.printError(`Failed to load env file: ${cliArgs.envFile}`, error.message);
       process.exit(1);
     }
     ui.printSetupOk(`Loaded env file: ${cliArgs.envFile}`);
@@ -1019,12 +1021,24 @@ async function main() {
       },
     });
 
-    if (planResult.isComplex) {
-      ui.printPlan(planResult.subGoals, planResult.reasoning);
-    } else {
-      ui.printInfo('Simple goal — executing directly');
-      console.log();
-    }
+    // ── Ink TUI: mount the live agent-loop UI on interactive TTYs only ──
+    // (never in --json / piped / SDK). Plain console output is the fallback.
+    // Mounted BEFORE the plan so the plan becomes the first transcript entry
+    // (and is preserved in the scrollback dump on exit).
+    const useInk = shouldUseInk() && !isJsonMode() && process.env.APPCLAW_TUI !== 'off';
+    if (useInk)
+      activateInk({
+        overallGoal: goal,
+        subGoalTotal: executor.all.length,
+        model: modelName,
+        mode: config.AGENT_MODE,
+        // Per-step rows are debug-only; default view shows sub-goals + outcomes.
+        // Gated by APPCLAW_DEBUG (MCP_DEBUG only adds the MCP traffic lane).
+        showSteps: process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true',
+      });
+
+    // Seed the live plan checklist (both simple and complex goals).
+    ui.printPlan(planResult.subGoals, planResult.reasoning);
 
     // Execute each sub-goal sequentially
     let subGoalIdx = 0;
@@ -1041,316 +1055,307 @@ async function main() {
     // complete trajectory (including exploration) for debugging.
     const exportHistory: any[] = [];
 
-    // ── Ink TUI: mount the live agent-loop UI on interactive TTYs only ──
-    // (never in --json / piped / SDK). Plain console output is the fallback.
-    const useInk = shouldUseInk() && !isJsonMode() && process.env.APPCLAW_TUI !== 'off';
-    if (useInk)
-      activateInk({
-        overallGoal: goal,
-        subGoalTotal: executor.all.length,
-        model: modelName,
-        mode: config.AGENT_MODE,
-        // Per-step rows are debug-only; default view shows sub-goals + outcomes.
-        showSteps: process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true',
-      });
-
     try {
-    while (!executor.isDone()) {
-      const subGoal = executor.current!;
+      while (!executor.isDone()) {
+        const subGoal = executor.current!;
 
-      // Reset action history between sub-goals for clean context
-      llm.resetHistory();
+        // Reset action history between sub-goals for clean context
+        llm.resetHistory();
 
-      // Each sub-goal gets the full MAX_STEPS budget
-      const stepsPerGoal = config.MAX_STEPS;
+        // Each sub-goal gets the full MAX_STEPS budget
+        const stepsPerGoal = config.MAX_STEPS;
 
-      // ─── Screen-aware orchestration ─────────────────────
-      // Before executing, check the screen and decide: skip, rewrite, or proceed
-      let effectiveGoal = subGoal.goal;
+        // ─── Screen-aware orchestration ─────────────────────
+        // Before executing, check the screen and decide: skip, rewrite, or proceed
+        let effectiveGoal = subGoal.goal;
 
-      if (planResult.isComplex && subGoalIdx > 0) {
-        ui.startSpinner('Reconciling plan with device…', 'orchestrator');
-        try {
-          // Capture DOM and/or screenshot for orchestration between sub-goals.
-          // Match agent loop: skip XML when AGENT_MODE=vision (orchestrator uses screenshot).
-          const captureScreenshot =
-            config.VISION_MODE !== 'never' || config.AGENT_MODE === 'vision';
-          const skipOrchestratorPageSource = config.AGENT_MODE === 'vision';
-          const screenState = await getScreenState(
-            agentScopedMcp,
-            config.MAX_ELEMENTS,
-            captureScreenshot,
-            skipOrchestratorPageSource
-          );
-          const orchestratorDom =
-            skipOrchestratorPageSource && !screenState.dom.trim()
-              ? '(Vision mode: XML page source omitted — use the screenshot for visual state.)'
-              : screenState.dom;
-
-          const orchestratorScreenshot = await prepareScreenshotForLlm(
-            screenState.screenshot,
-            config.LLM_SCREENSHOT_MAX_EDGE_PX
-          );
-
-          // ─── Parallel: Screen readiness + Sub-goal evaluation ──
-          // Run both checks in parallel — they're independent.
-          // If readiness rewrites the goal, we skip the evaluation result.
-          const prevGoal = executor.all[subGoalIdx - 1];
-          const completedGoalsList = executor.all
-            .filter((sg) => sg.status === 'completed')
-            .map((sg) => `${sg.executedAs ?? sg.goal} → ${sg.result}`);
-
-          const [readiness, decision] = await Promise.all([
-            prevGoal
-              ? assessScreenReadiness(
-                  plannerModel,
-                  prevGoal.executedAs ?? prevGoal.goal,
-                  subGoal.goal,
-                  orchestratorDom,
-                  thinkingOptions,
-                  orchestratorScreenshot,
-                  journeyAppGuide
-                )
-              : Promise.resolve({ ready: true, issues: [] as string[] } as {
-                  ready: boolean;
-                  issues: string[];
-                  suggestedAction?: string;
-                }),
-            evaluateSubGoal(
-              plannerModel,
-              goal,
-              subGoal.goal,
-              completedGoalsList,
-              orchestratorDom,
-              thinkingOptions,
-              orchestratorScreenshot,
-              journeyAppGuide
-            ),
-          ]);
-
-          // Apply readiness result
-          if (readiness && !readiness.ready) {
-            ui.stopSpinner();
-            ui.printScreenReadiness(readiness.issues, readiness.suggestedAction);
-            if (readiness.suggestedAction) {
-              effectiveGoal = `${readiness.suggestedAction}, then ${subGoal.goal}`;
-              ui.printOrchestratorRewrite(subGoal.goal, effectiveGoal);
-            }
-            ui.startSpinner('Reconciling plan with device…', 'orchestrator');
-          }
-
-          // Apply evaluation result (only if readiness didn't already rewrite)
-          if (effectiveGoal === subGoal.goal) {
-            if (decision.action === 'skip') {
-              ui.stopSpinner();
-              ui.printOrchestratorSkip(subGoal.goal, decision.reason);
-              executor.markCompleted(decision.reason);
-              subGoalIdx++;
-              continue;
-            }
-            ui.stopSpinner();
-            if (decision.action === 'rewrite' && decision.rewrittenGoal) {
-              ui.printOrchestratorRewrite(subGoal.goal, decision.rewrittenGoal);
-              effectiveGoal = decision.rewrittenGoal;
-            } else {
-              ui.printOrchestratorProceed(subGoal.goal);
-            }
-          }
-        } catch (err) {
-          // Orchestrator failed — proceed with original goal
-          ui.stopSpinner();
-          ui.printWarning(`Orchestrator check failed: ${err}`);
-        }
-        ui.stopSpinner();
-      }
-
-      if (planResult.isComplex) {
-        ui.printPlanContext(goal, effectiveGoal, executor.all, subGoalIdx);
-      }
-
-      // Build enriched goal with plan context so the LLM doesn't undo progress
-      let enrichedGoal = effectiveGoal;
-      if (planResult.isComplex) {
-        const completedGoals = executor.all
-          .filter((sg) => sg.status === 'completed')
-          .map((sg) => `✓ ${sg.goal} (${sg.result})`)
-          .join('\n');
-        const remainingGoals = executor.all
-          .filter((sg) => sg.status === 'pending' && sg.index !== subGoal.index)
-          .map((sg) => `○ ${sg.goal}`)
-          .join('\n');
-
-        if (completedGoals) {
-          enrichedGoal += `\n\nCONTEXT — Overall goal: "${goal}"\nAlready completed:\n${completedGoals}`;
-          if (remainingGoals) {
-            enrichedGoal += `\nStill pending (handled separately — NOT your job):\n${remainingGoals}`;
-          }
-          enrichedGoal += `\n\nIMPORTANT:`;
-          enrichedGoal += `\n- Previous sub-goals are DONE. Do NOT navigate backwards or undo their work.`;
-          enrichedGoal += `\n- ONLY perform actions for YOUR current sub-goal: "${effectiveGoal}". Do NOT perform actions for pending sub-goals — they will be handled separately after you call "done".`;
-          enrichedGoal += `\n- Once YOUR sub-goal is achieved, call "done" IMMEDIATELY. Do NOT continue to the next step.`;
-        }
-      }
-
-      // Track the actual goal being executed so reconciliation uses the rewritten goal, not the original
-      subGoal.executedAs = effectiveGoal;
-
-      // ── App-ID propagation (Fix B) ────────────────────
-      // If we still don't know the target app, try to extract it from the
-      // current sub-goal text. The planner often produces a sub-goal like
-      // "Launch the YouTube app" even when the user's original goal didn't
-      // contain "open|launch|start". Resolving here means every subsequent
-      // sub-goal can stamp recorder entries with a real appId.
-      if (!journeyAppId) {
-        const { extractAppIdFromText } = await import('./memory/fingerprint.js');
-        journeyAppId =
-          extractAppIdFromText(effectiveGoal) ||
-          (() => {
-            const m = effectiveGoal.match(
-              /(?:open|launch|start|use|in)\s+(?:the\s+)?(\w[\w\s]*?)(?:\s+app|\s+and\b|$)/i
+        if (planResult.isComplex && subGoalIdx > 0) {
+          ui.startSpinner('Reconciling plan with device…', 'orchestrator');
+          try {
+            // Capture DOM and/or screenshot for orchestration between sub-goals.
+            // Match agent loop: skip XML when AGENT_MODE=vision (orchestrator uses screenshot).
+            const captureScreenshot =
+              config.VISION_MODE !== 'never' || config.AGENT_MODE === 'vision';
+            const skipOrchestratorPageSource = config.AGENT_MODE === 'vision';
+            const screenState = await getScreenState(
+              agentScopedMcp,
+              config.MAX_ELEMENTS,
+              captureScreenshot,
+              skipOrchestratorPageSource
             );
-            return m ? (appResolver.resolve(m[1].trim()) ?? undefined) : undefined;
-          })();
-      }
+            const orchestratorDom =
+              skipOrchestratorPageSource && !screenState.dom.trim()
+                ? '(Vision mode: XML page source omitted — use the screenshot for visual state.)'
+                : screenState.dom;
 
-      emitJson({
-        event: 'goal_start',
-        data: { goal: effectiveGoal, subGoalIndex: subGoalIdx, totalSubGoals: executor.all.length },
-      });
+            const orchestratorScreenshot = await prepareScreenshotForLlm(
+              screenState.screenshot,
+              config.LLM_SCREENSHOT_MAX_EDGE_PX
+            );
 
-      const result = await runAgent({
-        goal: enrichedGoal,
-        displayGoal: effectiveGoal,
-        mcp: agentScopedMcp,
-        llm,
-        appResolver,
-        appId: journeyAppId,
-        maxSteps: stepsPerGoal,
-        stepDelay: config.STEP_DELAY,
-        maxElements: config.MAX_ELEMENTS,
-        visionMode: config.VISION_MODE,
-        recorder,
-        modelName,
-        onStep: (event) => {
-          logger.logStep({
-            step: event.step,
-            action: event.decision.toolName,
-            decision: event.decision,
-            result: event.result.message,
-            screenHash: '',
-          });
-          emitJson({
-            event: 'step',
-            data: {
+            // ─── Parallel: Screen readiness + Sub-goal evaluation ──
+            // Run both checks in parallel — they're independent.
+            // If readiness rewrites the goal, we skip the evaluation result.
+            const prevGoal = executor.all[subGoalIdx - 1];
+            const completedGoalsList = executor.all
+              .filter((sg) => sg.status === 'completed')
+              .map((sg) => `${sg.executedAs ?? sg.goal} → ${sg.result}`);
+
+            const [readiness, decision] = await Promise.all([
+              prevGoal
+                ? assessScreenReadiness(
+                    plannerModel,
+                    prevGoal.executedAs ?? prevGoal.goal,
+                    subGoal.goal,
+                    orchestratorDom,
+                    thinkingOptions,
+                    orchestratorScreenshot,
+                    journeyAppGuide
+                  )
+                : Promise.resolve({ ready: true, issues: [] as string[] } as {
+                    ready: boolean;
+                    issues: string[];
+                    suggestedAction?: string;
+                  }),
+              evaluateSubGoal(
+                plannerModel,
+                goal,
+                subGoal.goal,
+                completedGoalsList,
+                orchestratorDom,
+                thinkingOptions,
+                orchestratorScreenshot,
+                journeyAppGuide
+              ),
+            ]);
+
+            // Apply readiness result
+            if (readiness && !readiness.ready) {
+              ui.stopSpinner();
+              ui.printScreenReadiness(readiness.issues, readiness.suggestedAction);
+              if (readiness.suggestedAction) {
+                effectiveGoal = `${readiness.suggestedAction}, then ${subGoal.goal}`;
+                ui.printOrchestratorRewrite(subGoal.goal, effectiveGoal);
+              }
+              ui.startSpinner('Reconciling plan with device…', 'orchestrator');
+            }
+
+            // Apply evaluation result (only if readiness didn't already rewrite)
+            if (effectiveGoal === subGoal.goal) {
+              if (decision.action === 'skip') {
+                ui.stopSpinner();
+                ui.printOrchestratorSkip(subGoal.goal, decision.reason);
+                executor.markCompleted(decision.reason);
+                subGoalIdx++;
+                continue;
+              }
+              ui.stopSpinner();
+              if (decision.action === 'rewrite' && decision.rewrittenGoal) {
+                ui.printOrchestratorRewrite(subGoal.goal, decision.rewrittenGoal);
+                effectiveGoal = decision.rewrittenGoal;
+              } else {
+                ui.printOrchestratorProceed(subGoal.goal);
+              }
+            }
+          } catch (err) {
+            // Orchestrator failed — proceed with original goal
+            ui.stopSpinner();
+            ui.printWarning(`Orchestrator check failed: ${err}`);
+          }
+          ui.stopSpinner();
+        }
+
+        if (planResult.isComplex) {
+          ui.printPlanContext(goal, effectiveGoal, executor.all, subGoalIdx);
+        }
+
+        // Build enriched goal with plan context so the LLM doesn't undo progress
+        let enrichedGoal = effectiveGoal;
+        if (planResult.isComplex) {
+          const completedGoals = executor.all
+            .filter((sg) => sg.status === 'completed')
+            .map((sg) => `✓ ${sg.goal} (${sg.result})`)
+            .join('\n');
+          const remainingGoals = executor.all
+            .filter((sg) => sg.status === 'pending' && sg.index !== subGoal.index)
+            .map((sg) => `○ ${sg.goal}`)
+            .join('\n');
+
+          if (completedGoals) {
+            enrichedGoal += `\n\nCONTEXT — Overall goal: "${goal}"\nAlready completed:\n${completedGoals}`;
+            if (remainingGoals) {
+              enrichedGoal += `\nStill pending (handled separately — NOT your job):\n${remainingGoals}`;
+            }
+            enrichedGoal += `\n\nIMPORTANT:`;
+            enrichedGoal += `\n- Previous sub-goals are DONE. Do NOT navigate backwards or undo their work.`;
+            enrichedGoal += `\n- ONLY perform actions for YOUR current sub-goal: "${effectiveGoal}". Do NOT perform actions for pending sub-goals — they will be handled separately after you call "done".`;
+            enrichedGoal += `\n- Once YOUR sub-goal is achieved, call "done" IMMEDIATELY. Do NOT continue to the next step.`;
+          }
+        }
+
+        // Track the actual goal being executed so reconciliation uses the rewritten goal, not the original
+        subGoal.executedAs = effectiveGoal;
+
+        // ── App-ID propagation (Fix B) ────────────────────
+        // If we still don't know the target app, try to extract it from the
+        // current sub-goal text. The planner often produces a sub-goal like
+        // "Launch the YouTube app" even when the user's original goal didn't
+        // contain "open|launch|start". Resolving here means every subsequent
+        // sub-goal can stamp recorder entries with a real appId.
+        if (!journeyAppId) {
+          const { extractAppIdFromText } = await import('./memory/fingerprint.js');
+          journeyAppId =
+            extractAppIdFromText(effectiveGoal) ||
+            (() => {
+              const m = effectiveGoal.match(
+                /(?:open|launch|start|use|in)\s+(?:the\s+)?(\w[\w\s]*?)(?:\s+app|\s+and\b|$)/i
+              );
+              return m ? (appResolver.resolve(m[1].trim()) ?? undefined) : undefined;
+            })();
+        }
+
+        emitJson({
+          event: 'goal_start',
+          data: {
+            goal: effectiveGoal,
+            subGoalIndex: subGoalIdx,
+            totalSubGoals: executor.all.length,
+          },
+        });
+
+        const result = await runAgent({
+          goal: enrichedGoal,
+          displayGoal: effectiveGoal,
+          mcp: agentScopedMcp,
+          llm,
+          appResolver,
+          appId: journeyAppId,
+          maxSteps: stepsPerGoal,
+          stepDelay: config.STEP_DELAY,
+          maxElements: config.MAX_ELEMENTS,
+          visionMode: config.VISION_MODE,
+          recorder,
+          modelName,
+          onStep: (event) => {
+            logger.logStep({
               step: event.step,
               action: event.decision.toolName,
-              target: event.decision.args?.element as string | undefined,
-              args: event.decision.args,
-              success: event.result.success,
-              message: event.result.message,
-            },
-          });
-          // Stream device screenshot after each step
-          if (event.screenshot) {
-            emitJson({
-              event: 'screen',
-              data: { screenshot: event.screenshot, elementCount: event.elementsCount },
+              decision: event.decision,
+              result: event.result.message,
+              screenHash: '',
             });
-          }
-        },
-        // Screen evaluator: checks for unexpected states mid-execution
-        screenEvaluator: planResult.isComplex
-          ? (dom, currentGoal, _step) =>
-              evaluateScreen(plannerModel, currentGoal, dom, thinkingOptions)
-          : undefined,
-      });
+            emitJson({
+              event: 'step',
+              data: {
+                step: event.step,
+                action: event.decision.toolName,
+                target: event.decision.args?.element as string | undefined,
+                args: event.decision.args,
+                success: event.result.success,
+                message: event.result.message,
+              },
+            });
+            // Stream device screenshot after each step
+            if (event.screenshot) {
+              emitJson({
+                event: 'screen',
+                data: { screenshot: event.screenshot, elementCount: event.elementsCount },
+              });
+            }
+          },
+          // Screen evaluator: checks for unexpected states mid-execution
+          screenEvaluator: planResult.isComplex
+            ? (dom, currentGoal, _step) =>
+                evaluateScreen(plannerModel, currentGoal, dom, thinkingOptions)
+            : undefined,
+        });
 
-      totalSteps += result.stepsUsed;
-      allHistory.push(...result.history);
-      {
-        // Trim each sub-goal's history to its successful final attempt before
-        // appending to the export history. Must happen per-sub-goal: a flat
-        // concatenation would misidentify each sub-goal's accepted `done` as a
-        // "non-last rejected done" and drop everything before it.
-        const { keepOnlyFinalAttempt } = await import('./sdk/goal-export.js');
-        exportHistory.push(...keepOnlyFinalAttempt(result.history));
-      }
-      if (result.totalTokens) {
-        journeyInputTokens += result.totalTokens.input;
-        journeyOutputTokens += result.totalTokens.output;
-        journeyCost += result.totalTokens.cost;
-      }
-
-      // After each sub-goal, harvest the appId from any launch_app call or
-      // from a com.X.Y pattern in step results / final reason. This lets the
-      // very first sub-goal ("Launch the YouTube app") establish the app for
-      // every sub-goal that follows.
-      if (!journeyAppId) {
-        const { extractAppIdFromText } = await import('./memory/fingerprint.js');
-        for (const step of result.history) {
-          const launchAppId = step.decision?.args?.appId;
-          if (
-            step.decision?.toolName === 'launch_app' &&
-            typeof launchAppId === 'string' &&
-            launchAppId
-          ) {
-            journeyAppId = launchAppId;
-            break;
-          }
-          const fromResult = extractAppIdFromText(step.result ?? '');
-          if (fromResult) {
-            journeyAppId = fromResult;
-            break;
-          }
+        totalSteps += result.stepsUsed;
+        allHistory.push(...result.history);
+        {
+          // Trim each sub-goal's history to its successful final attempt before
+          // appending to the export history. Must happen per-sub-goal: a flat
+          // concatenation would misidentify each sub-goal's accepted `done` as a
+          // "non-last rejected done" and drop everything before it.
+          const { keepOnlyFinalAttempt } = await import('./sdk/goal-export.js');
+          exportHistory.push(...keepOnlyFinalAttempt(result.history));
         }
+        if (result.totalTokens) {
+          journeyInputTokens += result.totalTokens.input;
+          journeyOutputTokens += result.totalTokens.output;
+          journeyCost += result.totalTokens.cost;
+        }
+
+        // After each sub-goal, harvest the appId from any launch_app call or
+        // from a com.X.Y pattern in step results / final reason. This lets the
+        // very first sub-goal ("Launch the YouTube app") establish the app for
+        // every sub-goal that follows.
         if (!journeyAppId) {
-          journeyAppId = extractAppIdFromText(result.reason ?? '') ?? journeyAppId;
+          const { extractAppIdFromText } = await import('./memory/fingerprint.js');
+          for (const step of result.history) {
+            const launchAppId = step.decision?.args?.appId;
+            if (
+              step.decision?.toolName === 'launch_app' &&
+              typeof launchAppId === 'string' &&
+              launchAppId
+            ) {
+              journeyAppId = launchAppId;
+              break;
+            }
+            const fromResult = extractAppIdFromText(step.result ?? '');
+            if (fromResult) {
+              journeyAppId = fromResult;
+              break;
+            }
+          }
+          if (!journeyAppId) {
+            journeyAppId = extractAppIdFromText(result.reason ?? '') ?? journeyAppId;
+          }
         }
+
+        emitJson({
+          event: 'goal_done',
+          data: {
+            goal: effectiveGoal,
+            success: result.success,
+            reason: result.reason,
+            stepsUsed: result.stepsUsed,
+          },
+        });
+
+        if (result.success) {
+          executor.markCompleted(result.reason);
+        } else {
+          executor.markFailed(result.reason);
+          // Stop on failure for dependent sub-goals
+          const nextGoal = executor.current;
+          if (nextGoal?.dependsOn === subGoalIdx) {
+            ui.printError('Dependent sub-goal cannot proceed', `Sub-goal ${subGoalIdx + 1} failed`);
+            break;
+          }
+        }
+        subGoalIdx++;
       }
 
-      emitJson({
-        event: 'goal_done',
-        data: {
-          goal: effectiveGoal,
-          success: result.success,
-          reason: result.reason,
-          stepsUsed: result.stepsUsed,
+      // ── Final journey summary (rendered while Ink is still mounted) ──
+      allDone = executor.all.every((sg) => sg.status === 'completed');
+      ui.printJourneySummary({
+        success: allDone,
+        overallGoal: goal,
+        subGoals: executor.all.map((sg) => ({
+          goal: sg.goal,
+          status: sg.status,
+          result: sg.result,
+        })),
+        totalSteps,
+        durationMs: Date.now() - journeyStart,
+        tokens: {
+          input: journeyInputTokens,
+          output: journeyOutputTokens,
+          cost: journeyCost,
+          model: modelName,
         },
       });
-
-      if (result.success) {
-        executor.markCompleted(result.reason);
-      } else {
-        executor.markFailed(result.reason);
-        // Stop on failure for dependent sub-goals
-        const nextGoal = executor.current;
-        if (nextGoal?.dependsOn === subGoalIdx) {
-          ui.printError('Dependent sub-goal cannot proceed', `Sub-goal ${subGoalIdx + 1} failed`);
-          break;
-        }
-      }
-      subGoalIdx++;
-    }
-
-    // ── Final journey summary (rendered while Ink is still mounted) ──
-    allDone = executor.all.every((sg) => sg.status === 'completed');
-    ui.printJourneySummary({
-      success: allDone,
-      overallGoal: goal,
-      subGoals: executor.all.map((sg) => ({
-        goal: sg.goal,
-        status: sg.status,
-        result: sg.result,
-      })),
-      totalSteps,
-      durationMs: Date.now() - journeyStart,
-      tokens: {
-        input: journeyInputTokens,
-        output: journeyOutputTokens,
-        cost: journeyCost,
-        model: modelName,
-      },
-    });
     } finally {
       if (useInk) await deactivateInk();
     }

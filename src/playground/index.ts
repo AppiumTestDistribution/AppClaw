@@ -173,7 +173,9 @@ function printPlaygroundStep(
   const verb = success ? theme.step.bold(verbRaw) : theme.error.bold(verbRaw);
   const targetRaw = stepTarget(step);
   const targetPadded =
-    targetRaw.length > TARGET_W ? targetRaw.slice(0, TARGET_W - 1) + '…' : targetRaw.padEnd(TARGET_W);
+    targetRaw.length > TARGET_W
+      ? targetRaw.slice(0, TARGET_W - 1) + '…'
+      : targetRaw.padEnd(TARGET_W);
   const target = success ? theme.white(targetPadded) : theme.error(targetPadded);
   const glyph = theme.muted(KIND_ICON[step.kind] ?? '●');
   const dur = theme.dim(fmtMs(ms).padStart(6));

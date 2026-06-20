@@ -65,12 +65,20 @@ export interface JourneySummaryData {
 /** A committed timeline entry — rendered once into Ink's <Static> (persists in scrollback). */
 export type TimelineEntry =
   | { id: number; type: 'header'; goal: string; maxSteps: number }
+  | { id: number; type: 'plan'; items: PlanItem[] }
   | { id: number; type: 'step'; data: StepData }
   | { id: number; type: 'log'; entry: LogEntry }
   | { id: number; type: 'subgoal'; index: number; total: number; goal: string }
   | { id: number; type: 'result'; result: ResultData; durationMs: number }
   | { id: number; type: 'summary'; data: TokenSummaryData }
   | { id: number; type: 'journey'; data: JourneySummaryData };
+
+export interface PlanItem {
+  goal: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  steps?: number;
+  durationMs?: number;
+}
 
 /** Run-level context for the pinned bottom bar. */
 export interface RunContext {
@@ -96,7 +104,11 @@ export interface UIState {
   currentStep: number;
   /** Run context for the pinned bottom bar (agent mode). */
   ctx: RunContext;
-  /** Render committed per-step rows. Off by default in agent mode (debug-gated). */
+  /** Live plan checklist — each sub-goal ticks green/red as it completes. */
+  planGoals: PlanItem[];
+  /** Start time of the current sub-goal (for per-item duration). */
+  subGoalStart: number;
+  /** Render committed per-step rows + result boxes. Off by default (debug-gated). */
   showSteps: boolean;
   /** Fullscreen mode: scrolling viewport + pinned footer (off in debug). */
   fullscreen: boolean;
@@ -125,7 +137,16 @@ function initial(): UIState {
   return {
     maxSteps: 0,
     currentStep: 0,
-    ctx: { overallGoal: '', subGoalIndex: 0, subGoalTotal: 1, currentSubGoal: '', model: '', mode: '' },
+    ctx: {
+      overallGoal: '',
+      subGoalIndex: 0,
+      subGoalTotal: 1,
+      currentSubGoal: '',
+      model: '',
+      mode: '',
+    },
+    planGoals: [],
+    subGoalStart: Date.now(),
     showSteps: true,
     fullscreen: false,
     startTime: Date.now(),
@@ -180,6 +201,27 @@ export const store = {
     commit({ id: seq++, type: 'header', goal, maxSteps });
   },
 
+  /** Seed the live plan checklist (all pending). */
+  plan(subGoals: string[], _reasoning: string): void {
+    set({ planGoals: subGoals.map((goal) => ({ goal, status: 'pending' as const })) });
+  },
+
+  /** Mark a plan item's status (index into planGoals). */
+  markPlan(index: number, status: PlanItem['status'], steps?: number, durationMs?: number): void {
+    if (index < 0 || index >= state.planGoals.length) return;
+    const planGoals = state.planGoals.map((p, i) =>
+      i === index
+        ? {
+            ...p,
+            status,
+            ...(steps != null ? { steps } : {}),
+            ...(durationMs != null ? { durationMs } : {}),
+          }
+        : p
+    );
+    set({ planGoals });
+  },
+
   /** Seed run-level context (overall goal, sub-goal total, model, mode). */
   setRunContext(ctx: Partial<RunContext>): void {
     set({ ctx: { ...state.ctx, ...ctx } });
@@ -195,10 +237,16 @@ export const store = {
 
   /** Begin a sub-goal (agent mode): set budget + current step, no big box. */
   startSubGoal(goal: string, maxSteps: number): void {
+    const idx = state.ctx.subGoalIndex;
+    const planGoals = state.planGoals.map((p, i) =>
+      i === idx && p.status === 'pending' ? { ...p, status: 'running' as const } : p
+    );
     set({
       maxSteps,
       currentStep: 0,
       result: undefined, // previous sub-goal's result is committed; reopen the live bar
+      subGoalStart: Date.now(),
+      planGoals,
       ctx: {
         ...state.ctx,
         currentSubGoal: goal,
@@ -208,10 +256,18 @@ export const store = {
     });
   },
 
-  /** Orchestrator advanced to a sub-goal — update context + commit a divider. */
+  /** Orchestrator advanced to a sub-goal — update context + tick the checklist. */
   setSubGoal(index: number, total: number, overallGoal: string, goal: string): void {
+    // Anything before `index` we've moved past — mark complete (handles skips).
+    const planGoals = state.planGoals.map((p, i) => {
+      if (i < index && p.status !== 'failed') return { ...p, status: 'done' as const };
+      if (i === index && p.status === 'pending') return { ...p, status: 'running' as const };
+      return p;
+    });
     set({
       result: undefined,
+      subGoalStart: Date.now(),
+      planGoals,
       ctx: {
         ...state.ctx,
         overallGoal: overallGoal || state.ctx.overallGoal,
@@ -251,7 +307,13 @@ export const store = {
   },
 
   // steps
-  beginStep(step: number, maxSteps: number, verb: string, actionType: string, target: string): void {
+  beginStep(
+    step: number,
+    maxSteps: number,
+    verb: string,
+    actionType: string,
+    target: string
+  ): void {
     // Any live thinking/streaming resolves into this step.
     set({
       maxSteps,
@@ -326,17 +388,30 @@ export const store = {
     commit({ id: seq++, type: 'log', entry: { kind, text, detail } });
   },
 
-  // terminal
+  // terminal (per sub-goal)
   finish(result: ResultData): void {
     // Make sure any half-open step is committed first.
     if (state.liveStep) {
       this.endStep();
     }
     const durationMs = Date.now() - state.startTime;
+    // Tick the current plan item green/red.
+    const idx = state.ctx.subGoalIndex;
+    const planGoals = state.planGoals.map((p, i) =>
+      i === idx
+        ? {
+            ...p,
+            status: (result.status === 'success' ? 'done' : 'failed') as PlanItem['status'],
+            steps: result.steps,
+            durationMs: Date.now() - state.subGoalStart,
+          }
+        : p
+    );
     set({
       thinking: { active: false, primary: '' },
       streaming: { active: false, label: 'Thinking', text: '' },
       result,
+      planGoals,
     });
     commit({ id: seq++, type: 'result', result, durationMs });
   },
@@ -349,11 +424,25 @@ export const store = {
   /** Commit the final journey summary panel (overall pass/fail + sub-goals). */
   journey(data: JourneySummaryData): void {
     if (state.liveStep) this.endStep();
+    // Reconcile the checklist with the authoritative final statuses.
+    const planGoals =
+      data.subGoals.length === state.planGoals.length
+        ? state.planGoals.map((p, i) => ({
+            ...p,
+            status: (data.subGoals[i].status === 'completed'
+              ? 'done'
+              : 'failed') as PlanItem['status'],
+          }))
+        : state.planGoals;
     set({
       thinking: { active: false, primary: '' },
       streaming: { active: false, label: 'Thinking', text: '' },
       result: { status: data.success ? 'success' : 'failed', reason: '', steps: data.totalSteps },
+      planGoals,
     });
+    // Commit a static checklist snapshot (persists in the scrollback dump),
+    // then the summary panel.
+    if (planGoals.length > 0) commit({ id: seq++, type: 'plan', items: planGoals });
     commit({ id: seq++, type: 'journey', data });
   },
 

@@ -33,7 +33,7 @@ import { Config } from '../config.js';
 import sharp from 'sharp';
 import { theme } from '../ui/terminal.js';
 
-const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
+const appclawDebug = process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true';
 
 /**
  * The raw (full-res) screenshot captured by the most recent visionExecute call.
@@ -70,7 +70,7 @@ export async function downscaleForVision(base64: string): Promise<string> {
 }
 
 function logTiming(label: string, elapsed: number): void {
-  if (!mcpDebug) return;
+  if (!appclawDebug) return;
   console.log(`        ${theme.dim('vision')} ${theme.info(label)} ${theme.dim(`${elapsed}ms`)}`);
 }
 
@@ -355,7 +355,7 @@ function preCheck(instruction: string): PreCheckResult | null {
     const text = waitUntilVisible[1].trim();
     // Exclude bare "wait for Ns" (already handled above) and very short strings
     if (text && !/^\d+(?:\.\d+)?\s*(?:s|sec|seconds|ms)?$/i.test(text)) {
-      if (mcpDebug)
+      if (appclawDebug)
         console.log(
           `        ${theme.dim('preCheck')} ${theme.info('waitUntil visible')} extracted text=${theme.warn(`"${text}"`)} timeout=${theme.dim(`${timeoutSeconds}s`)} from ${theme.dim(`"${t}"`)}`
         );
@@ -596,7 +596,7 @@ export async function visionExecute(
   lastVisionScreenshot = rawScreenshot; // Expose for artifact reporting (tap dot overlay)
   // Downscale for faster Gemini processing — coordinates are normalized 0-1000 so resolution doesn't matter
   const imageBase64 = await downscaleForVision(rawScreenshot);
-  if (mcpDebug) {
+  if (appclawDebug) {
     const rawKB = Math.round(rawScreenshot.length / 1024);
     const newKB = Math.round(imageBase64.length / 1024);
     console.log(
@@ -617,7 +617,7 @@ export async function visionExecute(
   const t0 = performance.now();
   const rawResponse = await client.understandAndLocate(instruction, imageBase64);
   logTiming('understandAndLocate', Math.round(performance.now() - t0));
-  if (mcpDebug)
+  if (appclawDebug)
     console.log(
       `        ${theme.dim('vision')} ${theme.info('raw response:')} ${theme.dim(String(rawResponse).slice(0, 300))}`
     );
@@ -634,7 +634,7 @@ export async function visionExecute(
     const parsed = parseJsonLenient(cleanedText);
     actions = Array.isArray(parsed) ? parsed : [parsed];
   } catch {
-    if (mcpDebug)
+    if (appclawDebug)
       console.log(
         `        ${theme.dim('vision')} ${theme.error('JSON parse failed:')} ${theme.dim(cleanedText.slice(0, 100))}`
       );
@@ -677,7 +677,7 @@ export async function visionExecute(
   const value = action.value ?? null;
   const locators = action.locators ?? [];
 
-  if (mcpDebug)
+  if (appclawDebug)
     console.log(
       `        ${theme.dim('vision')} ${theme.info('parsed:')} action=${theme.warn(actionName)} value=${theme.dim(String(value))} locators=${theme.dim(JSON.stringify(locators).slice(0, 200))}`
     );
@@ -1039,7 +1039,7 @@ export async function visionExecute(
   }
 
   // Unknown action — don't fall through to another slow LLM call
-  if (mcpDebug)
+  if (appclawDebug)
     console.log(
       `        ${theme.dim('vision')} ${theme.warn(`unknown action: "${actionName}"`)} ${theme.dim(JSON.stringify(action).slice(0, 120))}`
     );

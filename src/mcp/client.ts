@@ -49,6 +49,11 @@ const MCP_TIMEOUT_MS = process.env.MCP_TIMEOUT_MS
   ? parseInt(process.env.MCP_TIMEOUT_MS, 10)
   : 120000;
 
+// Colored lane tags so MCP traffic (MCP_DEBUG=1) is easy to tell apart from
+// AppClaw's own agent logs (APPCLAW_DEBUG=1, rendered with a "│ app" lane).
+const MCP_TAG = theme.info('│ mcp ');
+const APPIUM_TAG = theme.warn('│ appium ');
+
 function logMCP(name: string, args: Record<string, unknown>, result: MCPToolResult): void {
   if (!mcpDebug()) return;
   if (QUIET_TOOLS.has(name)) return;
@@ -65,9 +70,9 @@ function logMCP(name: string, args: Record<string, unknown>, result: MCPToolResu
       .join(' ')
       .slice(0, 200) ?? '';
 
-  console.log(`        ${theme.dim('mcp')} ${theme.info(name)} ${theme.dim(argStr)}`);
+  console.log(`  ${MCP_TAG} ${theme.info(name)} ${theme.dim(argStr)}`);
   if (resText) {
-    console.log(`        ${theme.dim('  ⤷')} ${theme.dim(resText)}`);
+    console.log(`  ${theme.dim('│ mcp   ⤷')} ${theme.dim(resText)}`);
   }
 }
 
@@ -120,7 +125,7 @@ async function connectClient(config: MCPConfig): Promise<Client> {
           stderrLines.push(msg);
         }
         if (mcpDebug()) {
-          console.error(`  ${theme.dim('[appium-mcp]')} ${theme.dim(msg)}`);
+          console.error(`  ${APPIUM_TAG} ${theme.dim(msg)}`);
         }
       });
     }
@@ -156,7 +161,7 @@ function wrapClient(client: Client): MCPClient {
       const typed = result as MCPToolResult;
       if (debug) {
         const elapsed = Math.round(performance.now() - t0);
-        console.log(`        ${theme.dim('mcp')} ${theme.info(name)} ${theme.dim(`${elapsed}ms`)}`);
+        console.log(`  ${MCP_TAG} ${theme.info(name)} ${theme.dim(`${elapsed}ms`)}`);
       }
       logMCP(name, args, typed);
       return typed;

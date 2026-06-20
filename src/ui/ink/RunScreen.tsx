@@ -8,6 +8,7 @@ import { AgentBottomBar } from './components/AgentBottomBar.js';
 import { ResultBox } from './components/ResultBox.js';
 import { TokenSummary } from './components/TokenSummary.js';
 import { FinalSummary } from './components/FinalSummary.js';
+import { PlanChecklist } from './components/PlanChecklist.js';
 import { OrbitalSpinner } from './components/OrbitalSpinner.js';
 import { HitlPrompt } from './components/HitlPrompt.js';
 
@@ -69,12 +70,16 @@ export function renderEntry(entry: TimelineEntry): React.ReactNode {
   switch (entry.type) {
     case 'header':
       return <GoalHeader key={entry.id} goal={entry.goal} maxSteps={entry.maxSteps} />;
+    case 'plan':
+      return <PlanChecklist key={entry.id} items={entry.items} live={false} />;
     case 'step':
       return <StepLine key={entry.id} data={entry.data} />;
     case 'log':
       return <LogLine key={entry.id} entry={entry.entry} />;
     case 'subgoal':
-      return <SubGoalDivider key={entry.id} index={entry.index} total={entry.total} goal={entry.goal} />;
+      return (
+        <SubGoalDivider key={entry.id} index={entry.index} total={entry.total} goal={entry.goal} />
+      );
     case 'result':
       return <ResultBox key={entry.id} result={entry.result} durationMs={entry.durationMs} />;
     case 'summary':
@@ -89,6 +94,8 @@ function estimateHeight(e: TimelineEntry): number {
   switch (e.type) {
     case 'header':
       return 5;
+    case 'plan':
+      return 2 + e.items.length;
     case 'subgoal':
       return 2;
     case 'step':
@@ -118,7 +125,9 @@ export function tailSlice(entries: TimelineEntry[], budget: number): TimelineEnt
 
 function LiveRegion({ state, showSteps }: { state: UIState; showSteps: boolean }) {
   const { liveStep, thinking, streaming, hitl } = state;
-  const streamLines = streaming.active ? wrap(streaming.text, STREAM_WIDTH).slice(-STREAM_MAX_LINES) : [];
+  const streamLines = streaming.active
+    ? wrap(streaming.text, STREAM_WIDTH).slice(-STREAM_MAX_LINES)
+    : [];
   return (
     <Box flexDirection="column">
       {liveStep && showSteps ? <StepLine data={liveStep} /> : null}
@@ -145,7 +154,12 @@ function LiveRegion({ state, showSteps }: { state: UIState; showSteps: boolean }
         </Box>
       ) : null}
       {hitl ? (
-        <HitlPrompt type={hitl.type} question={hitl.question} options={hitl.options} onSubmit={hitl.onSubmit} />
+        <HitlPrompt
+          type={hitl.type}
+          question={hitl.question}
+          options={hitl.options}
+          onSubmit={hitl.onSubmit}
+        />
       ) : null}
     </Box>
   );
@@ -161,23 +175,45 @@ export function RunScreen() {
   const state = useSyncExternalStore(subscribe, getSnapshot);
   const { stdout } = useStdout();
   const rows = stdout?.rows ?? 0;
-  const { maxSteps, currentStep, ctx, timeline, tokens, result, startTime, showSteps, fullscreen } =
-    state;
+  const {
+    maxSteps,
+    currentStep,
+    ctx,
+    timeline,
+    tokens,
+    result,
+    startTime,
+    showSteps,
+    fullscreen,
+    planGoals,
+  } = state;
 
-  const visible = showSteps ? timeline : timeline.filter((t) => t.type !== 'step');
+  const visible = visibleEntries(timeline, showSteps);
   const showFooter = !result && (maxSteps > 0 || !!ctx.currentSubGoal || !!ctx.overallGoal);
+  // The live, ticking checklist shows during the run; once finished the
+  // committed snapshot in the timeline takes over.
+  const liveChecklist =
+    planGoals.length > 0 && !result ? <PlanChecklist items={planGoals} live /> : null;
 
   const footer = showFooter ? (
-    <AgentBottomBar ctx={ctx} currentStep={currentStep} maxSteps={maxSteps} startTime={startTime} tokens={tokens} />
+    <AgentBottomBar
+      ctx={ctx}
+      currentStep={currentStep}
+      maxSteps={maxSteps}
+      startTime={startTime}
+      tokens={tokens}
+    />
   ) : null;
 
-  // ── Fullscreen viewport (fixed footer, scrolling content) ──
+  // ── Fullscreen: pinned checklist (top) + scrolling viewport + footer ──
   if (fullscreen && rows > 0) {
     const footerH = showFooter ? FOOTER_H : 0;
-    const contentH = Math.max(3, rows - footerH);
-    const slice = tailSlice(visible, contentH - 6); // reserve room for the live region
+    const checklistH = liveChecklist ? planGoals.length + 2 : 0;
+    const contentH = Math.max(3, rows - footerH - checklistH);
+    const slice = tailSlice(visible, contentH - 4); // reserve room for the live region
     return (
       <Box flexDirection="column" height={rows}>
+        {liveChecklist}
         <Box flexDirection="column" flexGrow={1} overflow="hidden">
           {slice.map(renderEntry)}
           <LiveRegion state={state} showSteps={showSteps} />
@@ -192,6 +228,7 @@ export function RunScreen() {
     <Box flexDirection="column">
       <Static items={visible}>{(entry) => renderEntry(entry)}</Static>
       <Box flexDirection="column">
+        {liveChecklist}
         <LiveRegion state={state} showSteps={showSteps} />
         {footer}
       </Box>
@@ -199,11 +236,29 @@ export function RunScreen() {
   );
 }
 
+/**
+ * Filter the transcript for display. Debug (showSteps) shows everything;
+ * the default agent view collapses to the plan checklist + final summary +
+ * any errors (per-step rows, result boxes, dividers and orchestrator notes are
+ * hidden — the live checklist conveys progress).
+ */
+function visibleEntries(timeline: TimelineEntry[], showSteps: boolean): TimelineEntry[] {
+  if (showSteps) return timeline;
+  return timeline.filter(
+    (t) =>
+      t.type === 'plan' ||
+      t.type === 'journey' ||
+      t.type === 'header' ||
+      (t.type === 'log' && t.entry.kind === 'error')
+  );
+}
+
 /** Dumps the committed transcript to normal scrollback (used on exit). */
 export function TranscriptStatic() {
   const state = useSyncExternalStore(subscribe, getSnapshot);
-  const entries = state.showSteps
-    ? state.timeline
-    : state.timeline.filter((t) => t.type !== 'step');
-  return <Static items={entries}>{(entry) => renderEntry(entry)}</Static>;
+  return (
+    <Static items={visibleEntries(state.timeline, state.showSteps)}>
+      {(entry) => renderEntry(entry)}
+    </Static>
+  );
 }

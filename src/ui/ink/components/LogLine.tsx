@@ -17,7 +17,8 @@ const STYLES: Record<LogEntry['kind'], { icon: string; color: string }> = {
 /** A single inline log line (info / warning / bullet / reasoning …). */
 export function LogLine({ entry }: { entry: LogEntry }) {
   const { icon, color } = STYLES[entry.kind];
-  const dim = entry.kind === 'bullet' || entry.kind === 'reasoning' || entry.kind === 'preprocessor';
+  const dim =
+    entry.kind === 'bullet' || entry.kind === 'reasoning' || entry.kind === 'preprocessor';
   return (
     <Box flexDirection="column" marginLeft={2}>
       <Box>

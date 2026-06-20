@@ -1,9 +1,7 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import { COLORS, symbols } from '../theme.js';
 import type { JourneySummaryData } from '../store.js';
-
-const W = 70;
 
 function fmtDuration(ms: number): string {
   return ms < 60000
@@ -11,24 +9,24 @@ function fmtDuration(ms: number): string {
     : `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 }
 
-function truncate(s: string, n: number): string {
-  return s.length > n ? s.slice(0, n - 1) + '…' : s;
-}
-
 /**
  * Final journey summary — overall PASS/FAIL header, a per-sub-goal table, and
- * token/cost totals. Inspired by the kane-cli ResultBox.
+ * token/cost totals. Width tracks the terminal; goal + sub-goal names wrap in
+ * full (no truncation).
  */
 export function FinalSummary({ data }: { data: JourneySummaryData }) {
+  const { stdout } = useStdout();
+  const W = Math.min((stdout?.columns ?? 80) - 4, 110);
+  const inner = W - 4; // inside paddingX=1 borders
   const ok = data.success;
   const color = ok ? COLORS.green : COLORS.red;
   const passed = data.subGoals.filter((s) => s.status === 'completed').length;
   const failed = data.subGoals.length - passed;
-  const nameW = W - 16;
+  const nameW = inner - 8; // reserve the status column
 
   return (
-    <Box flexDirection="column" marginTop={1} width={W + 4}>
-      <Box borderStyle="round" borderColor={color} flexDirection="column" paddingX={1} width={W + 4}>
+    <Box flexDirection="column" marginTop={1} width={W}>
+      <Box borderStyle="round" borderColor={color} flexDirection="column" paddingX={1} width={W}>
         {/* header */}
         <Box>
           <Text bold color={color}>
@@ -41,11 +39,11 @@ export function FinalSummary({ data }: { data: JourneySummaryData }) {
         </Box>
 
         <Text> </Text>
-        <Text>{truncate(data.overallGoal, W)}</Text>
+        <Text>{data.overallGoal}</Text>
 
         {/* sub-goal table */}
         <Box flexDirection="column" marginTop={1}>
-          <Text color={COLORS.muted}>{'─'.repeat(W)}</Text>
+          <Text color={COLORS.muted}>{'─'.repeat(inner)}</Text>
           <Box>
             <Text bold>Steps </Text>
             <Text color={COLORS.green}>{passed} passed</Text>
@@ -62,9 +60,9 @@ export function FinalSummary({ data }: { data: JourneySummaryData }) {
                   </Text>
                 </Box>
                 <Box width={nameW}>
-                  <Text color={sgOk ? undefined : COLORS.red}>{truncate(sg.goal, nameW - 1)}</Text>
+                  <Text color={sgOk ? undefined : COLORS.red}>{sg.goal}</Text>
                 </Box>
-                <Box width={8} justifyContent="flex-end">
+                <Box width={5} justifyContent="flex-end">
                   <Text color={sgOk ? COLORS.green : COLORS.red} bold>
                     {sgOk ? 'pass' : 'FAIL'}
                   </Text>
@@ -77,7 +75,7 @@ export function FinalSummary({ data }: { data: JourneySummaryData }) {
         {/* tokens */}
         {data.tokens.input + data.tokens.output > 0 ? (
           <Box flexDirection="column" marginTop={1}>
-            <Text color={COLORS.muted}>{'─'.repeat(W)}</Text>
+            <Text color={COLORS.muted}>{'─'.repeat(inner)}</Text>
             <Box gap={1}>
               <Text color={COLORS.label}>Tokens</Text>
               <Text bold>{(data.tokens.input + data.tokens.output).toLocaleString('en-US')}</Text>

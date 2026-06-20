@@ -26,6 +26,7 @@ export interface JourneySummaryInput {
 export interface UIRenderer {
   // ── Goal / header ──
   printGoalStart(goal: string, maxSteps: number): void;
+  printPlan(subGoals: Array<{ goal: string }>, reasoning: string): void;
 
   // ── Steps ──
   printStep(step: number, maxSteps: number, toolName: string, argsSummary: string): void;
@@ -85,7 +86,13 @@ export interface UIRenderer {
 
   // ── Flow / replay / explorer surfaces ──
   printReplayGoal(goal: string, totalSteps: number): void;
-  printReplayStep(step: number, total: number, toolName: string, adapted: boolean, success: boolean): void;
+  printReplayStep(
+    step: number,
+    total: number,
+    toolName: string,
+    adapted: boolean,
+    success: boolean
+  ): void;
   printReplayResult(passed: number, total: number, adapted: number): void;
   printFlowStep(step: number, total: number, label: string, success: boolean): void;
   printExplorerPhase(phase: string, message: string): void;

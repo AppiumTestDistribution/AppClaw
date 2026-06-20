@@ -29,7 +29,13 @@ describe('Ink RunScreen', () => {
     store.endStep();
     await tick();
     store.finish({ status: 'success', reason: 'Results visible', steps: 2 });
-    store.summary({ input: 24000, output: 850, cached: 12000, cost: 0.0123, model: 'claude-opus-4-8' });
+    store.summary({
+      input: 24000,
+      output: 850,
+      cached: 12000,
+      cost: 0.0123,
+      model: 'claude-opus-4-8',
+    });
     await tick();
 
     const t = frames.join('\n');
@@ -74,22 +80,28 @@ describe('Ink RunScreen', () => {
     unmount();
   });
 
-  test('showSteps=false hides per-step rows but keeps sub-goals + results', async () => {
+  test('default view: plan checklist ticks, per-step rows + COMPLETED boxes hidden', async () => {
     store.reset();
     store.setShowSteps(false);
     store.setRunContext({ overallGoal: 'do a thing', subGoalTotal: 2 });
-    const { frames, unmount } = render(<RunScreen />);
+    store.plan(['Open the app', 'Do the thing'], '');
+    const { lastFrame, frames, unmount } = render(<RunScreen />);
     await tick();
     store.setSubGoal(0, 2, 'do a thing', 'Open the app');
+    store.startSubGoal('Open the app', 30);
     store.beginStep(1, 30, 'tap', 'click', 'blue search icon on the on-screen keyboard');
     store.setStepDetail('Clicked at [130,1591]', 'done');
     store.endStep();
     store.finish({ status: 'success', reason: 'app opened', steps: 1 });
+    // advance to next sub-goal (clears `result`, re-shows the live checklist)
+    store.setSubGoal(1, 2, 'do a thing', 'Do the thing');
+    store.startSubGoal('Do the thing', 30);
     await tick();
 
     const t = frames.join('\n');
-    expect(t).toContain('Open the app'); // sub-goal divider shown
-    expect(t).toContain('COMPLETED'); // result shown
+    expect(t).toContain('Open the app'); // shown in the plan checklist
+    expect(lastFrame()).toMatch(/✓.*Open the app/s); // ticked done
+    expect(t).not.toContain('COMPLETED'); // per-sub-goal result box hidden
     expect(t).not.toContain('on-screen keyboard'); // per-step row hidden
     unmount();
   });
@@ -117,6 +129,31 @@ describe('Ink RunScreen', () => {
     expect(t).toContain('Log in');
     expect(t).toContain('Open settings');
     expect(t).toContain('$0.0031');
+    unmount();
+  });
+
+  test('plan renders in transcript; summary shows full goal + sub-goal names', async () => {
+    store.reset();
+    const { frames, unmount } = render(<RunScreen />, { columns: 100 } as any);
+    await tick();
+    store.plan(['Launch app', 'Search and favourite'], 'decomposition reasoning');
+    const longGoal =
+      'open rapido app and search for Mumbai Airport and favourite the first result, then delete it';
+    const longSub = "Tap the destination search field and Type 'Mumbai Airport' into it";
+    store.journey({
+      success: true,
+      overallGoal: longGoal,
+      subGoals: [{ goal: longSub, status: 'completed' }],
+      totalSteps: 3,
+      durationMs: 1000,
+      tokens: { input: 1, output: 1, cost: 0.01, model: 'm' },
+    });
+    await tick();
+    const t = frames.join('\n');
+    expect(t).toContain('Plan');
+    expect(t).toContain('Launch app');
+    expect(t).toContain(longGoal); // goal shown in full, not truncated
+    expect(t).toContain(longSub); // sub-goal name shown in full
     unmount();
   });
 

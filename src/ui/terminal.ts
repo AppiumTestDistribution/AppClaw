@@ -683,6 +683,8 @@ export function printPlanStart(): void {
 }
 
 export function printPlan(subGoals: Array<{ goal: string }>, reasoning: string): void {
+  const r = getRenderer();
+  if (r?.printPlan) return r.printPlan(subGoals, reasoning);
   const goalList = subGoals.map((sg, i) => `${theme.brand(`${i + 1}.`)} ${sg.goal}`).join('\n');
   const reasonLines = wrapText(reasoning, 68, 2).slice(0, 2);
   const content = [goalList, '', ...reasonLines.map((l) => theme.dim(l))].join('\n');
@@ -699,7 +701,8 @@ export function printPlanContext(
   currentIndex: number
 ): void {
   const r = getRenderer();
-  if (r?.printPlanContext) return r.printPlanContext(overallGoal, _currentGoal, allGoals, currentIndex);
+  if (r?.printPlanContext)
+    return r.printPlanContext(overallGoal, _currentGoal, allGoals, currentIndex);
   console.log();
   console.log(`  ${theme.brand.bold('Progress')}`);
   console.log(
@@ -947,7 +950,8 @@ export function printStepTokens(
 ): void {
   if (!Config.SHOW_TOKEN_USAGE) return;
   const r = getRenderer();
-  if (r?.printStepTokens) return r.printStepTokens(inputTokens, outputTokens, cachedTokens, cost, label);
+  if (r?.printStepTokens)
+    return r.printStepTokens(inputTokens, outputTokens, cachedTokens, cost, label);
   const total = inputTokens + outputTokens;
   const cachedStr = cachedTokens && cachedTokens > 0 ? ` cached: ${cachedTokens}` : '';
   const costStr = cost != null && cost > 0 ? `  ${chalk.green(`$${cost.toFixed(5)}`)}` : '';
