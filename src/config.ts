@@ -228,19 +228,26 @@ export function loadConfig(overrides?: Record<string, string | undefined>): AppC
 export const Config = loadConfig();
 
 /**
- * Re-read `process.env` into the shared `Config` singleton, mutating it in place.
+ * Mutate the shared `Config` singleton in place so every module that imported it
+ * by reference (run-yaml-flow, run-instruction, vision/locate-enabled, agent/loop, …)
+ * sees `cfg`'s values.
  *
- * `Config` is computed once at import time (the line above). But the CLI loads a
- * `--env-file` into `process.env` at runtime — long after every module has already
- * imported `Config` by reference (run-yaml-flow, run-instruction, vision/locate-enabled,
- * agent/loop, …). Without this refresh those modules keep the import-time snapshot, so
- * `--env-file` values like `AGENT_MODE=vision` are silently ignored and execution falls
- * back to DOM mode.
- *
- * Mutating in place (rather than reassigning the `const`) means every existing importer
- * sees the merged values, because they all hold the same object reference. `loadConfig()`
- * always returns the full key set (zod defaults fill any gaps), so no stale keys survive.
+ * `Config` is computed once at import time (the line above), but config can change
+ * after that: the CLI loads a `--env-file` into `process.env` at runtime, and the SDK
+ * builds a per-instance config from constructor options. In-place mutation (rather than
+ * reassigning the `const`) is what lets existing importers pick up the new values,
+ * because they all hold the same object reference. A full `AppClawConfig` always carries
+ * the complete key set (zod defaults fill any gaps), so no stale keys survive.
+ */
+export function applyConfig(cfg: AppClawConfig): AppClawConfig {
+  return Object.assign(Config, cfg);
+}
+
+/**
+ * Re-read `process.env` into the shared `Config` singleton. Used by the CLI after a
+ * `--env-file` is loaded, so values like `AGENT_MODE=vision` reach the execution
+ * pipeline instead of being silently ignored (which would fall back to DOM mode).
  */
 export function refreshConfig(): AppClawConfig {
-  return Object.assign(Config, loadConfig());
+  return applyConfig(loadConfig());
 }
