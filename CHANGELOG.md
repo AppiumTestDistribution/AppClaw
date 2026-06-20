@@ -1,3 +1,9 @@
+## [1.5.4](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.3...v1.5.4) (2026-06-20)
+
+### Bug Fixes
+
+* Fix/env file vision mode ([#34](https://github.com/AppiumTestDistribution/AppClaw/issues/34)) ([1a292ac](https://github.com/AppiumTestDistribution/AppClaw/commit/1a292ac6b57f8b761a3e3328113fc1129e7c1aae))
+
 ## [1.5.3](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.2...v1.5.3) (2026-06-20)
 
 ### Bug Fixes
