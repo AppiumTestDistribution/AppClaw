@@ -1,3 +1,9 @@
+## [1.6.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.6...v1.6.0) (2026-06-20)
+
+### Features
+
+* **session:** merge a capabilities JSON file into create_session ([0bc3b7b](https://github.com/AppiumTestDistribution/AppClaw/commit/0bc3b7b2ef9afc6809213e8a2f154af2dc61e368))
+
 ## [1.5.6](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.5...v1.5.6) (2026-06-20)
 
 ### Bug Fixes
