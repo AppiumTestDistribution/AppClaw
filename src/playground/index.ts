@@ -982,7 +982,24 @@ async function connectToDevice(): Promise<boolean> {
     process.stderr.write(`[playground] Connection failed: ${err?.message ?? err}\n`);
     if (err?.stack) process.stderr.write(`[playground] ${err.stack}\n`);
     ui.printError(`Failed to connect: ${err?.message ?? err}`);
-    ui.printInfo('Make sure Appium server is running and a device/emulator is connected.');
+    // AppClaw drives Appium through the appium-mcp subprocess, which it starts itself —
+    // there is no separate "Appium server" to launch. A timeout (-32001) almost always
+    // means appium-mcp couldn't start/handshake in time (e.g. a cold `npx` download on a
+    // global install that doesn't bundle it), NOT that a server is missing.
+    const errMsg = String(err?.message ?? err);
+    const timedOut = errMsg.includes('-32001') || /timed out/i.test(errMsg);
+    if (timedOut) {
+      ui.printInfo(
+        'AppClaw starts appium-mcp itself — no separate Appium server is needed. The MCP handshake ' +
+          'timed out: on a first run appium-mcp may still be downloading via npx. Retry, or reinstall so ' +
+          "it's bundled (e.g. npm i -g appclaw@latest). Set MCP_DEBUG=1 to see appium-mcp's startup logs."
+      );
+    } else {
+      ui.printInfo(
+        'AppClaw starts appium-mcp itself — no separate Appium server is needed. Make sure a ' +
+          'device/emulator is connected. Set MCP_DEBUG=1 to see appium-mcp’s startup logs.'
+      );
+    }
     console.log();
     return false;
   }
