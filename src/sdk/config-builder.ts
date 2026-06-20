@@ -15,6 +15,7 @@ const OPTION_TO_ENV_VAR: Partial<Record<keyof AppClawOptions, string>> = {
   model: 'LLM_MODEL',
   platform: 'PLATFORM',
   deviceUdid: 'DEVICE_UDID',
+  capabilitiesFile: 'CAPABILITIES_FILE',
   agentMode: 'AGENT_MODE',
   maxSteps: 'MAX_STEPS',
   stepDelay: 'STEP_DELAY',

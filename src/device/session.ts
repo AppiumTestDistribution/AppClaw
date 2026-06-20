@@ -5,6 +5,8 @@
  * function that builds the right capabilities for each platform.
  */
 
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { MCPClient } from '../mcp/types.js';
 import type { AppClawConfig } from '../config.js';
 import type { Platform, DeviceType } from '../index.js';
@@ -41,26 +43,32 @@ export async function createPlatformSession(
   _deviceType?: DeviceType,
   extraCaps?: Record<string, unknown>
 ): Promise<SessionResult> {
+  // User-supplied capabilities from CAPABILITIES_FILE (if any). Loaded once and
+  // merged into whichever session path runs below.
+  const fileCaps = loadCapabilitiesFile(config);
+
   if (config.CLOUD_PROVIDER === 'lambdatest') {
-    return createLambdaTestSession(mcp, config, platform);
+    return createLambdaTestSession(mcp, config, platform, fileCaps);
   }
 
   ui.startSpinner('Creating Appium session...');
 
   const args: Record<string, unknown> = { platform };
 
-  // Add platform-specific capabilities (serialized as JSON string for appium-mcp)
+  // Capability precedence (later wins): config defaults < CAPABILITIES_FILE <
+  // extraCaps. extraCaps (parallel ports, pinned udid) must win last so concurrent
+  // workers don't collide and device pinning holds even if the file sets the same key.
   if (platform === 'android') {
-    // extraCaps wins over config defaults (e.g. parallel workers override mjpeg/system ports)
-    const caps = { ...buildAndroidCapabilities(config), ...extraCaps };
+    const caps = { ...buildAndroidCapabilities(config), ...fileCaps, ...extraCaps };
     if (Object.keys(caps).length > 0) {
       args.capabilities = JSON.stringify(caps);
     }
   } else if (platform === 'ios') {
     // For iOS, appium-mcp handles most capabilities internally (WDA setup, device selection).
-    // Merge config-level APP_PATH with extraCaps (extraCaps wins, e.g. per-flow app: overrides .env).
+    // Merge config-level APP_PATH with the caps file and extraCaps (per-flow app: overrides .env).
     const iosCaps = {
       ...(config.APP_PATH ? { 'appium:app': config.APP_PATH } : {}),
+      ...fileCaps,
       ...extraCaps,
     };
     if (Object.keys(iosCaps).length > 0) {
@@ -107,6 +115,35 @@ export async function createPlatformSession(
   }
 }
 
+/**
+ * Load extra Appium capabilities from CAPABILITIES_FILE (a JSON object), if set.
+ * Returns {} when unset. Throws a clear error when the path is set but missing,
+ * unreadable, not valid JSON, or not a plain object — fail fast rather than
+ * silently ignoring caps the user explicitly asked for.
+ */
+function loadCapabilitiesFile(config: AppClawConfig): Record<string, unknown> {
+  const path = config.CAPABILITIES_FILE?.trim();
+  if (!path) return {};
+
+  const resolved = resolve(process.cwd(), path);
+  if (!existsSync(resolved)) {
+    throw new Error(`CAPABILITIES_FILE not found: ${path} (resolved to ${resolved})`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(resolved, 'utf8'));
+  } catch (e: any) {
+    throw new Error(`CAPABILITIES_FILE ${path} is not valid JSON: ${e?.message ?? e}`);
+  }
+
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`CAPABILITIES_FILE ${path} must be a JSON object of capabilities`);
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
 /** Build Android-specific session capabilities (MJPEG, app install etc.) */
 function buildAndroidCapabilities(config: AppClawConfig): Record<string, unknown> {
   const caps: Record<string, unknown> = {};
@@ -130,7 +167,8 @@ function buildAndroidCapabilities(config: AppClawConfig): Record<string, unknown
 async function createLambdaTestSession(
   mcp: MCPClient,
   config: AppClawConfig,
-  platform: Platform
+  platform: Platform,
+  fileCaps: Record<string, unknown> = {}
 ): Promise<SessionResult> {
   ui.startSpinner('Creating LambdaTest cloud session...');
 
@@ -149,6 +187,8 @@ async function createLambdaTestSession(
     'appium:deviceName': config.LAMBDATEST_DEVICE_NAME,
     'appium:platformVersion': config.LAMBDATEST_OS_VERSION,
     'lt:options': ltOptions,
+    // User-supplied caps win over the cloud defaults above (their explicit choice).
+    ...fileCaps,
   };
 
   const args: Record<string, unknown> = {

@@ -31,6 +31,16 @@ const envSchema = z.object({
    */
   APP_PATH: z.string().default(''),
 
+  /**
+   * Path to a JSON file of extra Appium capabilities to merge into create_session.
+   * The file must contain a flat JSON object of capability key/values, e.g.:
+   *   { "appium:automationName": "UiAutomator2", "appium:autoGrantPermissions": true }
+   * Merged on top of the config-derived defaults; framework-managed caps (parallel
+   * ports, pinned udid) still take final precedence. Set via CAPABILITIES_FILE env,
+   * the `--caps <path>` CLI flag, or the SDK `capabilitiesFile` option.
+   */
+  CAPABILITIES_FILE: z.string().default(''),
+
   MCP_TRANSPORT: z.enum(['stdio', 'sse']).default('stdio'),
   MCP_HOST: z.string().default('localhost'),
   MCP_PORT: z.coerce.number().default(8080),

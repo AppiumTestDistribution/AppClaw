@@ -58,6 +58,12 @@ export interface AppClawOptions {
    * Get Android UDIDs from: adb devices
    */
   deviceUdid?: string;
+  /**
+   * Path to a JSON file of extra Appium capabilities merged into the session
+   * (e.g. `{ "appium:automationName": "UiAutomator2", "appium:autoGrantPermissions": true }`).
+   * Maps to the CAPABILITIES_FILE env var.
+   */
+  capabilitiesFile?: string;
   /** Interaction strategy: DOM locators (default) or AI vision. */
   agentMode?: AgentMode;
   /** Maximum number of agent steps before giving up. Default: 30. */
