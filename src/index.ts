@@ -83,6 +83,8 @@ interface CLIArgs {
    * reserved `--env-file` CLI flag.
    */
   envFile: string | null;
+  /** Path to a JSON file of extra Appium capabilities (maps to CAPABILITIES_FILE). */
+  capsFile: string | null;
   /** Strict YAML parsing — fail on unrecognized steps instead of LLM fallback */
   strict: boolean;
   /**
@@ -144,6 +146,9 @@ function printHelp(): void {
   );
   console.log(
     `    ${c.flag('--env-path')} ${c.arg('<path>')}            ${c.desc('Load a dotenv file into process.env (alias: --env-file, after the script)')}`
+  );
+  console.log(
+    `    ${c.flag('--caps')} ${c.arg('<path>')}                ${c.desc('JSON file of extra Appium capabilities merged into the session')}`
   );
   console.log(
     `    ${c.flag('--playground')}                    ${c.desc('Interactive REPL for building flows')}`
@@ -276,6 +281,7 @@ function parseArgs(): CLIArgs {
   let json = false;
   let env: string | null = null;
   let envFile: string | null = null;
+  let capsFile: string | null = null;
   let strict = false;
   let exportPath: string | null = null;
   let exportDir: string | null = null;
@@ -294,6 +300,10 @@ function parseArgs(): CLIArgs {
       envFile = args[++i] ?? null;
     } else if (args[i].startsWith('--env-path=') || args[i].startsWith('--env-file=')) {
       envFile = args[i].slice(args[i].indexOf('=') + 1) || null;
+    } else if (args[i] === '--caps' || args[i] === '--capabilities') {
+      capsFile = args[++i] ?? null;
+    } else if (args[i].startsWith('--caps=') || args[i].startsWith('--capabilities=')) {
+      capsFile = args[i].slice(args[i].indexOf('=') + 1) || null;
     } else if (args[i] === '--record') {
       record = true;
     } else if (args[i] === '--replay') {
@@ -376,6 +386,7 @@ function parseArgs(): CLIArgs {
     json,
     env,
     envFile,
+    capsFile,
     strict,
     exportPath,
     exportDir,
@@ -434,6 +445,11 @@ async function main() {
       process.exit(1);
     }
     ui.printSetupOk(`Loaded env file: ${cliArgs.envFile}`);
+  }
+  // `--caps <path>` overrides CAPABILITIES_FILE — set after the env file loads so
+  // the explicit flag wins, and before refreshConfig() so it reaches the singleton.
+  if (cliArgs.capsFile) {
+    process.env.CAPABILITIES_FILE = cliArgs.capsFile;
   }
   // Re-read process.env (now including any --env-file values) INTO the shared
   // Config singleton, not just into this local copy. Modules like run-yaml-flow
