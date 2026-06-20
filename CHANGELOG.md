@@ -1,3 +1,9 @@
+## [1.5.5](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.4...v1.5.5) (2026-06-20)
+
+### Bug Fixes
+
+* **playground:** correct misleading "Appium server" error; sync npx appium-mcp version ([82788c0](https://github.com/AppiumTestDistribution/AppClaw/commit/82788c0b438df5f4406ff19e313724321355810f))
+
 ## [1.5.4](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.3...v1.5.4) (2026-06-20)
 
 ### Bug Fixes
