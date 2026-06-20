@@ -281,6 +281,22 @@ function buildMetaTools(agentMode: 'dom' | 'vision'): Record<string, Tool> {
     }),
   });
 
+  const dragTool = tool({
+    description:
+      'Drag from one point to another — MOVE A SLIDER handle along its track, reorder a list item, pan a map, or swipe a card. ' +
+      'Provide START coordinates (fromX, fromY = where the handle/element is NOW) and END coordinates (toX, toY = the target position), ' +
+      'all normalized 0-1000 (0=left/top, 1000=right/bottom). ' +
+      'For a slider: put fromX/fromY on the handle (the colored dot) and toX/toY at the target along the SAME track — keep Y the same and only change X for a horizontal slider. ' +
+      'To move a slider fully right use toX≈950; fully left use toX≈50. After the drag, look at the screenshot to confirm the handle moved, then call done.',
+    inputSchema: z.object({
+      fromX: z.number().describe('Start X normalized 0-1000 — the handle / element current position'),
+      fromY: z.number().describe('Start Y normalized 0-1000'),
+      toX: z.number().describe('End X normalized 0-1000 — the target position'),
+      toY: z.number().describe('End Y normalized 0-1000'),
+      duration: z.number().int().optional().describe('Drag duration in ms (default 800)'),
+    }),
+  });
+
   return {
     done: tool({
       description:
@@ -309,6 +325,8 @@ function buildMetaTools(agentMode: 'dom' | 'vision'): Record<string, Tool> {
     find_and_type: agentMode === 'vision' ? findAndTypeVision : findAndTypeDom,
 
     find_and_long_press: agentMode === 'vision' ? findAndLongPressVision : findAndLongPressDom,
+
+    drag: dragTool,
 
     launch_app: tool({
       description:

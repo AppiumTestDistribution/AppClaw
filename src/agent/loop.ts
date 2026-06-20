@@ -934,6 +934,7 @@ const META_TOOLS = new Set([
   'find_and_click',
   'find_and_type',
   'find_and_long_press',
+  'drag',
   'launch_app',
   'go_back',
   'go_home',
@@ -1347,6 +1348,43 @@ async function executeMetaTool(
         return {
           success: false,
           message: `All strategies failed for long-press "${lpSelector.slice(0, 60)}": ${lpDomAttempts.join(', ')}`,
+        };
+      }
+
+      case 'drag': {
+        // Coordinate drag (slider handles, reordering, pan). LLM provides
+        // from/to in normalized 0-1000; scale to device space and use
+        // appium_drag_and_drop (same path the YAML flow engine uses).
+        const fromX = args.fromX as number | undefined;
+        const fromY = args.fromY as number | undefined;
+        const toX = args.toX as number | undefined;
+        const toY = args.toY as number | undefined;
+        const dragDuration = (args.duration as number | undefined) ?? 800;
+        if ([fromX, fromY, toX, toY].some((v) => typeof v !== 'number')) {
+          return {
+            success: false,
+            message: 'drag requires numeric fromX, fromY, toX, toY (normalized 0-1000)',
+          };
+        }
+        const from = await scaleLLMCoords(fromX as number, fromY as number);
+        const to = await scaleLLMCoords(toX as number, toY as number);
+        const dragRes = await mcp.callTool('appium_drag_and_drop', {
+          sourceX: from.x,
+          sourceY: from.y,
+          targetX: to.x,
+          targetY: to.y,
+          duration: dragDuration,
+          longPressDuration: 400,
+        });
+        if (isMCPError(dragRes)) {
+          return {
+            success: false,
+            message: `Drag failed from [${from.x},${from.y}] to [${to.x},${to.y}]`,
+          };
+        }
+        return {
+          success: true,
+          message: `Dragged from [${from.x},${from.y}] to [${to.x},${to.y}]`,
         };
       }
 

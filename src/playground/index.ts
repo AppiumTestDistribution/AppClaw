@@ -24,7 +24,7 @@ import { resetVisionTokens, getVisionTokens } from '../vision/vision-token-track
 import { MODEL_PRICING, DEFAULT_MODELS } from '../constants.js';
 import { getStarkVisionModel } from '../vision/locate-enabled.js';
 import { generateSdkTestFromInstructions } from '../sdk/goal-export.js';
-import { stepAction, stepTarget, printStepResult } from '../ui/step-printer.js';
+import { stepAction, stepTarget } from '../ui/step-printer.js';
 import type { FlowStep, FlowMeta } from '../flow/types.js';
 import type { MCPClient } from '../mcp/types.js';
 import {
@@ -127,12 +127,69 @@ function spinnerDetail(step: FlowStep): string {
   }
 }
 
-function printStepSuccess(stepNum: number, step: FlowStep, message: string): void {
-  printStepResult(stepNum, step, true, message);
+// Action glyph per step kind — mirrors the Ink StepLine look.
+const KIND_ICON: Record<string, string> = {
+  tap: '●',
+  longPress: '●',
+  type: '⊞',
+  swipe: '↕',
+  scrollAssert: '↕',
+  zoom: '⊕',
+  drag: '↔',
+  assert: '◈',
+  launchApp: '↗',
+  openApp: '↗',
+  wait: '…',
+  waitUntil: '…',
+  enter: '↵',
+  back: '‹',
+  home: '⌂',
+  getInfo: '◎',
+  done: '✓',
+};
+
+function fmtMs(ms?: number): string {
+  if (ms == null) return '';
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-function printStepFail(stepNum: number, step: FlowStep, message: string): void {
-  printStepResult(stepNum, step, false, message);
+/**
+ * Colorful, aligned single-line step row (matches the Ink RunScreen vibe):
+ *
+ *   ✓  3  tap     "Login"                         ●  0.8s
+ *           ↳ Tapped "Login"
+ */
+function printPlaygroundStep(
+  stepNum: number,
+  step: FlowStep,
+  success: boolean,
+  message: string,
+  ms?: number
+): void {
+  const TARGET_W = 42;
+  const icon = success ? theme.success('✓') : theme.error('✗');
+  const num = theme.dim(String(stepNum).padStart(2));
+  const verbRaw = stepAction(step).padEnd(8);
+  const verb = success ? theme.step.bold(verbRaw) : theme.error.bold(verbRaw);
+  const targetRaw = stepTarget(step);
+  const targetPadded =
+    targetRaw.length > TARGET_W ? targetRaw.slice(0, TARGET_W - 1) + '…' : targetRaw.padEnd(TARGET_W);
+  const target = success ? theme.white(targetPadded) : theme.error(targetPadded);
+  const glyph = theme.muted(KIND_ICON[step.kind] ?? '●');
+  const dur = theme.dim(fmtMs(ms).padStart(6));
+
+  console.log(`  ${icon}  ${num}  ${verb}${target} ${glyph}  ${dur}`);
+  if (message && message !== 'recorded') {
+    console.log(`         ${success ? theme.dim('↳ ' + message) : theme.error('↳ ' + message)}`);
+  }
+}
+
+function printStepSuccess(stepNum: number, step: FlowStep, message: string, ms?: number): void {
+  printPlaygroundStep(stepNum, step, true, message, ms);
+}
+
+function printStepFail(stepNum: number, step: FlowStep, message: string, ms?: number): void {
+  printPlaygroundStep(stepNum, step, false, message, ms);
 }
 
 /**
@@ -267,6 +324,38 @@ function buildSdkTestString(): string {
   });
 }
 
+/** Light syntax tint for a single code line — strings green, comments dim. */
+function highlightCodeLine(line: string): string {
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
+    return theme.dim(line);
+  }
+  // eslint-disable-next-line no-useless-escape
+  return line.replace(/(['"`])(?:\\.|(?!\1).)*\1/g, (m) => chalk.hex('#22C55E')(m));
+}
+
+/**
+ * Render a syntax-tinted, line-numbered preview of generated export code in a
+ * bordered box. Used by `/export` (before writing) and `/preview`.
+ */
+function printCodePreview(body: string, filename: string, label: string): void {
+  const MAX_LINES = 60;
+  const lines = body.replace(/\n+$/, '').split('\n');
+  const shown = lines.slice(0, MAX_LINES);
+  const gutter = String(shown.length).length;
+  const rendered = shown
+    .map((l, i) => `${theme.dim(String(i + 1).padStart(gutter))}  ${highlightCodeLine(l)}`)
+    .join('\n');
+  const more =
+    lines.length > MAX_LINES ? `\n${theme.dim(`… +${lines.length - MAX_LINES} more lines`)}` : '';
+  console.log();
+  printBox(rendered + more, {
+    title: `Preview · ${path.basename(filename)} · ${label}`,
+    titleAlignment: 'left',
+    borderColor: '#FC8EAC',
+  });
+}
+
 function printStepList(): void {
   if (state.steps.length === 0) return;
 
@@ -309,11 +398,11 @@ function printStepList(): void {
     const step = state.steps[i];
     const action = stepAction(step);
     const target = stepTarget(step);
-    const actionColored = chalk.hex('#6CB6FF').bold(action);
+    const actionColored = chalk.hex('#9CC6F5').bold(action);
     const statusColored = chalk.green('● pass');
 
     table.push([
-      chalk.hex('#7C6FFF')(`${i + 1}`),
+      chalk.hex('#FC8EAC')(`${i + 1}`),
       actionColored,
       chalk.white(target),
       statusColored,
@@ -321,7 +410,7 @@ function printStepList(): void {
   }
 
   console.log();
-  console.log(`  ${chalk.hex('#7C6FFF').bold(title)}`);
+  console.log(`  ${chalk.hex('#FC8EAC').bold(title)}`);
   console.log(`  ${table.toString().split('\n').join('\n  ')}`);
   console.log();
   console.log(
@@ -494,6 +583,23 @@ const COMMANDS: Record<string, { desc: string; run: (arg: string) => Promise<voi
       console.log();
     },
   },
+  '/preview': {
+    desc: 'Preview the generated code without saving (optionally pass a filename for format)',
+    run: (arg: string) => {
+      if (state.steps.length === 0) {
+        console.log(`\n  ${theme.error('✗')} No steps to preview.\n`);
+        return;
+      }
+      const filename = arg.trim() || `flow-${Date.now()}.test.ts`;
+      const asSdkTest = isSdkTestFilename(filename);
+      const body = asSdkTest ? buildSdkTestString() : buildYamlString();
+      const formatLabel = asSdkTest ? 'SDK test (vitest)' : 'YAML flow';
+      printCodePreview(body, filename, formatLabel);
+      console.log(
+        `  ${theme.dim('Use')} ${theme.info(`/export ${arg.trim() || '<file>'}`)} ${theme.dim('to save.')}\n`
+      );
+    },
+  },
   '/export': {
     desc:
       'Export steps. SDK vitest test by default (e.g. /export my-flow.test.ts) ' +
@@ -507,12 +613,16 @@ const COMMANDS: Record<string, { desc: string; run: (arg: string) => Promise<voi
       const asSdkTest = isSdkTestFilename(filename);
       const filepath = resolvePlaygroundExportPath(filename, asSdkTest);
       const body = asSdkTest ? buildSdkTestString() : buildYamlString();
+      const formatLabel = asSdkTest ? 'SDK test (vitest)' : 'YAML flow';
+
+      // Show the generated code before writing it.
+      printCodePreview(body, filepath, formatLabel);
+
       mkdirSync(path.dirname(filepath), { recursive: true });
       writeFileSync(filepath, body, 'utf-8');
       const runHint = asSdkTest
         ? `vitest run ${path.relative(process.cwd(), filepath)}`
         : `appclaw --flow ${path.relative(process.cwd(), filepath)}`;
-      const formatLabel = asSdkTest ? 'SDK test (vitest)' : 'YAML flow';
       const exportContent = [
         `${chalk.green.bold(`${state.steps.length}`)} ${chalk.dim('steps exported as')} ${chalk.white(formatLabel)}`,
         '',
@@ -785,7 +895,7 @@ function printPlaygroundHeader(): void {
 // ─── Prompt ─────────────────────────────────────────────
 
 function getPrompt(): string {
-  return `\n  ${chalk.hex('#7C6FFF').bold('›')} `;
+  return `\n  ${chalk.hex('#FC8EAC').bold('›')} `;
 }
 
 // ─── Device connection ──────────────────────────────────
@@ -1223,6 +1333,28 @@ export async function runPlayground(deviceArgs?: PlaygroundDeviceArgs): Promise<
   // Prior device-setup steps (spinners, MCP calls) can leave stdin paused.
   if (process.stdin.isPaused()) process.stdin.resume();
 
+  // ── Ink REPL shell on interactive TTYs (pinned prompt, scrolling output) ──
+  const useInk =
+    !!process.stdout.isTTY && !!process.stdin.isTTY && process.env.APPCLAW_TUI !== 'off';
+  if (useInk) {
+    const { runPlaygroundInk } = await import('../ui/ink/playground-runner.js');
+    const cfg = loadConfig();
+    await runPlaygroundInk({
+      info: {
+        platform: _resolvedPlatform,
+        app: state.meta.appId,
+        model: cfg.LLM_MODEL || DEFAULT_MODELS[cfg.LLM_PROVIDER] || 'model',
+        mode: cfg.AGENT_MODE,
+        transport: cfg.MCP_TRANSPORT,
+      },
+      onCommand: (line: string) => Promise.resolve(processLine(line)),
+      onQuit: cleanup,
+      getStepCount: () => state.steps.length,
+    });
+    console.log(`\n  ${theme.dim('Goodbye!')}\n`);
+    return;
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -1425,6 +1557,7 @@ async function processLine(line: string): Promise<void> {
   ui.startSpinner('Executing', line);
   resetVisionTokens();
   let outcome;
+  const t0 = performance.now();
   try {
     outcome = await runOneInstruction(state.mcp, line, {
       appResolver: state.appResolver ?? undefined,
@@ -1439,6 +1572,7 @@ async function processLine(line: string): Promise<void> {
     return;
   }
   ui.stopSpinner();
+  const elapsedMs = Math.round(performance.now() - t0);
 
   const printVisionTokens = (): void => {
     const vt = getVisionTokens();
@@ -1480,9 +1614,9 @@ async function processLine(line: string): Promise<void> {
 
   if (outcome.result.success) {
     state.steps.push(outcome.step);
-    printStepSuccess(stepNum, outcome.step, outcome.result.message);
+    printStepSuccess(stepNum, outcome.step, outcome.result.message, elapsedMs);
   } else {
-    printStepFail(stepNum, outcome.step, outcome.result.message);
+    printStepFail(stepNum, outcome.step, outcome.result.message, elapsedMs);
     if (outcome.step.kind === 'tap' && outcome.closestMatch) {
       console.log(
         `    ${theme.warn(`Closest match: "${outcome.closestMatch}". Try: tap on ${outcome.closestMatch}`)}`

@@ -11,6 +11,7 @@
 
 import * as readline from 'readline';
 import * as ui from '../ui/terminal.js';
+import { isInkActive } from '../ui/renderer.js';
 
 export interface HITLRequest {
   type: 'otp' | 'captcha' | 'choice' | 'confirmation' | 'input';
@@ -27,6 +28,14 @@ export interface HITLResponse {
 
 /** Prompt the user via CLI with optional timeout */
 export async function askUser(request: HITLRequest): Promise<HITLResponse> {
+  // When the Ink TUI owns the terminal, route through its input component —
+  // readline would fight Ink for raw-mode stdin. Dynamic import keeps Ink/React
+  // out of the plain/SDK code path.
+  if (isInkActive()) {
+    const { askUserViaInk } = await import('../ui/ink/InkRenderer.js');
+    return askUserViaInk(request);
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,

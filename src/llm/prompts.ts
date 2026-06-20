@@ -122,6 +122,7 @@ RULES
 8. DONE — only when the goal is fully achieved AND verified in the screenshot.
 9. STAY FOCUSED — only your current goal. Ignore pending sub-goals.
 10. FIELD TARGETING — identify each field by its label/hint/position. Type into the correct one.
+11. SLIDERS / DRAGGING — to move a slider, use the drag tool (NOT repeated taps): fromX/fromY on the handle, toX/toY at the target on the same track. The moment the handle is visibly at the target (e.g. at the right end), call done — do NOT keep dragging.
 
 ═══════════════════════════════════════════
 PROBLEM-SOLVING
@@ -156,12 +157,14 @@ export function buildSystemPrompt(
 **Primary tools — use strategy="ai_instruction" with a visual description:**
 - find_and_click: Visually find + click in one step.
 - find_and_type: Visually find + click + type text in one step.
-- find_and_long_press: Visually find + long-press in one step (context menus, drag initiation).`
+- find_and_long_press: Visually find + long-press in one step (context menus, drag initiation).
+- drag: Move a SLIDER handle, reorder a list item, or pan. Give fromX/fromY (handle now) and toX/toY (target), normalized 0-1000. For a horizontal slider keep Y the same and change only X (fully right ≈ toX 950, fully left ≈ toX 50).`
     : `
 **Primary tools:**
 - find_and_click: Find element + click in one step (strategy + selector).
 - find_and_type: Find element + click + type text in one step (strategy + selector + text).
-- find_and_long_press: Find element + long-press in one step (strategy + selector + optional duration).`;
+- find_and_long_press: Find element + long-press in one step (strategy + selector + optional duration).
+- drag: Move a SLIDER handle, reorder a list item, or pan. Give fromX/fromY (handle now) and toX/toY (target), normalized 0-1000. For a horizontal slider keep Y the same and change only X (fully right ≈ toX 950, fully left ≈ toX 50).`;
 
   // Vision fallback section for DOM mode
   const visionFallback =

@@ -47,6 +47,7 @@ import { setupDevice } from './device/index.js';
 import { loadAppGuide } from './appguides/index.js';
 import * as ui from './ui/terminal.js';
 import { silenceTerminalUI } from './ui/terminal.js';
+import { activateInk, deactivateInk, shouldUseInk } from './ui/ink/InkRenderer.js';
 import { enableJsonMode, isJsonMode, emitJson } from './json-emitter.js';
 
 export type Platform = 'android' | 'ios';
@@ -476,14 +477,18 @@ async function main() {
     });
     const mcp = mcpClient;
 
+    const replayInk = shouldUseInk() && !isJsonMode() && process.env.APPCLAW_TUI !== 'off';
+    if (replayInk) activateInk({ model: config.LLM_MODEL || '', mode: config.AGENT_MODE });
     try {
       const result = await replayRecording(mcpClient, recording, {
         adaptive: true,
         stepDelay: config.STEP_DELAY,
         maxElements: config.MAX_ELEMENTS,
       });
+      if (replayInk) await deactivateInk();
       process.exit(result.success ? 0 : 1);
     } finally {
+      if (replayInk) await deactivateInk();
       await mcpClient.close();
     }
     return;
@@ -808,19 +813,26 @@ async function main() {
         /* appium version or driver may not support recording — skip silently */
       }
 
-      const result = await runYamlFlow(
-        flowScopedMcp,
-        parsed.meta,
-        parsed.steps,
-        {
-          stepDelayMs: config.STEP_DELAY,
-          appResolver: flowAppResolver,
-          onFlowStep,
-          artifactCollector,
-          deviceUdid: flowDeviceUdid,
-        },
-        parsed.phases
-      );
+      const flowInk = shouldUseInk() && !isJsonMode() && process.env.APPCLAW_TUI !== 'off';
+      if (flowInk) activateInk({ mode: config.AGENT_MODE });
+      let result: Awaited<ReturnType<typeof runYamlFlow>>;
+      try {
+        result = await runYamlFlow(
+          flowScopedMcp,
+          parsed.meta,
+          parsed.steps,
+          {
+            stepDelayMs: config.STEP_DELAY,
+            appResolver: flowAppResolver,
+            onFlowStep,
+            artifactCollector,
+            deviceUdid: flowDeviceUdid,
+          },
+          parsed.phases
+        );
+      } finally {
+        if (flowInk) await deactivateInk();
+      }
 
       // Stop recording and attach to report
       if (recordingStarted) {
@@ -895,6 +907,7 @@ async function main() {
 
   // Get goal (and optionally platform) via interactive prompt
   let goal = cliArgs.goal;
+  const interactive = !goal;
   if (!goal) {
     ui.printInteractiveHeader();
 
@@ -912,7 +925,8 @@ async function main() {
     process.exit(1);
   }
 
-  ui.printHeader(VERSION);
+  // Interactive mode already showed the AppClaw header above — don't repeat it.
+  if (!interactive) ui.printHeader(VERSION);
   ui.startSpinner(`Connecting to appium-mcp (${config.MCP_TRANSPORT})...`);
 
   const mcpClient = await createMCPClient({
@@ -1018,6 +1032,8 @@ async function main() {
     let journeyInputTokens = 0;
     let journeyOutputTokens = 0;
     let journeyCost = 0;
+    let allDone = false;
+    const journeyStart = Date.now();
     const allHistory: any[] = [];
     // exportHistory keeps only the "final successful attempt" per sub-goal —
     // recovery steps from failed branches are pruned via keepOnlyFinalAttempt.
@@ -1025,6 +1041,20 @@ async function main() {
     // complete trajectory (including exploration) for debugging.
     const exportHistory: any[] = [];
 
+    // ── Ink TUI: mount the live agent-loop UI on interactive TTYs only ──
+    // (never in --json / piped / SDK). Plain console output is the fallback.
+    const useInk = shouldUseInk() && !isJsonMode() && process.env.APPCLAW_TUI !== 'off';
+    if (useInk)
+      activateInk({
+        overallGoal: goal,
+        subGoalTotal: executor.all.length,
+        model: modelName,
+        mode: config.AGENT_MODE,
+        // Per-step rows are debug-only; default view shows sub-goals + outcomes.
+        showSteps: process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true',
+      });
+
+    try {
     while (!executor.isDone()) {
       const subGoal = executor.current!;
 
@@ -1302,20 +1332,29 @@ async function main() {
       subGoalIdx++;
     }
 
-    if (planResult.isComplex) {
-      ui.printPlanSummary(executor.all);
+    // ── Final journey summary (rendered while Ink is still mounted) ──
+    allDone = executor.all.every((sg) => sg.status === 'completed');
+    ui.printJourneySummary({
+      success: allDone,
+      overallGoal: goal,
+      subGoals: executor.all.map((sg) => ({
+        goal: sg.goal,
+        status: sg.status,
+        result: sg.result,
+      })),
+      totalSteps,
+      durationMs: Date.now() - journeyStart,
+      tokens: {
+        input: journeyInputTokens,
+        output: journeyOutputTokens,
+        cost: journeyCost,
+        model: modelName,
+      },
+    });
+    } finally {
+      if (useInk) await deactivateInk();
     }
 
-    // Print journey-level token totals
-    ui.printJourneyTokenSummary(
-      journeyInputTokens,
-      journeyOutputTokens,
-      journeyCost,
-      totalSteps,
-      modelName
-    );
-
-    const allDone = executor.all.every((sg) => sg.status === 'completed');
     emitJson({
       event: 'done',
       data: { success: allDone, totalSteps, totalCost: journeyCost || undefined },

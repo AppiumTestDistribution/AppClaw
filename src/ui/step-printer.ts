@@ -112,7 +112,7 @@ export function printStepResult(
   const target = stepTarget(step);
   const icon = success ? theme.success('✓') : theme.error('✗');
   const actionBadge = success
-    ? chalk.bgHex('#7C6FFF').white.bold(` ${action} `)
+    ? chalk.bgHex('#FC8EAC').white.bold(` ${action} `)
     : chalk.bgRed.white.bold(` ${action} `);
   const statusDot = success ? chalk.green('●') : chalk.red('●');
 
