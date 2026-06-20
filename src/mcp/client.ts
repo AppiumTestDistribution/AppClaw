@@ -26,7 +26,10 @@ function resolveAppiumMcp(): { command: string; args: string[] } {
     const bin = join(dirname(pkgJson), 'dist', 'index.js');
     return { command: 'node', args: [bin] };
   } catch {
-    return { command: 'npx', args: ['--yes', 'appium-mcp@1.77.0'] };
+    // Keep this pinned version in sync with the "appium-mcp" entry in package.json.
+    // A drift here means an old global install (which can't resolve the bundled copy)
+    // silently downloads a different version than the one AppClaw is tested against.
+    return { command: 'npx', args: ['--yes', 'appium-mcp@1.85.8'] };
   }
 }
 
