@@ -1,3 +1,9 @@
+## [1.5.6](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.5...v1.5.6) (2026-06-20)
+
+### Bug Fixes
+
+* **vision:** locate input field by kind when a type target label can't be matched ([e5f58a6](https://github.com/AppiumTestDistribution/AppClaw/commit/e5f58a6e0c0536875598d4bafdbce66f7ebc1be6))
+
 ## [1.5.5](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.4...v1.5.5) (2026-06-20)
 
 ### Bug Fixes
