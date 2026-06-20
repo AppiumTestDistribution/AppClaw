@@ -13,6 +13,7 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { buildConfig } from './config-builder.js';
+import { applyConfig } from '../config.js';
 import { McpSession } from './mcp-session.js';
 import { FlowRunner } from './flow-runner.js';
 import { GoalRunner } from './goal-runner.js';
@@ -80,6 +81,13 @@ export class AppClaw {
     }
 
     this.config = buildConfig(options);
+    // Sync the shared Config singleton with this instance's options. The execution
+    // pipeline (run-yaml-flow, run-instruction, vision/locate-enabled, agent/loop) reads
+    // the global Config by reference, so without this, options set purely via the
+    // constructor — e.g. `new AppClaw({ agentMode: 'vision' })` — would be ignored and
+    // every command would silently run in DOM mode. (With multiple instances in one
+    // process the last constructed config wins, same as the pre-existing singleton.)
+    applyConfig(this.config);
     this.session = new McpSession(this.config);
 
     // `silent` controls per-step log lines (✓ #1 tap "label" ...). Default is
