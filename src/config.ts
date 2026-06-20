@@ -226,3 +226,21 @@ export function loadConfig(overrides?: Record<string, string | undefined>): AppC
 }
 
 export const Config = loadConfig();
+
+/**
+ * Re-read `process.env` into the shared `Config` singleton, mutating it in place.
+ *
+ * `Config` is computed once at import time (the line above). But the CLI loads a
+ * `--env-file` into `process.env` at runtime — long after every module has already
+ * imported `Config` by reference (run-yaml-flow, run-instruction, vision/locate-enabled,
+ * agent/loop, …). Without this refresh those modules keep the import-time snapshot, so
+ * `--env-file` values like `AGENT_MODE=vision` are silently ignored and execution falls
+ * back to DOM mode.
+ *
+ * Mutating in place (rather than reassigning the `const`) means every existing importer
+ * sees the merged values, because they all hold the same object reference. `loadConfig()`
+ * always returns the full key set (zod defaults fill any gaps), so no stale keys survive.
+ */
+export function refreshConfig(): AppClawConfig {
+  return Object.assign(Config, loadConfig());
+}

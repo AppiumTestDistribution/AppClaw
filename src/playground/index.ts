@@ -22,7 +22,7 @@ import { tryParseNaturalFlowLine } from '../flow/natural-line.js';
 import { runOneInstruction, DEFAULT_MIN_MATCH_SCORE } from '../flow/run-instruction.js';
 import { resetVisionTokens, getVisionTokens } from '../vision/vision-token-tracker.js';
 import { MODEL_PRICING, DEFAULT_MODELS } from '../constants.js';
-import { getStarkVisionModel } from '../vision/locate-enabled.js';
+import { getStarkVisionModel, isVisionLocateEnabled } from '../vision/locate-enabled.js';
 import { generateSdkTestFromInstructions } from '../sdk/goal-export.js';
 import { stepAction, stepTarget } from '../ui/step-printer.js';
 import type { FlowStep, FlowMeta } from '../flow/types.js';
@@ -941,6 +941,22 @@ async function connectToDevice(): Promise<boolean> {
     state.appResolver = appResolver;
     ui.stopSpinner();
     ui.printSetupOk('App resolver ready');
+
+    // Surface the effective interaction mode so a silent DOM fallback is never a
+    // mystery. `isVisionMode()` (run-yaml-flow) requires BOTH AGENT_MODE=vision AND
+    // vision-locate being configured — if vision is requested but not configured,
+    // every command quietly runs against the DOM instead.
+    const visionLocate = isVisionLocateEnabled();
+    if (Config.AGENT_MODE === 'vision' && visionLocate) {
+      ui.printSetupOk('Interaction mode: vision');
+    } else if (Config.AGENT_MODE === 'vision' && !visionLocate) {
+      ui.printWarning(
+        'AGENT_MODE=vision is set, but vision-locate is not configured — running in DOM mode. ' +
+          'Set GEMINI_API_KEY / STARK_VISION_API_KEY / STARK_VISION_BASE_URL (or LLM_PROVIDER=gemini) to enable vision.'
+      );
+    } else {
+      ui.printSetupOk('Interaction mode: dom');
+    }
 
     const readyContent = [
       `${theme.dim('Type commands to execute on device.')}`,

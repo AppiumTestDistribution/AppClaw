@@ -13,7 +13,7 @@
 import { resolve } from 'path';
 import { config as loadDotenvFile } from 'dotenv';
 import { VERSION } from './version.js';
-import { loadConfig } from './config.js';
+import { refreshConfig } from './config.js';
 import { createMCPClient } from './mcp/client.js';
 import { createLLMProvider, buildModel, buildThinkingOptions } from './llm/provider.js';
 import { getScreenState } from './perception/screen.js';
@@ -435,7 +435,12 @@ async function main() {
     }
     ui.printSetupOk(`Loaded env file: ${cliArgs.envFile}`);
   }
-  const config = loadConfig();
+  // Re-read process.env (now including any --env-file values) INTO the shared
+  // Config singleton, not just into this local copy. Modules like run-yaml-flow
+  // and vision/locate-enabled import that singleton by reference, so without this
+  // an --env-file `AGENT_MODE=vision` would be ignored and execution would fall
+  // back to DOM mode. Returns the same merged config used below.
+  const config = refreshConfig();
 
   // ─── Report mode (serve execution reports) ──────────────
   if (cliArgs.report) {
