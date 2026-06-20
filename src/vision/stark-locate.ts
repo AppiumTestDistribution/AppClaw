@@ -133,7 +133,7 @@ export async function starkLocateTapTarget(
   // Use raw screenshot for coordinate scaling (needs true device pixels), compressed for Gemini
   const screenSize = await getScreenSizeForStark(mcp, rawScreenshot);
   const imageBase64 = await downscaleForVision(rawScreenshot);
-  if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
+  if (process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true') {
     const rawKB = Math.round(rawScreenshot.length / 1024);
     const newKB = Math.round(imageBase64.length / 1024);
     console.log(`        [stark] screenshot ${rawKB}KB → ${newKB}KB`);
@@ -150,7 +150,7 @@ export async function starkLocateTapTarget(
 
   const locateT0 = performance.now();
   const actions = await parseInstruction(client, trimmed, imageBase64);
-  if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
+  if (process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true') {
     const elapsed = Math.round(performance.now() - locateT0);
     console.log(`        [stark] parseInstruction ${elapsed}ms`);
   }
@@ -176,7 +176,7 @@ export async function starkLocateTapTarget(
       if (locator.element) {
         const bboxT0 = performance.now();
         const bboxResponse = await client.getBoundingBox(locator.element, imageBase64);
-        if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
+        if (process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true') {
           console.log(`        [stark] getBoundingBox ${Math.round(performance.now() - bboxT0)}ms`);
         }
         const arrayStr = findSubstringWithBrackets(bboxResponse);

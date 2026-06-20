@@ -50,7 +50,7 @@ import {
 } from '../memory/fingerprint.js';
 import { loadAppGuide } from '../appguides/index.js';
 
-const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
+const appclawDebug = process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true';
 
 export interface AgentOptions {
   goal: string;
@@ -192,7 +192,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   let procedureEntry: ProcedureEntry | undefined;
   let procedurePlanText: string | undefined;
 
-  if (episodicEnabled && mcpDebug) {
+  if (episodicEnabled && appclawDebug) {
     const entryCount = episodicStore?.entries.length ?? 0;
     const procCount = procedureStore?.entries.length ?? 0;
     ui.printAgentBullet(
@@ -245,7 +245,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   }
 
   for (let step = 0; step < maxSteps; step++) {
-    if (step === 0 && mcpDebug) {
+    if (step === 0 && appclawDebug) {
       ui.printAgentBullet('Pulling UI state from the device');
       ui.printAgentBullet('Consulting the agent model for the next action');
     }
@@ -447,7 +447,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       if (matches.length > 0) {
         pastExperience = formatExperienceForPrompt(matches);
         episodicRecorder.trackInjectedTrajectories(matches);
-        if (mcpDebug) {
+        if (appclawDebug) {
           ui.printAgentBullet(
             `Episodic memory: injecting ${matches.length} past experience(s) (score: ${matches[0].score.toFixed(2)})`
           );
@@ -474,7 +474,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
             `Procedural memory: injecting ${procedureEntry.steps.length}-step plan ` +
               `(score ${match.score.toFixed(2)}, succeeded ${procedureEntry.successCount}x, namespace=${memoryNamespace})`
           );
-        } else if (mcpDebug) {
+        } else if (appclawDebug) {
           const best = getBestProcedureCandidate(procedureStore, procedureQuery);
           if (best) {
             const threshold = getProcedureInjectionThreshold(best);
@@ -499,13 +499,13 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     if (appGuide) {
       if (activeAppId !== lastAppGuideId) {
         lastAppGuideId = activeAppId;
-        if (mcpDebug) {
+        if (appclawDebug) {
           const firstLine = appGuide.split('\n')[0];
           ui.printAgentBullet(
             `AppGuide: injecting ${firstLine.replace('APP_GUIDE ', '').replace(':', '').trim()}`
           );
         }
-      } else if (mcpDebug) {
+      } else if (appclawDebug) {
         ui.printAgentBullet(`AppGuide: active (${activeAppId})`);
       }
     }
@@ -537,7 +537,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     try {
       decision = await llm.getDecision(
         context,
-        mcpDebug
+        appclawDebug
           ? {
               onTextStart() {
                 streamingStarted = true;
@@ -586,14 +586,14 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     // ─── 4b. LOG THE DECISION + TOKENS ──────────────────
     const llmElapsed = Math.round(performance.now() - llmT0);
     ui.stopSpinner();
-    if (mcpDebug) {
+    if (appclawDebug) {
       console.log(
-        `        ${ui.theme.dim('llm')} ${ui.theme.info('getDecision')} ${ui.theme.dim(`${llmElapsed}ms`)}`
+        `  ${ui.theme.brand('│ app ')} ${ui.theme.dim('llm getDecision')} ${ui.theme.dim(`${llmElapsed}ms`)}`
       );
     }
 
     // If reasoning text is available but wasn't streamed live, show it now (debug only)
-    if (mcpDebug && decision.reasoning && !streamingStarted) {
+    if (appclawDebug && decision.reasoning && !streamingStarted) {
       ui.printReasoning(decision.reasoning);
     }
 
@@ -841,11 +841,11 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         const wasTyping = decision.toolName === 'find_and_type';
         const wasClicking = decision.toolName === 'find_and_click';
         if (wasTyping) {
-          lastResult += `\n>> ⛔ STOP. You just typed text. Before your next action, you MUST examine the screenshot:`;
-          lastResult += `\n>>   1. Do you see a SUGGESTION DROPDOWN or CONTACT LIST? → You MUST tap the correct suggestion NOW.`;
-          lastResult += `\n>>   2. Do you see a CHIP/PILL confirming the input? → Input is confirmed, you may call done.`;
-          lastResult += `\n>>   3. Do you see the raw text still in the field with no confirmation? → Press ENTER to confirm.`;
-          lastResult += `\n>>   You CANNOT call "done" unless the input is visually confirmed in the screenshot.`;
+          lastResult += `\n>> You just typed text. Examine the screenshot, then act based on YOUR CURRENT GOAL:`;
+          lastResult += `\n>>   • If the goal is to SELECT or NAVIGATE TO a specific item (pick a destination, choose a contact, open a result) → tap the matching suggestion in the dropdown.`;
+          lastResult += `\n>>   • If the goal is only to TYPE / SEARCH / ENTER text (a later step will verify or read the results) → do NOT tap any suggestion. Once the typed text or the results list is visible, call "done".`;
+          lastResult += `\n>>   • If the text isn't confirmed and there is no suggestion to pick → press ENTER.`;
+          lastResult += `\n>>   Do NOT tap a suggestion/result unless your goal explicitly asks you to select one — tapping it may navigate away from the search.`;
         } else if (wasClicking) {
           lastResult += `\n>> VERIFY: Look at the screenshot carefully after your tap:`;
           lastResult += `\n>>   1. Did the screen change SIGNIFICANTLY (e.g., navigated to a completely different screen)? → Your action likely SUCCEEDED. Check if your GOAL is now ACHIEVED — if yes, call "done" immediately.`;
@@ -866,10 +866,10 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
             // After typing, new elements are likely autocomplete/suggestions that MUST be handled
             const wasTyping = decision.toolName === 'find_and_type';
             if (wasTyping) {
-              lastResult += `\n>> ⛔ STOP — DO NOT call "done" yet. New elements appeared after typing. You MUST handle them first:`;
-              lastResult += `\n>>   - Tap the correct suggestion/item from the dropdown`;
-              lastResult += `\n>>   - OR press ENTER to confirm your input`;
-              lastResult += `\n>>   - The goal is NOT complete until the overlay is dismissed.`;
+              lastResult += `\n>> New elements appeared after typing (likely autocomplete/suggestions). Decide based on YOUR CURRENT GOAL:`;
+              lastResult += `\n>>   - Goal is to SELECT / NAVIGATE to a specific item → tap the matching suggestion.`;
+              lastResult += `\n>>   - Goal is only to TYPE / SEARCH / enter text (a later step verifies or reads the results) → do NOT tap a suggestion; the text is entered, call "done".`;
+              lastResult += `\n>>   - Need to confirm the input and no relevant suggestion to pick → press ENTER.`;
             } else {
               lastResult += `\n>> IMPORTANT: Handle these new elements before proceeding. If suggestions/autocomplete appeared, tap the correct one. If a dialog/popup appeared, dismiss it.`;
             }
@@ -934,6 +934,7 @@ const META_TOOLS = new Set([
   'find_and_click',
   'find_and_type',
   'find_and_long_press',
+  'drag',
   'launch_app',
   'go_back',
   'go_home',
@@ -1009,9 +1010,9 @@ async function executeMetaTool(
             const scaled = await scaleLLMCoords(tapX, tapY);
             const tapped = await tapAtCoordinates(mcp, scaled.x, scaled.y);
             if (tapped) {
-              if (mcpDebug)
+              if (appclawDebug)
                 console.log(
-                  `        [fast-tap] LLM (${Math.round(tapX)},${Math.round(tapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`
+                  `  ${ui.theme.brand('│ app ')} ${ui.theme.dim(`[fast-tap] LLM (${Math.round(tapX)},${Math.round(tapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`)}`
                 );
               return {
                 success: true,
@@ -1020,9 +1021,9 @@ async function executeMetaTool(
             }
             attempts.push(`llm_coords [${scaled.x},${scaled.y}]: tap failed`);
             // Fall through to vision locate as backup
-          } else if (skipFastTapCoords && tapX != null && tapY != null && mcpDebug) {
+          } else if (skipFastTapCoords && tapX != null && tapY != null && appclawDebug) {
             console.log(
-              `        [vision-tap-policy] Ignoring LLM tap coords for keypad-like selector — using vision locate`
+              `  ${ui.theme.brand('│ app ')} ${ui.theme.dim('[vision-tap-policy] Ignoring LLM tap coords for keypad-like selector — using vision locate')}`
             );
           }
 
@@ -1350,6 +1351,43 @@ async function executeMetaTool(
         };
       }
 
+      case 'drag': {
+        // Coordinate drag (slider handles, reordering, pan). LLM provides
+        // from/to in normalized 0-1000; scale to device space and use
+        // appium_drag_and_drop (same path the YAML flow engine uses).
+        const fromX = args.fromX as number | undefined;
+        const fromY = args.fromY as number | undefined;
+        const toX = args.toX as number | undefined;
+        const toY = args.toY as number | undefined;
+        const dragDuration = (args.duration as number | undefined) ?? 800;
+        if ([fromX, fromY, toX, toY].some((v) => typeof v !== 'number')) {
+          return {
+            success: false,
+            message: 'drag requires numeric fromX, fromY, toX, toY (normalized 0-1000)',
+          };
+        }
+        const from = await scaleLLMCoords(fromX as number, fromY as number);
+        const to = await scaleLLMCoords(toX as number, toY as number);
+        const dragRes = await mcp.callTool('appium_drag_and_drop', {
+          sourceX: from.x,
+          sourceY: from.y,
+          targetX: to.x,
+          targetY: to.y,
+          duration: dragDuration,
+          longPressDuration: 400,
+        });
+        if (isMCPError(dragRes)) {
+          return {
+            success: false,
+            message: `Drag failed from [${from.x},${from.y}] to [${to.x},${to.y}]`,
+          };
+        }
+        return {
+          success: true,
+          message: `Dragged from [${from.x},${from.y}] to [${to.x},${to.y}]`,
+        };
+      }
+
       case 'find_and_type': {
         const isVisionModeType = Config.AGENT_MODE === 'vision';
         // In vision mode, force ai_instruction regardless of what the LLM chose
@@ -1372,9 +1410,9 @@ async function executeMetaTool(
             const tapped = await tapAtCoordinates(mcp, scaled.x, scaled.y);
             if (tapped) {
               tappedViaVision = true;
-              if (mcpDebug)
+              if (appclawDebug)
                 console.log(
-                  `        [fast-tap] LLM (${Math.round(typeTapX)},${Math.round(typeTapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`
+                  `  ${ui.theme.brand('│ app ')} ${ui.theme.dim(`[fast-tap] LLM (${Math.round(typeTapX)},${Math.round(typeTapY)}) → device (${scaled.x},${scaled.y}) — skipped vision locate`)}`
                 );
             }
           }
@@ -1469,7 +1507,7 @@ async function executeMetaTool(
           if (setResult && !isMCPError(setResult)) {
             return {
               success: true,
-              message: `Typed "${text}" into "${selector.slice(0, 60)}". NOTE: Check the screen — if autocomplete suggestions appeared, tap the correct one or press Enter to confirm before proceeding.`,
+              message: `Typed "${text}" into "${selector.slice(0, 60)}". NOTE: Check the screen. Only tap a suggestion if your goal is to SELECT/navigate to a specific item; if the goal is just to type/search, the text is entered — do not tap into a result.`,
             };
           }
         }

@@ -109,11 +109,11 @@ RULES
 
 1. VERIFY BEFORE DECIDING — before EVERY action, study the screenshot. Ask yourself: "What do I see? What changed? Is there something I need to handle first?" Only then choose your next action.
 2. ONE STEP AT A TIME — do the NEXT logical step only. Don't skip ahead.
-3. AFTER TYPING — after find_and_type, your NEXT action must be based on what the screenshot shows:
-   - Suggestion/dropdown visible? → TAP the correct suggestion. Not done yet.
-   - Chip/pill created (input confirmed)? → You can proceed or call done.
-   - Raw text with no confirmation? → Press ENTER or tap elsewhere to confirm.
-   - NEVER call "done" right after typing. Always verify first.
+3. AFTER TYPING — look at the screenshot, then act based on YOUR GOAL:
+   - Goal is to SELECT / navigate to a specific item (destination, contact, result)? → tap the matching suggestion in the dropdown.
+   - Goal is only to TYPE / SEARCH / enter text (a later step verifies or reads the results)? → do NOT tap a suggestion; once the text or results are visible, call "done".
+   - Raw text not confirmed and no suggestion to pick? → press ENTER.
+   - Don't tap a suggestion/result unless your goal requires choosing one — tapping it can navigate away from the search.
 4. AFTER TAPPING — after find_and_click, check: did the screen change? If it looks the same, your tap may have missed. Try a different description.
 5. OVERLAYS — if anything is covering the screen (dialog, popup, dropdown, suggestions), handle it FIRST.
 6. NO REPETITION — if an action failed, try something DIFFERENT. Never repeat the same failing action.
@@ -122,6 +122,7 @@ RULES
 8. DONE — only when the goal is fully achieved AND verified in the screenshot.
 9. STAY FOCUSED — only your current goal. Ignore pending sub-goals.
 10. FIELD TARGETING — identify each field by its label/hint/position. Type into the correct one.
+11. SLIDERS / DRAGGING — to move a slider, use the drag tool (NOT repeated taps): fromX/fromY on the handle, toX/toY at the target on the same track. The moment the handle is visibly at the target (e.g. at the right end), call done — do NOT keep dragging.
 
 ═══════════════════════════════════════════
 PROBLEM-SOLVING
@@ -156,12 +157,14 @@ export function buildSystemPrompt(
 **Primary tools — use strategy="ai_instruction" with a visual description:**
 - find_and_click: Visually find + click in one step.
 - find_and_type: Visually find + click + type text in one step.
-- find_and_long_press: Visually find + long-press in one step (context menus, drag initiation).`
+- find_and_long_press: Visually find + long-press in one step (context menus, drag initiation).
+- drag: Move a SLIDER handle, reorder a list item, or pan. Give fromX/fromY (handle now) and toX/toY (target), normalized 0-1000. For a horizontal slider keep Y the same and change only X (fully right ≈ toX 950, fully left ≈ toX 50).`
     : `
 **Primary tools:**
 - find_and_click: Find element + click in one step (strategy + selector).
 - find_and_type: Find element + click + type text in one step (strategy + selector + text).
-- find_and_long_press: Find element + long-press in one step (strategy + selector + optional duration).`;
+- find_and_long_press: Find element + long-press in one step (strategy + selector + optional duration).
+- drag: Move a SLIDER handle, reorder a list item, or pan. Give fromX/fromY (handle now) and toX/toY (target), normalized 0-1000. For a horizontal slider keep Y the same and change only X (fully right ≈ toX 950, fully left ≈ toX 50).`;
 
   // Vision fallback section for DOM mode
   const visionFallback =

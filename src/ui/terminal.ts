@@ -22,10 +22,11 @@ import { Config } from '../config.js';
 
 marked.use(markedTerminal({ reflowText: true, width: 76, tab: 2 }) as any);
 
-const appGradient: (text: string) => string = gradient(['#7C6FFF', '#6CB6FF']);
-const successGradient: (text: string) => string = gradient(['#7C6FFF', '#22C55E']);
+const appGradient: (text: string) => string = gradient(['#FC8EAC', '#9CC6F5']);
+const successGradient: (text: string) => string = gradient(['#FC8EAC', '#22C55E']);
 
 import { isJsonMode } from '../json-emitter.js';
+import { getRenderer, type JourneySummaryInput } from './renderer.js';
 
 /** No-op — kept for call-site compat. */
 export async function initUI(): Promise<void> {}
@@ -66,7 +67,7 @@ export function silenceTerminalUI(): void {
 // ─── Theme ───────────────────────────────────────────────
 
 const theme = {
-  brand: chalk.hex('#7C6FFF'),
+  brand: chalk.hex('#FC8EAC'),
   success: chalk.green,
   error: chalk.red,
   warn: chalk.yellow,
@@ -75,7 +76,7 @@ const theme = {
   muted: chalk.gray,
   info: chalk.cyan,
   white: chalk.white,
-  step: chalk.hex('#6CB6FF'),
+  step: chalk.hex('#9CC6F5'),
   label: chalk.hex('#9CA3AF'),
   badgeSkip: chalk.bgGreen.black,
   badgeAdapt: chalk.bgYellow.black,
@@ -145,7 +146,7 @@ function printBox(content: string, opts: BoxenOptions = {}): void {
       padding: 1,
       margin: { left: 2 },
       borderStyle: 'round',
-      borderColor: '#7C6FFF',
+      borderColor: '#FC8EAC',
       ...opts,
     })
   );
@@ -187,7 +188,7 @@ function printPanel(opts: PanelOptions): void {
     title: opts.title,
     titleAlignment: 'left',
     width: opts.width,
-    borderColor: opts.borderColor ?? '#7C6FFF',
+    borderColor: opts.borderColor ?? '#FC8EAC',
     dimBorder: opts.dimBorder,
   });
 }
@@ -346,10 +347,14 @@ export function formatAgentThinkingDetail(
 }
 
 export function printAgentBullet(message: string): void {
+  const r = getRenderer();
+  if (r?.printAgentBullet) return r.printAgentBullet(message);
   console.log(`  ${theme.muted('○')} ${theme.dim(message)}`);
 }
 
 export function updateSpinner(message?: string, detail?: string): void {
+  const r = getRenderer();
+  if (r?.updateSpinner) return r.updateSpinner(message, detail);
   if (!spinnerLineActive) return;
   if (message !== undefined) spinnerPrimary = message;
   if (detail !== undefined) spinnerDetail = detail;
@@ -357,6 +362,8 @@ export function updateSpinner(message?: string, detail?: string): void {
 }
 
 export function startSpinner(message: string, detail?: string, rotateWords = false): void {
+  const r = getRenderer();
+  if (r?.startSpinner) return r.startSpinner(message, detail, rotateWords);
   stopSpinner();
   spinnerFrame = 0;
   spinnerLineActive = true;
@@ -377,6 +384,8 @@ export function startSpinner(message: string, detail?: string, rotateWords = fal
 }
 
 export function stopSpinner(finalMessage?: string): void {
+  const r = getRenderer();
+  if (r?.stopSpinner) return r.stopSpinner(finalMessage);
   if (wordRotateTimer) {
     clearInterval(wordRotateTimer);
     wordRotateTimer = null;
@@ -415,6 +424,8 @@ function cleanReasoningText(text: string): string {
 }
 
 export function startStreaming(label: string = 'Thinking'): void {
+  const r = getRenderer();
+  if (r?.startStreaming) return r.startStreaming(label);
   if (spinnerTimer) {
     clearInterval(spinnerTimer);
     spinnerTimer = null;
@@ -430,6 +441,8 @@ export function startStreaming(label: string = 'Thinking'): void {
 }
 
 export function streamChunk(text: string): void {
+  const r = getRenderer();
+  if (r?.streamChunk) return r.streamChunk(text);
   if (!streamActive) return;
   streamBuffer += text;
   const allLines = wrapStreamText(streamBuffer, STREAM_LINE_WIDTH);
@@ -442,6 +455,8 @@ export function streamChunk(text: string): void {
 }
 
 export function stopStreaming(): void {
+  const r = getRenderer();
+  if (r?.stopStreaming) return r.stopStreaming();
   if (!streamActive) return;
   streamActive = false;
   eraseStreamLines();
@@ -472,6 +487,8 @@ function eraseStreamLines(): void {
 export function printReasoning(text: string): void {
   const cleaned = cleanReasoningText(text);
   if (!cleaned) return;
+  const r = getRenderer();
+  if (r?.printReasoning) return r.printReasoning(cleaned);
   const allLines = wrapStreamText(cleaned, STREAM_LINE_WIDTH);
   console.log(`  ${theme.dim('┃')} ${theme.dim('Reasoning')}`);
   for (const line of allLines) {
@@ -569,6 +586,8 @@ export function printSetupError(message: string, hint?: string): void {
 // ─── Goal ────────────────────────────────────────────────
 
 export function printGoalStart(goal: string, maxSteps: number): void {
+  const r = getRenderer();
+  if (r?.printGoalStart) return r.printGoalStart(goal, maxSteps);
   const wrapped = wrapText(goal, 55, 0);
   const content = [
     ...wrapped.map((l) => chalk.bold(l)),
@@ -587,6 +606,8 @@ export function printStep(
   toolName: string,
   argsSummary: string
 ): void {
+  const r = getRenderer();
+  if (r?.printStep) return r.printStep(step, maxSteps, toolName, argsSummary);
   const counter = theme.dim(`[${step}/${maxSteps}]`.padEnd(8));
 
   if (toolName === 'find_and_click') {
@@ -623,14 +644,20 @@ export function printStep(
 }
 
 export function printStepDetail(message: string): void {
+  const r = getRenderer();
+  if (r?.printStepDetail) return r.printStepDetail(message);
   console.log(`  ${' '.repeat(8)}${theme.dim('→')} ${theme.dim(message)}`);
 }
 
 export function printStepError(message: string): void {
+  const r = getRenderer();
+  if (r?.printStepError) return r.printStepError(message);
   console.log(`  ${' '.repeat(8)}${theme.error('✗')} ${theme.error(message)}`);
 }
 
 export function printGoalSuccess(steps: number, reason: string): void {
+  const r = getRenderer();
+  if (r?.printGoalSuccess) return r.printGoalSuccess(steps, reason);
   console.log();
   console.log(
     `  ${theme.success('✓')} ${theme.success.bold('Completed')} ${theme.dim(`in ${steps} steps`)}`
@@ -640,6 +667,8 @@ export function printGoalSuccess(steps: number, reason: string): void {
 }
 
 export function printGoalFailed(reason: string): void {
+  const r = getRenderer();
+  if (r?.printGoalFailed) return r.printGoalFailed(reason);
   console.log();
   console.log(
     `  ${theme.error('✗')} ${theme.error.bold('Failed')} ${theme.dim('—')} ${theme.dim(reason)}`
@@ -654,6 +683,8 @@ export function printPlanStart(): void {
 }
 
 export function printPlan(subGoals: Array<{ goal: string }>, reasoning: string): void {
+  const r = getRenderer();
+  if (r?.printPlan) return r.printPlan(subGoals, reasoning);
   const goalList = subGoals.map((sg, i) => `${theme.brand(`${i + 1}.`)} ${sg.goal}`).join('\n');
   const reasonLines = wrapText(reasoning, 68, 2).slice(0, 2);
   const content = [goalList, '', ...reasonLines.map((l) => theme.dim(l))].join('\n');
@@ -669,6 +700,9 @@ export function printPlanContext(
   allGoals: Array<{ goal: string; status: string }>,
   currentIndex: number
 ): void {
+  const r = getRenderer();
+  if (r?.printPlanContext)
+    return r.printPlanContext(overallGoal, _currentGoal, allGoals, currentIndex);
   console.log();
   console.log(`  ${theme.brand.bold('Progress')}`);
   console.log(
@@ -729,7 +763,7 @@ export function printPlanSummary(
     const goalCell = ok ? chalk.white(sg.goal) : chalk.red(sg.goal);
     const resultCell = ok ? chalk.green(sg.result ?? '') : chalk.red(sg.result ?? '');
 
-    table.push([chalk.hex('#7C6FFF')(`${i + 1}`), goalCell, statusCell, resultCell]);
+    table.push([chalk.hex('#FC8EAC')(`${i + 1}`), goalCell, statusCell, resultCell]);
   }
 
   console.log(indent(table.toString()));
@@ -747,6 +781,8 @@ export function printPlanSummary(
 // ─── Orchestrator badges ─────────────────────────────────
 
 export function printOrchestratorSkip(subGoal: string, reason: string): void {
+  const r = getRenderer();
+  if (r?.printOrchestratorSkip) return r.printOrchestratorSkip(subGoal, reason);
   const pill = badge('SKIP', theme.badgeSkip);
   const goalShort = subGoal.length > 55 ? subGoal.slice(0, 52) + '…' : subGoal;
   console.log(`  ${pill} ${theme.dim(goalShort)}`);
@@ -754,6 +790,8 @@ export function printOrchestratorSkip(subGoal: string, reason: string): void {
 }
 
 export function printOrchestratorRewrite(original: string, rewritten: string): void {
+  const r = getRenderer();
+  if (r?.printOrchestratorRewrite) return r.printOrchestratorRewrite(original, rewritten);
   const pill = badge('ADAPT', theme.badgeAdapt);
   const origShort = original.length > 50 ? original.slice(0, 47) + '…' : original;
   console.log(`  ${pill} ${theme.dim(origShort)}`);
@@ -763,11 +801,15 @@ export function printOrchestratorRewrite(original: string, rewritten: string): v
 }
 
 export function printOrchestratorProceed(subGoal: string): void {
+  const r = getRenderer();
+  if (r?.printOrchestratorProceed) return r.printOrchestratorProceed(subGoal);
   const pill = badge('NEXT', theme.badgeProceed);
   console.log(`  ${pill} ${theme.white(subGoal)}`);
 }
 
 export function printScreenReadiness(issues: string[], suggestedAction?: string): void {
+  const r = getRenderer();
+  if (r?.printScreenReadiness) return r.printScreenReadiness(issues, suggestedAction);
   console.log(`  ${theme.warn('⚠')} ${theme.warn('Screen not ready')}`);
   for (const issue of issues) {
     console.log(`    ${theme.dim('•')} ${theme.dim(issue)}`);
@@ -785,6 +827,8 @@ export function printReplayHeader(filepath: string): void {
 }
 
 export function printReplayGoal(goal: string, totalSteps: number): void {
+  const r = getRenderer();
+  if (r?.printReplayGoal) return r.printReplayGoal(goal, totalSteps);
   console.log(`  ${theme.bold(goal)} ${theme.dim(`(${totalSteps} steps)`)}`);
   console.log();
 }
@@ -796,6 +840,8 @@ export function printReplayStep(
   adapted: boolean,
   success: boolean
 ): void {
+  const r = getRenderer();
+  if (r?.printReplayStep) return r.printReplayStep(step, total, toolName, adapted, success);
   const counter = theme.dim(`[${step}/${total}]`.padEnd(8));
   const tool = theme.step(toolName);
   const badges: string[] = [];
@@ -810,6 +856,8 @@ export function printYamlFlowHeader(filepath: string): void {
 }
 
 export function printFlowStep(step: number, total: number, label: string, success: boolean): void {
+  const r = getRenderer();
+  if (r?.printFlowStep) return r.printFlowStep(step, total, label, success);
   const counter = theme.dim(`[${step}/${total}]`.padEnd(8));
   const line = theme.step(label);
   const status = success ? theme.success(' ok') : theme.error(' failed');
@@ -817,6 +865,8 @@ export function printFlowStep(step: number, total: number, label: string, succes
 }
 
 export function printReplayResult(passed: number, total: number, adapted: number): void {
+  const r = getRenderer();
+  if (r?.printReplayResult) return r.printReplayResult(passed, total, adapted);
   console.log();
   console.log(`  ${progressBar(passed, total, 25)}`);
   const allPassed = passed === total;
@@ -832,14 +882,20 @@ export function printReplayResult(passed: number, total: number, adapted: number
 // ─── Status / misc ───────────────────────────────────────
 
 export function printWarning(message: string): void {
+  const r = getRenderer();
+  if (r?.printWarning) return r.printWarning(message);
   console.log(`  ${theme.warn('!')} ${theme.warn(message)}`);
 }
 
 export function printInfo(message: string): void {
+  const r = getRenderer();
+  if (r?.printInfo) return r.printInfo(message);
   console.log(`  ${theme.info('ℹ')} ${theme.dim(message)}`);
 }
 
 export function printError(message: string, detail?: string): void {
+  const r = getRenderer();
+  if (r?.printError) return r.printError(message, detail);
   console.log(`  ${theme.error('✗')} ${message}`);
   if (detail) console.log(`    ${theme.dim(detail)}`);
 }
@@ -849,14 +905,20 @@ export function printFileSaved(label: string, filepath: string): void {
 }
 
 export function printStuck(step: number): void {
+  const r = getRenderer();
+  if (r?.printStuck) return r.printStuck(step);
   console.log(`  ${theme.warn('!')} ${theme.warn('Stuck')} ${theme.dim(`at step ${step}`)}`);
 }
 
 export function printRecovery(message: string): void {
+  const r = getRenderer();
+  if (r?.printRecovery) return r.printRecovery(message);
   console.log(`  ${theme.info('↻')} ${theme.dim(message)}`);
 }
 
 export function printPreprocessor(message: string): void {
+  const r = getRenderer();
+  if (r?.printPreprocessor) return r.printPreprocessor(message);
   printStepDetail(message);
 }
 
@@ -887,6 +949,9 @@ export function printStepTokens(
   label?: string
 ): void {
   if (!Config.SHOW_TOKEN_USAGE) return;
+  const r = getRenderer();
+  if (r?.printStepTokens)
+    return r.printStepTokens(inputTokens, outputTokens, cachedTokens, cost, label);
   const total = inputTokens + outputTokens;
   const cachedStr = cachedTokens && cachedTokens > 0 ? ` cached: ${cachedTokens}` : '';
   const costStr = cost != null && cost > 0 ? `  ${chalk.green(`$${cost.toFixed(5)}`)}` : '';
@@ -904,6 +969,9 @@ export function printTokenSummary(
   totalCached?: number
 ): void {
   if (!Config.SHOW_TOKEN_USAGE) return;
+  const r = getRenderer();
+  if (r?.printTokenSummary)
+    return r.printTokenSummary(totalInput, totalOutput, cost, modelName, totalCached);
   const total = totalInput + totalOutput;
   const lines = [
     `${chalk.hex('#9CA3AF')('Tokens')}  ${chalk.white.bold(total.toLocaleString())}  ${chalk.dim(`(in: ${totalInput.toLocaleString()}  out: ${totalOutput.toLocaleString()})`)}`,
@@ -924,6 +992,33 @@ export function printTokenSummary(
   });
 }
 
+/**
+ * Final journey summary — overall pass/fail + sub-goal table + token totals.
+ * Ink renders a panel; the plain fallback reuses the plan-summary table and
+ * journey token box.
+ */
+export function printJourneySummary(data: JourneySummaryInput): void {
+  const r = getRenderer();
+  if (r?.printJourneySummary) return r.printJourneySummary(data);
+  // plain fallback
+  if (data.subGoals.length > 1) {
+    printPlanSummary(data.subGoals);
+  } else {
+    const ok = data.success;
+    console.log();
+    console.log(
+      `  ${ok ? theme.success('✓') : theme.error('✗')} ${(ok ? theme.success : theme.error).bold(ok ? 'PASSED' : 'FAILED')} ${theme.dim(`· ${data.totalSteps} steps`)}`
+    );
+  }
+  printJourneyTokenSummary(
+    data.tokens.input,
+    data.tokens.output,
+    data.tokens.cost,
+    data.totalSteps,
+    data.tokens.model
+  );
+}
+
 export function printJourneyTokenSummary(
   totalInput: number,
   totalOutput: number,
@@ -936,7 +1031,7 @@ export function printJourneyTokenSummary(
   console.log();
   const content = [
     `${chalk.hex('#9CA3AF')('Tokens')}  ${chalk.white.bold(total.toLocaleString())}  ${chalk.dim(`(in: ${totalInput.toLocaleString()}  out: ${totalOutput.toLocaleString()})`)}`,
-    `${chalk.hex('#9CA3AF')('Steps')}   ${chalk.hex('#7C6FFF').bold(`${totalSteps}`)}`,
+    `${chalk.hex('#9CA3AF')('Steps')}   ${chalk.hex('#FC8EAC').bold(`${totalSteps}`)}`,
     `${chalk.hex('#9CA3AF')('Cost')}    ${chalk.green.bold(`$${totalCost.toFixed(4)}`)}`,
     `${chalk.hex('#9CA3AF')('Model')}   ${chalk.dim(modelName)}`,
   ].join('\n');
@@ -962,6 +1057,8 @@ export function printExplorerHeader(): void {
 }
 
 export function printExplorerPhase(phase: string, message: string): void {
+  const r = getRenderer();
+  if (r?.printExplorerPhase) return r.printExplorerPhase(phase, message);
   const phaseColors: Record<string, (s: string) => string> = {
     Read: theme.info,
     Think: theme.brand,

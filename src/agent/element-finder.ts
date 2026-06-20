@@ -159,19 +159,19 @@ export async function findElementWithFallback(
 export async function tapAtCoordinates(mcp: MCPClient, x: number, y: number): Promise<boolean> {
   const ix = Math.round(x);
   const iy = Math.round(y);
-  const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
+  const appclawDebug = process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true';
 
   // Preferred: appium_gesture tap at coordinates (appium-mcp 1.61+)
   try {
     const result = await mcp.callTool('appium_gesture', { action: 'tap', x: ix, y: iy });
     const text = result.content?.map((c: any) => (c.type === 'text' ? c.text : '')).join('') ?? '';
-    if (mcpDebug)
+    if (appclawDebug)
       console.log(`        tapAtCoordinates(${ix},${iy}) gesture response: ${text.slice(0, 200)}`);
     if (!text.toLowerCase().includes('error') && !text.toLowerCase().includes('failed')) {
       return true;
     }
   } catch (err) {
-    if (mcpDebug)
+    if (appclawDebug)
       console.log(
         `        tapAtCoordinates gesture error: ${err instanceof Error ? err.message : err}`
       );
@@ -196,7 +196,7 @@ export async function tapAtCoordinates(mcp: MCPClient, x: number, y: number): Pr
     });
     return true;
   } catch (err) {
-    if (mcpDebug)
+    if (appclawDebug)
       console.log(
         `        tapAtCoordinates w3c error: ${err instanceof Error ? err.message : err}`
       );

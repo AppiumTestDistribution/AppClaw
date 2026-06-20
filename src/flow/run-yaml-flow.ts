@@ -604,7 +604,7 @@ async function flowTypeText(
   deviceUdid?: string,
   poll: FlowTapPollOptions = { maxAttempts: 10, intervalMs: 300 }
 ): Promise<ActionResult> {
-  if (mcpDebug) ui.printAgentBullet(`[type] text="${text}", target=${target ?? '(none)'}`);
+  if (appclawDebug) ui.printAgentBullet(`[type] text="${text}", target=${target ?? '(none)'}`);
   // ── If a target field is specified, tap it first to focus (implicit wait) ──
   if (target) {
     const tapResult = await tapByLabel(mcp, target, poll);
@@ -816,13 +816,13 @@ const ASSERT_DOM_POLLS_BEFORE_VISION = 3;
  * Vision-based assertion: take a screenshot and ask the LLM
  * "Is this visible on screen?" — returns a true yes/no answer.
  */
-const mcpDebug = process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true';
+const appclawDebug = process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true';
 
 async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
   const apiKey = getStarkVisionApiKey();
   const baseUrl = getStarkVisionBaseUrl();
   if (!apiKey && !baseUrl) {
-    if (mcpDebug)
+    if (appclawDebug)
       ui.printWarning(
         '[vision-assert] No API key or local server configured, skipping vision assert'
       );
@@ -846,7 +846,7 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (attempt > 0) await sleep(500);
 
-    if (mcpDebug)
+    if (appclawDebug)
       ui.printAgentBullet(
         `[vision-assert] Taking screenshot for: "${text}"${attempt > 0 ? ` (retry ${attempt})` : ''}`
       );
@@ -854,22 +854,22 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
     // full resolution to identify small labels (e.g. bottom nav items on high-DPI devices).
     const imageBase64 = await screenshot(mcp);
     if (!imageBase64) {
-      if (mcpDebug) ui.printWarning('[vision-assert] Failed to capture screenshot');
+      if (appclawDebug) ui.printWarning('[vision-assert] Failed to capture screenshot');
       continue;
     }
-    if (mcpDebug)
+    if (appclawDebug)
       ui.printAgentBullet(
         `[vision-assert] Screenshot captured (${Math.round(imageBase64.length / 1024)}KB)`
       );
 
-    if (mcpDebug)
+    if (appclawDebug)
       ui.printAgentBullet(
         `[vision-assert] Asking LLM: is "${text}" visible? (model: ${getStarkVisionModel()})`
       );
     const visT0 = performance.now();
     const response = await client.isElementVisible(imageBase64, text, false);
     const visElapsed = Math.round(performance.now() - visT0);
-    if (mcpDebug)
+    if (appclawDebug)
       ui.printAgentBullet(`[vision-assert] LLM response (${visElapsed}ms): ${response}`);
 
     // Parse { conditionSatisfied: boolean } from isElementVisible response
@@ -895,7 +895,7 @@ async function visionAssert(mcp: MCPClient, text: string): Promise<boolean> {
         const popupType = (parsed.typeOfPopUp ?? '').toLowerCase().trim();
         const searchText = text.toLowerCase();
         if (popupType && (searchText.includes(popupType) || popupType.includes(searchText))) {
-          if (mcpDebug)
+          if (appclawDebug)
             ui.printAgentBullet(
               `[vision-assert] popup match: typeOfPopUp="${parsed.typeOfPopUp}" matches "${text}" → treating as VISIBLE`
             );
@@ -1075,7 +1075,7 @@ async function waitUntilCondition(
   const pollMs = 500;
   const deadline = Date.now() + timeoutSeconds * 1000;
 
-  if (mcpDebug)
+  if (appclawDebug)
     ui.printAgentBullet(
       `[waitUntil] condition=${condition} text=${text ? `"${text}"` : 'n/a'} timeout=${timeoutSeconds}s`
     );
@@ -1559,7 +1559,7 @@ async function executePhase(
     const globalN = globalStepOffset + i + 1;
 
     // Debug: show resolved value when secrets are redacted
-    if (mcpDebug && step.verbatim?.includes('***')) {
+    if (appclawDebug && step.verbatim?.includes('***')) {
       const resolved = stepLabelResolved(step);
       if (resolved) ui.printAgentBullet(`[debug] resolved → ${resolved}`);
     }
@@ -1790,7 +1790,7 @@ export async function runYamlFlow(
     const label = stepLabel(step);
     const n = i + 1;
 
-    if (mcpDebug && step.verbatim?.includes('***')) {
+    if (appclawDebug && step.verbatim?.includes('***')) {
       const resolved = stepLabelResolved(step);
       if (resolved) ui.printAgentBullet(`[debug] resolved → ${resolved}`);
     }

@@ -34,7 +34,7 @@ export async function prepareScreenshotForLlm(
       .jpeg({ quality: 80 })
       .toBuffer();
 
-    if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
+    if (process.env.APPCLAW_DEBUG === '1' || process.env.APPCLAW_DEBUG === 'true') {
       const resizedMeta = await sharp(resized).metadata();
       const rawKB = Math.round(input.length / 1024);
       const outKB = Math.round(resized.length / 1024);
