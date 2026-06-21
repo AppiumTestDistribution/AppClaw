@@ -18,6 +18,12 @@ import { McpSession } from './mcp-session.js';
 import { FlowRunner } from './flow-runner.js';
 import { GoalRunner } from './goal-runner.js';
 import { StepRunner } from './step-runner.js';
+import {
+  loadCache,
+  saveCache,
+  getLocatorCachePath,
+  type LocatorCacheCtx,
+} from './locator-cache.js';
 import { snapshotVisibleTexts } from './screen-snapshot.js';
 import {
   generateSdkTest,
@@ -64,6 +70,12 @@ export class AppClaw {
   /** Instance-default scroll/swipe overrides (undefined → engine/parsed defaults). */
   private readonly scrollMode?: AppClawOptions['scrollMode'];
   private readonly scrollTimes?: number;
+  /**
+   * SDK locator cache — null when disabled, populated when opted in via the
+   * `locatorCache` option or the `LOCATOR_CACHE_ENABLED=on` env var. Shared
+   * across every `run()` call on this instance; flushed in `teardown()`.
+   */
+  private readonly locatorCache: LocatorCacheCtx | null;
   private runStepCounter = 0;
   private runSuccess = true;
   private runFailedAt: number | undefined;
@@ -126,6 +138,38 @@ export class AppClaw {
     // Instance-default scroll/swipe overrides — per-call run() options win over these.
     this.scrollMode = options.scrollMode;
     this.scrollTimes = options.scrollTimes;
+
+    // SDK locator cache. Enabled when the option is truthy OR the env var is "on".
+    // Object form lets callers override the file path (CI isolation) and the
+    // namespace (multi-tenant memory). When disabled, this is null and every
+    // touch point below short-circuits.
+    const cacheOpt = options.locatorCache;
+    const cacheEnabledByEnv = this.config.LOCATOR_CACHE_ENABLED === 'on';
+    const cacheEnabled =
+      cacheOpt === true || (typeof cacheOpt === 'object' && cacheOpt !== null)
+        ? true
+        : cacheOpt === false
+          ? false
+          : cacheEnabledByEnv;
+    if (cacheEnabled) {
+      const overridePath =
+        (typeof cacheOpt === 'object' && cacheOpt?.path) ||
+        this.config.LOCATOR_CACHE_PATH ||
+        undefined;
+      const namespace =
+        (typeof cacheOpt === 'object' && cacheOpt?.namespace) ||
+        this.config.APPCLAW_MEMORY_NAMESPACE ||
+        'default';
+      const path = getLocatorCachePath(overridePath);
+      this.locatorCache = {
+        store: loadCache(path),
+        namespace,
+        path,
+        dirty: false,
+      };
+    } else {
+      this.locatorCache = null;
+    }
   }
 
   /**
@@ -178,7 +222,8 @@ export class AppClaw {
       appResolver,
       this.silent,
       tapPoll,
-      scroll
+      scroll,
+      this.locatorCache ?? undefined
     );
     const result = await runner.run(instruction);
 
@@ -323,6 +368,14 @@ export class AppClaw {
         reason: this.runFailureReason,
       };
       await this.collector.finalize(process.cwd(), flowResult);
+    }
+    // Flush the locator cache if any hit / miss / stale mutated it.
+    if (this.locatorCache?.dirty) {
+      try {
+        saveCache(this.locatorCache.store, this.locatorCache.path);
+      } catch {
+        /* best-effort — cache write failure mustn't break teardown */
+      }
     }
     await this.session.release();
   }

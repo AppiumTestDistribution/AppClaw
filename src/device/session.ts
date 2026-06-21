@@ -45,7 +45,7 @@ export async function createPlatformSession(
 ): Promise<SessionResult> {
   // User-supplied capabilities from CAPABILITIES_FILE (if any). Loaded once and
   // merged into whichever session path runs below.
-  const fileCaps = loadCapabilitiesFile(config);
+  const fileCaps = loadCapabilitiesFile(config, platform);
 
   if (config.CLOUD_PROVIDER === 'lambdatest') {
     return createLambdaTestSession(mcp, config, platform, fileCaps);
@@ -121,7 +121,60 @@ export async function createPlatformSession(
  * unreadable, not valid JSON, or not a plain object — fail fast rather than
  * silently ignoring caps the user explicitly asked for.
  */
-function loadCapabilitiesFile(config: AppClawConfig): Record<string, unknown> {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Accept both:
+ *   { "appium:app": "/tmp/app.apk" }
+ * and platform-scoped files:
+ *   { "android": { "appium:app": "/tmp/app.apk" }, "ios": { ... } }
+ *
+ * Platform wrapper keys are config metadata, not Appium capabilities. Sending
+ * them through to Appium 3 fails W3C validation because "android"/"ios" are
+ * unprefixed, non-standard capability names.
+ */
+export function normalizeCapabilitiesForPlatform(
+  parsed: Record<string, unknown>,
+  platform: Platform,
+  sourceLabel = 'CAPABILITIES_FILE'
+): Record<string, unknown> {
+  const platformKeys = new Set(['android', 'ios']);
+  const sharedKeys = new Set(['common', 'default', 'shared']);
+  const hasPlatformSection = 'android' in parsed || 'ios' in parsed;
+
+  if (!hasPlatformSection) return parsed;
+
+  const topLevelCaps: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!platformKeys.has(key) && !sharedKeys.has(key)) {
+      topLevelCaps[key] = value;
+    }
+  }
+
+  const sharedCaps: Record<string, unknown> = {};
+  for (const key of sharedKeys) {
+    const value = parsed[key];
+    if (value === undefined) continue;
+    if (!isPlainObject(value)) {
+      throw new Error(`${sourceLabel} field "${key}" must be a JSON object of capabilities`);
+    }
+    Object.assign(sharedCaps, value);
+  }
+
+  const platformCaps = parsed[platform];
+  if (platformCaps === undefined) {
+    return { ...topLevelCaps, ...sharedCaps };
+  }
+  if (!isPlainObject(platformCaps)) {
+    throw new Error(`${sourceLabel} field "${platform}" must be a JSON object of capabilities`);
+  }
+
+  return { ...topLevelCaps, ...sharedCaps, ...platformCaps };
+}
+
+function loadCapabilitiesFile(config: AppClawConfig, platform: Platform): Record<string, unknown> {
   const path = config.CAPABILITIES_FILE?.trim();
   if (!path) return {};
 
@@ -137,11 +190,11 @@ function loadCapabilitiesFile(config: AppClawConfig): Record<string, unknown> {
     throw new Error(`CAPABILITIES_FILE ${path} is not valid JSON: ${e?.message ?? e}`);
   }
 
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  if (!isPlainObject(parsed)) {
     throw new Error(`CAPABILITIES_FILE ${path} must be a JSON object of capabilities`);
   }
 
-  return parsed as Record<string, unknown>;
+  return normalizeCapabilitiesForPlatform(parsed, platform, `CAPABILITIES_FILE ${path}`);
 }
 
 /** Build Android-specific session capabilities (MJPEG, app install etc.) */

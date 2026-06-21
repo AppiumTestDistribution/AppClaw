@@ -164,6 +164,17 @@ const envSchema = z.object({
   EPISODIC_MEMORY_PATH: z.string().default(''),
 
   /**
+   * SDK locator cache: persist resolved (strategy, selector) per (app, screen,
+   * label) so repeat `app.run(...)` calls skip page-source fetch + DOM scoring +
+   * multi-strategy probe. DOM mode only. "on" to enable globally without
+   * editing each `new AppClaw(...)` site.
+   */
+  LOCATOR_CACHE_ENABLED: z.enum(['on', 'off']).default('off'),
+
+  /** Override path for the SDK locator cache. Empty = ~/.appclaw/locator-cache.json */
+  LOCATOR_CACHE_PATH: z.string().default(''),
+
+  /**
    * Namespace scoping for episodic + procedural memory. Use to isolate stores
    * across users, CI lanes, branches, or test suites so memories never bleed
    * between contexts. Default "default" preserves single-user behavior.

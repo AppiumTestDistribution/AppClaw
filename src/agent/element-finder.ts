@@ -27,15 +27,26 @@ export function parseAIElementCoords(uuid: string): { x: number; y: number } | n
   return { x, y };
 }
 
+/** A successfully-resolved locator + the strategy that won. Returned by
+ *  {@link findByIdStrategiesDetailed} so callers (e.g. the SDK locator cache)
+ *  can persist the strategy/selector pair and skip re-probing next time. */
+export interface ResolvedLocator {
+  uuid: string;
+  strategy: 'accessibility id' | 'id' | 'xpath';
+  selector: string;
+  /** Original text used to build the xpath, kept so the cache can rebuild it. */
+  text?: string;
+}
+
 /**
  * Tries to find an element by id/text using accessibility id, resource id, then xpath.
- * Returns the Appium element UUID or null.
+ * Returns the resolved locator (UUID + winning strategy/selector) or null.
  */
-export async function findByIdStrategies(
+export async function findByIdStrategiesDetailed(
   mcp: MCPClient,
   id: string,
   text?: string
-): Promise<string | null> {
+): Promise<ResolvedLocator | null> {
   // 1. Try accessibility id (content-desc) — but skip empty or generic IDs like "title"
   //    that are shared by many elements (e.g. every row in Android Settings).
   const genericIds = new Set([
@@ -49,31 +60,43 @@ export async function findByIdStrategies(
   ]);
   if (!genericIds.has(id.toLowerCase())) {
     let uuid = await findElement(mcp, 'accessibility id', id).catch(() => null);
-    if (uuid) return uuid;
+    if (uuid) return { uuid, strategy: 'accessibility id', selector: id };
 
     // 2. Try resource id (Android: com.package:id/name, iOS: name)
     uuid = await findElement(mcp, 'id', id).catch(() => null);
-    if (uuid) return uuid;
+    if (uuid) return { uuid, strategy: 'id', selector: id };
   }
 
   // 3. Try finding by visible text (xpath) — [1] ensures the first DOM match when duplicates exist
   if (text) {
     const escapedText = text.replace(/'/g, "\\'");
-    const uuid = await findElement(mcp, 'xpath', `(//*[@text='${escapedText}'])[1]`).catch(
-      () => null
-    );
-    if (uuid) return uuid;
+    const selector = `(//*[@text='${escapedText}'])[1]`;
+    const uuid = await findElement(mcp, 'xpath', selector).catch(() => null);
+    if (uuid) return { uuid, strategy: 'xpath', selector, text };
   }
 
   // 4. Fallback: try generic id anyway if we skipped it
   if (genericIds.has(id.toLowerCase())) {
     let uuid = await findElement(mcp, 'accessibility id', id).catch(() => null);
-    if (uuid) return uuid;
+    if (uuid) return { uuid, strategy: 'accessibility id', selector: id };
     uuid = await findElement(mcp, 'id', id).catch(() => null);
-    if (uuid) return uuid;
+    if (uuid) return { uuid, strategy: 'id', selector: id };
   }
 
   return null;
+}
+
+/**
+ * Tries to find an element by id/text using accessibility id, resource id, then xpath.
+ * Returns the Appium element UUID or null. Back-compat wrapper around
+ * {@link findByIdStrategiesDetailed}.
+ */
+export async function findByIdStrategies(
+  mcp: MCPClient,
+  id: string,
+  text?: string
+): Promise<string | null> {
+  return (await findByIdStrategiesDetailed(mcp, id, text))?.uuid ?? null;
 }
 
 /**

@@ -17,6 +17,7 @@ import { screenshot } from '../mcp/tools.js';
 import { lastVisionScreenshot } from '../flow/vision-execute.js';
 import { runOneInstruction } from '../flow/run-instruction.js';
 import type { FlowTapPollOptions, ScrollControl } from '../flow/run-yaml-flow.js';
+import type { LocatorCacheCtx } from './locator-cache.js';
 import { getCachedScreenSize } from '../vision/window-size.js';
 import { pngDimensionsFromBase64 } from '../vision/png-dimensions.js';
 import { printStepResult } from '../ui/step-printer.js';
@@ -50,7 +51,13 @@ export class StepRunner {
      */
     private readonly tapPoll?: FlowTapPollOptions,
     /** Per-command scroll/swipe overrides (distance + repeat/maxScroll count). */
-    private readonly scroll?: ScrollControl
+    private readonly scroll?: ScrollControl,
+    /**
+     * SDK locator cache context. When set, element-bearing actions first try
+     * the cached locator before falling back to today's DOM scoring +
+     * multi-strategy probe. See `src/sdk/locator-cache.ts`.
+     */
+    private readonly locatorCache?: LocatorCacheCtx
   ) {}
 
   async run(instruction: string): Promise<RunResult> {
@@ -64,6 +71,7 @@ export class StepRunner {
       appResolver: this.appResolver,
       tapPoll: this.tapPoll,
       scroll: this.scroll,
+      locatorCache: this.locatorCache,
     });
 
     if (this.collector && this.stepIndex !== undefined) {
@@ -78,6 +86,7 @@ export class StepRunner {
         error: result.success ? undefined : result.message,
         tapCoordinates: tapCoords,
         deviceScreenSize: getCachedScreenSize(this.mcp) ?? undefined,
+        cacheHit: result.cacheHit,
       });
 
       // In vision mode, visionExecute captured the pre-action screenshot — use it

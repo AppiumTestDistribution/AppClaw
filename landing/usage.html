@@ -13,10 +13,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <meta name="color-scheme" content="dark light" />
+    <script>
+      // Apply theme BEFORE first paint to avoid flash. Stored choice wins over system preference.
+      (function () {
+        try {
+          var stored = localStorage.getItem('appclaw-theme');
+          var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+          var theme = stored || (prefersLight ? 'light' : 'dark');
+          if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        } catch (e) {
+          /* localStorage blocked → default dark */
+        }
+      })();
+    </script>
     <style>
+      /* ============================================================
+         AppClaw Usage Guide — refined editorial-technical, warm dark
+         ============================================================ */
+
       *,
       *::before,
       *::after {
@@ -26,21 +44,95 @@
       }
 
       :root {
-        --bg: #ffffff;
-        --bg-alt: #f9fafb;
-        --text: #0f172a;
-        --text-secondary: #64748b;
-        --text-tertiary: #94a3b8;
-        --accent: #f97316;
-        --accent-hover: #ea580c;
-        --teal: #0ea5e9;
-        --purple: #7c3aed;
-        --green: #16a34a;
-        --border: rgba(15, 23, 42, 0.08);
-        --terminal-bg: #0f172a;
-        --terminal-text: #e2e8f0;
-        --radius: 16px;
-        --radius-lg: 24px;
+        /* ── DARK (default): warm near-black, off-white, single accent ── */
+        --bg: #0e0d0b;
+        --bg-elev: #16140f;
+        --bg-soft: #131210;
+        --bg-code: #16140f;
+        --ink: #ebe7df;
+        --ink-mid: #b8b1a4;
+        --ink-mute: #8a8377;
+        --ink-faint: #5b554c;
+        --rule: rgba(235, 231, 223, 0.07);
+        --rule-mid: rgba(235, 231, 223, 0.12);
+        --rule-strong: rgba(235, 231, 223, 0.18);
+        --accent: #ff7a1a;
+        --accent-soft: rgba(255, 122, 26, 0.13);
+        --accent-rim: rgba(255, 122, 26, 0.28);
+        --mark: #ffd180;
+        --green: #6db970;
+        --red: #e96a6a;
+        --purple: #b29cf2;
+        --teal: #61c4d6;
+
+        --grain-opacity: 0.04;
+        --hover-tint: var(--hover-tint);
+        --hover-tint-strong: var(--hover-tint-strong);
+
+        /* ── type ── */
+        --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+        --font-body: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+        --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+        /* ── shape ── */
+        --radius: 8px;
+        --radius-lg: 12px;
+      }
+
+      /* ── LIGHT theme — warm paper, deeper ink, restrained accent ── */
+      [data-theme='light'] {
+        --bg: #faf8f3;
+        --bg-elev: #f1eee5;
+        --bg-soft: #f5f2ea;
+        --bg-code: #1f1c17; /* code blocks stay dark on light — better readability */
+        --ink: #1a1612;
+        --ink-mid: #4d463c;
+        --ink-mute: #7a7367;
+        --ink-faint: #a89f91;
+        --rule: rgba(26, 22, 18, 0.08);
+        --rule-mid: rgba(26, 22, 18, 0.14);
+        --rule-strong: rgba(26, 22, 18, 0.22);
+        --accent: #e65100;
+        --accent-soft: rgba(230, 81, 0, 0.1);
+        --accent-rim: rgba(230, 81, 0, 0.3);
+        --mark: #b85700;
+        --green: #2f7d33;
+        --red: #c4322e;
+        --purple: #6845c1;
+        --teal: #117a8b;
+
+        --grain-opacity: 0.025;
+        --hover-tint: rgba(26, 22, 18, 0.04);
+        --hover-tint-strong: rgba(26, 22, 18, 0.07);
+      }
+
+      /* Light-mode adjustments — code blocks keep dark "terminal" aesthetic
+         (more legible code) but reset their internal token colors to dark-mode palette */
+      [data-theme='light'] .code-block,
+      [data-theme='light'] .code-block-header {
+        background: var(--bg-code);
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+      [data-theme='light'] .code-block-header {
+        background: var(--hover-tint);
+      }
+      [data-theme='light'] .code-block pre {
+        color: #ebe7df;
+      }
+      [data-theme='light'] .code-block-label {
+        color: #8a8377;
+      }
+      [data-theme='light'] .code-block-dots span {
+        background: #4a4641;
+      }
+      [data-theme='light'] .code-block .c {
+        color: #5b554c;
+      }
+      [data-theme='light'] .code-block .p {
+        color: #8a8377;
+      }
+      [data-theme='light'] .code-block .n {
+        color: #ebe7df;
       }
 
       html {
@@ -48,402 +140,457 @@
       }
 
       body {
-        font-family:
-          'Inter',
-          -apple-system,
-          BlinkMacSystemFont,
-          sans-serif;
+        font-family: var(--font-body);
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 1.65;
         background: var(--bg);
-        color: var(--text);
-        line-height: 1.7;
+        color: var(--ink);
         -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        font-feature-settings: 'ss01', 'cv11';
         overflow-x: hidden;
-      }
-
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 0 32px;
-      }
-
-      /* ===== ANIMATIONS ===== */
-      .reveal {
-        opacity: 0;
-        transform: translateY(40px);
         transition:
-          opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-          transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+          background-color 0.25s ease,
+          color 0.25s ease;
       }
-      .reveal.visible {
-        opacity: 1;
-        transform: translateY(0);
+      /* ── subtle film grain overlay; opacity adapts per theme ── */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        opacity: var(--grain-opacity);
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.6  0 0 0 0 0.55  0 0 0 0 0.5  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        background-size: 240px 240px;
+        mix-blend-mode: overlay;
       }
 
-      @media (prefers-reduced-motion: reduce) {
-        .reveal {
-          opacity: 1;
-          transform: none;
-          transition: none;
-        }
+      ::selection {
+        background: var(--accent-soft);
+        color: #fff;
       }
 
-      /* ===== NAVBAR ===== */
+      a {
+        color: var(--ink);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+
+      /* ============================================================
+         NAVBAR — unified with index.html (60px height, btn-ghost/btn-orange)
+         ============================================================ */
       nav {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        z-index: 100;
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(20px) saturate(180%);
-        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        z-index: 200;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        background: color-mix(in srgb, var(--bg) 76%, transparent);
+        backdrop-filter: blur(18px) saturate(160%);
+        -webkit-backdrop-filter: blur(18px) saturate(160%);
         border-bottom: 1px solid transparent;
-        transition: border-color 0.3s;
+        transition:
+          border-color 0.3s,
+          background 0.25s;
       }
       nav.scrolled {
-        border-bottom-color: var(--border);
+        border-bottom-color: var(--rule);
+        background: color-mix(in srgb, var(--bg) 92%, transparent);
       }
 
       .nav-inner {
-        max-width: 1200px;
+        max-width: 1440px;
         margin: 0 auto;
         padding: 0 32px;
+        width: 100%;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        height: 64px;
+        gap: 40px;
       }
 
       .nav-logo {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 9px;
         text-decoration: none;
+        flex-shrink: 0;
       }
       .nav-logo img {
-        width: 32px;
-        height: 32px;
+        width: 26px;
+        height: 26px;
       }
-      .nav-logo span {
-        font-size: 18px;
-        font-weight: 800;
-        color: var(--text);
-        letter-spacing: -0.02em;
+      .nav-logo-name {
+        font-family: var(--font-display);
+        font-size: 19px;
+        font-weight: 700;
+        font-style: italic;
+        color: var(--ink);
+        letter-spacing: -0.005em;
       }
 
       .nav-links {
         display: flex;
-        align-items: center;
-        gap: 36px;
         list-style: none;
+        gap: 4px;
+        flex: 1;
       }
       .nav-links a {
-        text-decoration: none;
-        color: var(--text-secondary);
         font-size: 14px;
         font-weight: 500;
-        transition: color 0.2s;
+        color: var(--ink-mute);
+        padding: 6px 12px;
+        border-radius: 6px;
+        transition:
+          color 0.2s,
+          background 0.2s;
       }
       .nav-links a:hover {
-        color: var(--text);
+        color: var(--ink);
+        background: var(--rule);
       }
       .nav-links a.active {
         color: var(--accent);
-        font-weight: 600;
       }
 
       .nav-right {
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: 10px;
       }
 
-      .nav-github {
+      /* btn-ghost (Star button) — matches index.html */
+      .btn-ghost {
         display: flex;
         align-items: center;
-        gap: 6px;
-        text-decoration: none;
-        color: var(--text-secondary);
+        gap: 7px;
         font-size: 13px;
         font-weight: 500;
-        padding: 6px 12px;
+        color: var(--ink-mid);
+        background: none;
+        border: 1px solid var(--rule);
+        padding: 7px 14px;
         border-radius: 8px;
-        border: 1px solid var(--border);
-        transition: all 0.2s;
+        cursor: pointer;
+        transition:
+          color 0.2s,
+          border-color 0.2s,
+          background 0.2s;
       }
-      .nav-github:hover {
-        border-color: rgba(15, 23, 42, 0.2);
-        color: var(--text);
+      .btn-ghost:hover {
+        color: var(--ink);
+        border-color: var(--rule-strong);
+        background: var(--hover-tint);
       }
-      .nav-github svg {
+      .btn-ghost svg {
+        flex-shrink: 0;
+      }
+
+      /* btn-orange (Get Started CTA) — matches index.html */
+      .btn-orange {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-size: 14px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--accent);
+        padding: 7px 18px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          transform 0.15s;
+        letter-spacing: 0.01em;
+      }
+      .btn-orange:hover {
+        background: #ff8e3d;
+        transform: translateY(-1px);
+      }
+      [data-theme='light'] .btn-orange:hover {
+        background: #ff7a14;
+      }
+
+      /* Theme toggle — matches index.html (36px square, transparent bg) */
+      .theme-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        padding: 0;
+        background: transparent;
+        border: 1px solid var(--rule);
+        border-radius: 8px;
+        color: var(--ink-mute);
+        cursor: pointer;
+        transition:
+          color 0.2s,
+          border-color 0.2s,
+          background 0.2s;
+      }
+      .theme-toggle:hover {
+        color: var(--ink);
+        border-color: var(--rule-strong);
+        background: var(--hover-tint);
+      }
+      .theme-toggle svg {
         width: 18px;
         height: 18px;
       }
-
-      .nav-cta {
-        display: inline-flex;
-        align-items: center;
-        padding: 8px 20px;
-        background: var(--accent);
-        color: #fff;
-        font-size: 14px;
-        font-weight: 600;
-        border-radius: 8px;
-        text-decoration: none;
-        transition: background 0.2s;
+      /* Default = dark; show sun (click to go light). Flip in light. */
+      .theme-toggle .icon-moon {
+        display: none;
       }
-      .nav-cta:hover {
-        background: var(--accent-hover);
+      .theme-toggle .icon-sun {
+        display: block;
+      }
+      [data-theme='light'] .theme-toggle .icon-moon {
+        display: block;
+      }
+      [data-theme='light'] .theme-toggle .icon-sun {
+        display: none;
       }
 
       .mobile-menu-btn {
         display: none;
         background: none;
         border: none;
+        color: var(--ink);
         cursor: pointer;
-        padding: 4px;
+        padding: 6px;
       }
       .mobile-menu-btn svg {
-        width: 24px;
-        height: 24px;
-        color: var(--text);
+        width: 22px;
+        height: 22px;
       }
 
-      /* ===== PAGE HEADER (compact title bar) ===== */
+      /* PAGE HEADER — kept in DOM (JS updates #page-header-section text)
+         but not rendered. Sidebar + nav already convey location. */
       .page-header {
-        position: fixed;
-        top: 64px;
-        left: 0;
-        right: 0;
-        z-index: 90;
-        height: 48px;
-        background: var(--bg);
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        padding: 0 32px;
-        gap: 12px;
-      }
-
-      .page-header h1 {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text);
-        letter-spacing: -0.01em;
-        margin: 0;
-      }
-
-      .page-header .page-header-sep {
-        color: var(--text-tertiary);
-        font-size: 14px;
-      }
-
-      .page-header .page-header-section {
-        font-size: 14px;
-        color: var(--text-secondary);
-        font-weight: 400;
-      }
-
-      .page-header p {
         display: none;
-        font-size: 18px;
-        color: var(--text-secondary);
-        max-width: 640px;
-        margin: 0 auto;
       }
 
-      /* ===== DOCS LAYOUT ===== */
+      /* ============================================================
+         LAYOUT — sidebar + content (NO right rail; content breathes)
+         ============================================================ */
       .docs-layout {
-        display: flex;
-        gap: 0;
-        padding: 0;
-        height: calc(100vh - 112px);
-        margin-top: 112px;
+        display: grid;
+        grid-template-columns: 264px minmax(0, 1fr);
+        min-height: calc(100vh - 60px);
+        margin-top: 60px; /* clears nav */
         position: relative;
       }
 
-      /* Sidebar */
+      /* ── SIDEBAR — persistent vertical, breathable ── */
       .docs-sidebar {
-        width: 240px;
-        flex-shrink: 0;
         position: sticky;
-        top: 112px;
-        height: calc(100vh - 112px);
+        top: 60px;
+        align-self: start;
+        width: 264px;
+        height: calc(100vh - 60px);
         overflow-y: auto;
-        background: var(--bg-alt);
-        border-right: 1px solid var(--border);
-        padding: 20px 0 40px;
+        overflow-x: hidden;
+        padding: 0 0 40px;
+        /* Reserve space for the sticky search bar at the top so
+           `activeLink.scrollIntoView()` doesn't push items under it. */
+        scroll-padding-top: 72px;
+        background: var(--bg-soft);
+        border-right: 1px solid var(--rule);
         scrollbar-width: thin;
-        scrollbar-color: rgba(15, 23, 42, 0.1) transparent;
+        scrollbar-color: var(--rule-mid) transparent;
+        z-index: 40;
       }
-
       .docs-sidebar::-webkit-scrollbar {
-        width: 4px;
-      }
-      .docs-sidebar::-webkit-scrollbar-track {
-        background: transparent;
+        width: 6px;
       }
       .docs-sidebar::-webkit-scrollbar-thumb {
-        background: rgba(15, 23, 42, 0.1);
-        border-radius: 2px;
+        background: var(--rule-mid);
+        border-radius: 3px;
+      }
+      .docs-sidebar::-webkit-scrollbar-thumb:hover {
+        background: var(--rule-strong);
       }
 
-      .docs-sidebar ul {
-        list-style: none;
+      .sidebar-search {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        padding: 18px 16px 14px;
+        margin: 0 0 4px;
+        background: var(--bg-soft);
+        /* Hairline shadow underneath so content scrolling past is visibly cut off. */
+        box-shadow: 0 1px 0 var(--rule);
       }
-
-      .docs-sidebar li {
-        margin-bottom: 2px;
-      }
-
-      .docs-sidebar a {
-        display: block;
-        padding: 5px 16px 5px 28px;
+      .sidebar-search input {
+        width: 100%;
+        padding: 9px 12px 9px 32px;
+        font-family: var(--font-mono);
         font-size: 13px;
-        font-weight: 400;
-        color: var(--text-secondary);
-        text-decoration: none;
-        border-radius: 0;
-        transition: all 0.12s;
-        border-left: 2px solid transparent;
+        color: var(--ink);
+        background: var(--bg);
+        border: 1px solid var(--rule-mid);
+        border-radius: 6px;
+        outline: none;
+        transition: border-color 0.15s;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a8377' stroke-width='2.2' stroke-linecap='round'><circle cx='11' cy='11' r='7'/><path d='M21 21l-4.3-4.3'/></svg>");
+        background-repeat: no-repeat;
+        background-position: 8px center;
       }
-      .docs-sidebar a:hover {
-        color: var(--text);
-        background: rgba(15, 23, 42, 0.04);
-        border-left-color: rgba(249, 115, 22, 0.3);
+      .sidebar-search input::placeholder {
+        color: var(--ink-faint);
       }
-      .docs-sidebar a.active {
+      .sidebar-search input:focus {
+        border-color: var(--accent-rim);
+        background-color: var(--bg-elev);
+      }
+
+      /* ── Groups — collapsible accordion; auto-opens on active section ── */
+      .sidebar-group {
+        margin: 0 8px 4px;
+        padding: 0;
+        border-radius: 8px;
+      }
+
+      .sidebar-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        padding: 11px 14px;
+        margin: 0;
+        font-family: var(--font-body);
+        font-size: 14.5px;
+        font-weight: 500;
+        letter-spacing: -0.005em;
+        text-transform: none;
+        color: var(--ink-mid);
+        background: none;
+        border: none;
+        text-align: left;
+        cursor: pointer;
+        border-radius: 7px;
+        transition:
+          color 0.15s,
+          background 0.15s;
+      }
+      .sidebar-heading:hover {
+        color: var(--ink);
+        background: var(--hover-tint);
+      }
+      .sidebar-group.open .sidebar-heading {
+        color: var(--ink);
+        background: var(--hover-tint-strong);
+        font-weight: 600;
+      }
+
+      /* Chevron — rotated -90° collapsed, 0° open */
+      .sidebar-chevron {
+        display: block;
+        width: 12px;
+        height: 12px;
+        flex-shrink: 0;
+        color: var(--ink-faint);
+        transition:
+          transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+          color 0.15s;
+        transform: rotate(-90deg);
+      }
+      .sidebar-heading:hover .sidebar-chevron {
+        color: var(--ink-mute);
+      }
+      .sidebar-group.open .sidebar-chevron {
+        transform: rotate(0deg);
         color: var(--accent);
-        background: rgba(249, 115, 22, 0.08);
+      }
+
+      /* Children — collapsed by default, expand on .open */
+      .sidebar-group ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition:
+          max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+          opacity 0.18s ease,
+          padding 0.22s ease;
+      }
+      .sidebar-group.open ul {
+        max-height: 600px;
+        opacity: 1;
+        padding: 4px 0 10px;
+      }
+      .sidebar-group li {
+        margin: 0;
+      }
+      .sidebar-group li.hidden {
+        display: none;
+      }
+
+      .sidebar-group a {
+        display: block;
+        position: relative;
+        padding: 9px 14px 9px 28px;
+        margin-left: 6px;
+        font-size: 14px;
+        font-weight: 400;
+        color: var(--ink-mute);
+        line-height: 1.45;
+        border-left: 2px solid transparent;
+        border-radius: 0 6px 6px 0;
+        transition:
+          color 0.12s,
+          background 0.12s,
+          border-color 0.12s;
+      }
+      .sidebar-group a:hover {
+        color: var(--ink);
+        background: var(--hover-tint);
+      }
+      .sidebar-group a.active {
+        color: var(--ink);
+        background: var(--accent-soft);
         border-left-color: var(--accent);
         font-weight: 500;
       }
 
-      /* Accordion groups */
-      .sidebar-group {
-        margin-bottom: 4px;
+      /* Hide the JS-injected horizontal subnav — sidebar already shows everything */
+      .docs-subnav {
+        display: none !important;
       }
 
-      .sidebar-heading {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 7px 12px 7px 16px;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text);
-        background: none;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        text-align: left;
-        font-family: inherit;
-        transition:
-          background 0.15s,
-          color 0.15s;
-        margin: 4px 8px 2px;
-        width: calc(100% - 16px);
-      }
-      .sidebar-heading:hover {
-        background: rgba(15, 23, 42, 0.05);
-        color: var(--text);
-      }
-
-      .sidebar-chevron {
-        width: 13px;
-        height: 13px;
-        flex-shrink: 0;
-        transition: transform 0.2s ease;
-        color: var(--text-secondary);
-        opacity: 0.6;
-      }
-      .sidebar-group:not(.open) .sidebar-chevron {
-        transform: rotate(-90deg);
-      }
-
-      /* Accordion body */
-      .sidebar-group ul {
-        overflow: hidden;
-        max-height: 600px;
-        transition:
-          max-height 0.25s ease,
-          opacity 0.2s ease;
-        opacity: 1;
-      }
-      .sidebar-group:not(.open) ul {
-        max-height: 0;
-        opacity: 0;
-      }
-
-      /* Content */
+      /* ============================================================
+         CONTENT — single comfortable column with editorial rhythm
+         ============================================================ */
       .docs-content {
-        flex: 1;
         min-width: 0;
-        overflow-y: auto;
-        height: calc(100vh - 112px);
         padding: 0;
-        scrollbar-width: thin;
-        scrollbar-color: rgba(15, 23, 42, 0.15) transparent;
-      }
-
-      .docs-content::-webkit-scrollbar {
-        width: 6px;
-      }
-      .docs-content::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      .docs-content::-webkit-scrollbar-thumb {
-        background: rgba(15, 23, 42, 0.15);
-        border-radius: 3px;
+        position: relative;
       }
 
       .docs-content section {
         display: none;
         max-width: 820px;
-        padding: 48px 64px 80px;
-        margin: 0;
+        margin: 0 auto;
+        padding: 56px 56px 96px;
       }
-
-      /* CLI Options — wider to support 2-column table layout */
-      #cli-options {
-        max-width: 1100px;
-      }
-
-      .cli-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 40px;
-        margin-bottom: 8px;
-      }
-      .cli-grid .cli-col h3 {
-        margin-top: 0;
-      }
-      .cli-full {
-        margin-top: 0;
-      }
-
-      @media (max-width: 860px) {
-        .cli-grid {
-          grid-template-columns: 1fr;
-          gap: 0;
-        }
-        #cli-options {
-          max-width: 820px;
-        }
-      }
-
       .docs-content section.active {
         display: block;
-        animation: panelIn 0.18s ease-out;
+        animation: panelIn 0.32s cubic-bezier(0.16, 1, 0.3, 1);
       }
 
       @keyframes panelIn {
         from {
           opacity: 0;
-          transform: translateY(10px);
+          transform: translateY(6px);
         }
         to {
           opacity: 1;
@@ -451,477 +598,586 @@
         }
       }
 
+      /* Section h2 — Geist 700, substantial, with quiet orange rule */
       .docs-content h2 {
-        font-size: 1.75rem;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        margin-bottom: 16px;
-        padding-bottom: 12px;
-        border-bottom: 2px solid var(--bg-alt);
+        position: relative;
+        font-family: var(--font-body);
+        font-style: normal;
+        font-weight: 700;
+        font-size: 38px;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+        color: var(--ink);
+        margin: 0 0 28px;
+      }
+      .docs-content h2::before {
+        content: '';
+        display: block;
+        width: 28px;
+        height: 2px;
+        background: var(--accent);
+        margin-bottom: 20px;
+        border-radius: 1px;
       }
 
       .docs-content h3 {
-        font-size: 1.15rem;
-        font-weight: 700;
-        margin-top: 36px;
-        margin-bottom: 12px;
-        color: var(--text);
+        font-family: var(--font-body);
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+        color: var(--ink);
+        margin: 40px 0 12px;
+        line-height: 1.3;
+      }
+      .docs-content h3 code {
+        font-size: 15px;
+        font-weight: 500;
+        padding: 2px 8px;
+        background: var(--bg-elev);
+        border: 1px solid var(--rule);
+        border-radius: 5px;
+        color: var(--ink-mid);
+      }
+
+      .docs-content h4 {
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--ink-faint);
+        margin: 32px 0 10px;
       }
 
       .docs-content p {
-        color: var(--text-secondary);
-        margin-bottom: 16px;
-        font-size: 15px;
+        font-size: 15.5px;
+        line-height: 1.7;
+        color: var(--ink-mid);
+        margin: 0 0 16px;
       }
 
+      .docs-content strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .docs-content em {
+        color: var(--ink);
+      }
+
+      .docs-content a {
+        color: var(--accent);
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.15s;
+      }
+      .docs-content a:hover {
+        border-bottom-color: var(--accent-rim);
+      }
+
+      /* Inline code */
+      .docs-content p code,
+      .docs-content li code,
+      .docs-content td code,
+      .docs-content th code {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        padding: 2px 7px;
+        color: var(--mark);
+        background: var(--bg-elev);
+        border: 1px solid var(--rule);
+        border-radius: 5px;
+        white-space: nowrap;
+      }
+
+      /* Lists — comfortable rhythm */
       .docs-content ul,
       .docs-content ol {
-        margin-bottom: 16px;
-        padding-left: 24px;
+        margin: 0 0 18px;
+        padding-left: 22px;
       }
-
       .docs-content li {
-        color: var(--text-secondary);
-        font-size: 15px;
-        margin-bottom: 6px;
+        font-size: 15.5px;
+        line-height: 1.7;
+        color: var(--ink-mid);
+        margin: 6px 0;
+      }
+      .docs-content ul li::marker {
+        color: var(--ink-faint);
       }
 
-      .docs-content li code {
-        background: var(--bg-alt);
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 13px;
-        color: var(--accent);
-      }
-
-      /* Code blocks */
+      /* ─────────── Code blocks — terminal-style, dense ─────────── */
       .code-block {
-        background: var(--terminal-bg);
+        position: relative;
+        margin: 18px 0;
+        background: var(--bg-code);
+        border: 1px solid var(--rule);
         border-radius: var(--radius);
-        margin-bottom: 24px;
         overflow: hidden;
+        box-shadow: 0 1px 0 var(--hover-tint) inset;
       }
-
       .code-block-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 12px 20px;
-        background: rgba(255, 255, 255, 0.04);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        gap: 12px;
+        padding: 8px 14px;
+        background: var(--hover-tint);
+        border-bottom: 1px solid var(--rule);
+        min-height: 32px;
       }
-
       .code-block-dots {
-        display: flex;
-        gap: 6px;
+        display: inline-flex;
+        gap: 5px;
       }
       .code-block-dots span {
-        width: 10px;
-        height: 10px;
+        width: 9px;
+        height: 9px;
         border-radius: 50%;
+        background: var(--rule-strong);
       }
       .code-block-dots span:nth-child(1) {
-        background: #ef4444;
+        background: #4a4641;
       }
       .code-block-dots span:nth-child(2) {
-        background: #eab308;
+        background: #4a4641;
       }
       .code-block-dots span:nth-child(3) {
-        background: #22c55e;
+        background: #4a4641;
       }
-
       .code-block-label {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 12px;
-        color: var(--text-tertiary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--ink-faint);
+        letter-spacing: 0.04em;
       }
-
       .code-block pre {
-        padding: 20px;
+        margin: 0;
+        padding: 16px 20px;
+        font-family: var(--font-mono);
+        font-size: 13.5px;
+        line-height: 1.65;
+        color: var(--ink);
         overflow-x: auto;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 13px;
-        line-height: 1.7;
-        color: var(--terminal-text);
+        scrollbar-width: thin;
+        scrollbar-color: var(--rule-mid) transparent;
+      }
+      .code-block pre::-webkit-scrollbar {
+        height: 6px;
+      }
+      .code-block pre::-webkit-scrollbar-thumb {
+        background: var(--rule-mid);
+        border-radius: 3px;
+      }
+      .code-block code {
+        font-family: inherit;
+        font-size: inherit;
       }
 
-      .code-block pre .c {
-        color: #64748b;
-      } /* comment */
-      .code-block pre .k {
-        color: #f97316;
-      } /* keyword / key */
-      .code-block pre .s {
-        color: #22d3ee;
+      /* Syntax token classes (Pygments-ish) */
+      .code-block .k {
+        color: #c792ea;
+      } /* keyword */
+      .code-block .s {
+        color: #a8d572;
       } /* string */
-      .code-block pre .v {
-        color: #a78bfa;
-      } /* variable */
-      .code-block pre .n {
-        color: #facc15;
+      .code-block .c {
+        color: var(--ink-faint);
+        font-style: italic;
+      } /* comment */
+      .code-block .n {
+        color: var(--ink);
+      } /* name */
+      .code-block .m {
+        color: #f0b07e;
       } /* number */
-      .code-block pre .p {
-        color: #94a3b8;
-      } /* punctuation */
-      .code-block pre .g {
-        color: #4ade80;
-      } /* green / success */
-      .code-block pre .fl {
-        color: #fb923c;
-      } /* flag */
+      .code-block .fl {
+        color: #f0b07e;
+      } /* float */
+      .code-block .p {
+        color: var(--ink-mute);
+      } /* punct */
+      .code-block .v {
+        color: #61c4d6;
+      } /* variable */
 
-      /* Inline code */
-      code {
-        background: var(--bg-alt);
-        padding: 2px 7px;
-        border-radius: 5px;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 13px;
-        color: var(--accent);
-        border: 1px solid var(--border);
+      /* ─────────── Callouts — quiet left-bar, no heavy bg ─────────── */
+      .callout {
+        position: relative;
+        margin: 22px 0;
+        padding: 16px 20px 16px 22px;
+        background: var(--bg-elev);
+        border: 1px solid var(--rule);
+        border-left: 3px solid var(--accent);
+        border-radius: var(--radius);
+        font-size: 15px;
+        color: var(--ink-mid);
+        line-height: 1.65;
+      }
+      .callout-tip {
+        border-left-color: var(--teal);
+      }
+      .callout-warn {
+        border-left-color: #e9a86a;
+      }
+      .callout-title {
+        display: block;
+        font-size: 11.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--ink);
+        margin-bottom: 6px;
+      }
+      .callout-tip .callout-title {
+        color: var(--teal);
+      }
+      .callout-warn .callout-title {
+        color: #e9a86a;
+      }
+      .callout p {
+        margin-bottom: 8px;
+      }
+      .callout p:last-child {
+        margin-bottom: 0;
+      }
+      .callout code {
+        color: var(--mark);
       }
 
-      /* Command reference table */
+      /* ─────────── Tables — dense, monospace cells ─────────── */
       .cmd-table {
         width: 100%;
+        margin: 22px 0;
         border-collapse: collapse;
-        margin-bottom: 24px;
-        font-size: 14px;
+        font-size: 15px;
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .cmd-table thead {
+        background: var(--bg-elev);
       }
       .cmd-table th {
         text-align: left;
-        padding: 12px 16px;
+        padding: 13px 18px;
+        font-size: 12.5px;
         font-weight: 600;
-        font-size: 12px;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--text-tertiary);
-        background: var(--bg-alt);
-        border-bottom: 2px solid var(--border);
+        letter-spacing: 0.08em;
+        color: var(--ink-faint);
+        border-bottom: 1px solid var(--rule);
       }
       .cmd-table td {
-        padding: 10px 16px;
-        border-bottom: 1px solid var(--border);
-        color: var(--text-secondary);
+        padding: 14px 18px;
+        color: var(--ink-mid);
+        border-bottom: 1px solid var(--rule);
         vertical-align: top;
-      }
-      .cmd-table td:first-child {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 13px;
-        color: var(--accent);
-        white-space: nowrap;
+        line-height: 1.65;
       }
       .cmd-table tr:last-child td {
         border-bottom: none;
       }
       .cmd-table tr:hover td {
-        background: rgba(249, 115, 22, 0.03);
+        background: var(--hover-tint);
+      }
+      /* Inline code inside table cells — bump above the generic td-code rule */
+      .docs-content .cmd-table td code,
+      .docs-content .cmd-table th code,
+      .cmd-table code {
+        font-family: var(--font-mono);
+        font-size: 13.5px;
+        padding: 2px 8px;
+        color: var(--mark);
+        background: var(--bg-elev);
+        border: 1px solid var(--rule);
+        border-radius: 5px;
+        white-space: nowrap;
       }
 
-      /* Badge / pill */
+      /* ─────────── Badges — minimal pills, mono ─────────── */
       .badge {
         display: inline-block;
+        padding: 2px 8px;
+        font-family: var(--font-mono);
         font-size: 11px;
-        font-weight: 600;
-        padding: 3px 10px;
-        border-radius: 20px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        border-radius: 999px;
+        vertical-align: middle;
+        line-height: 1.5;
       }
       .badge-orange {
-        background: rgba(249, 115, 22, 0.1);
         color: var(--accent);
+        background: var(--accent-soft);
+        border: 1px solid var(--accent-rim);
       }
       .badge-teal {
-        background: rgba(14, 165, 233, 0.1);
         color: var(--teal);
+        background: rgba(97, 196, 214, 0.1);
+        border: 1px solid rgba(97, 196, 214, 0.25);
       }
       .badge-purple {
-        background: rgba(124, 58, 237, 0.1);
         color: var(--purple);
-      }
-      .badge-green {
-        background: rgba(22, 163, 74, 0.1);
-        color: var(--green);
+        background: rgba(178, 156, 242, 0.1);
+        border: 1px solid rgba(178, 156, 242, 0.25);
       }
 
-      /* Callout / tip box */
-      .callout {
-        padding: 16px 20px;
-        border-radius: 12px;
-        margin-bottom: 24px;
-        font-size: 14px;
-        line-height: 1.6;
-      }
-      .callout-tip {
-        background: rgba(14, 165, 233, 0.06);
-        border-left: 3px solid var(--teal);
-      }
-      .callout-tip .callout-title {
-        color: var(--teal);
-      }
-      .callout-warn {
-        background: rgba(249, 115, 22, 0.06);
-        border-left: 3px solid var(--accent);
-      }
-      .callout-warn .callout-title {
-        color: var(--accent);
-      }
-      .callout-title {
-        font-weight: 700;
-        font-size: 13px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        margin-bottom: 4px;
-      }
-      .callout p {
-        margin-bottom: 0;
-      }
-
-      /* Footer */
-      footer {
-        background: var(--bg-alt);
-        padding: 80px 0 40px;
-        border-top: 1px solid var(--border);
-      }
-      .footer-grid {
+      /* ─────────── CLI grid (used on CLI Options page) ─────────── */
+      .cli-grid {
         display: grid;
-        grid-template-columns: 2fr 1fr 1fr 1fr;
-        gap: 48px;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+        margin: 8px 0 16px;
       }
-      .footer-brand p {
-        color: var(--text-secondary);
-        font-size: 14px;
+      .cli-grid .cli-col h3 {
+        margin-top: 0;
+      }
+      .cli-full {
         margin-top: 12px;
-        max-width: 280px;
       }
-      .footer-brand .footer-logo {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .footer-brand .footer-logo img {
-        width: 28px;
-        height: 28px;
-      }
-      .footer-brand .footer-logo span {
-        font-size: 18px;
-        font-weight: 800;
-        color: var(--text);
-      }
-      .footer-col h4 {
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--text-tertiary);
-        margin-bottom: 16px;
-      }
-      .footer-col ul {
-        list-style: none;
-      }
-      .footer-col li {
-        margin-bottom: 12px;
-      }
-      .footer-col a {
-        color: var(--text-secondary);
-        text-decoration: none;
-        font-size: 14px;
-        transition: color 0.2s;
-      }
-      .footer-col a:hover {
-        color: var(--text);
-      }
-
-      .footer-bottom {
-        margin-top: 48px;
-        padding-top: 24px;
-        border-top: 1px solid var(--border);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 13px;
-        color: var(--text-tertiary);
-      }
-      .footer-socials {
-        display: flex;
-        gap: 16px;
-      }
-      .footer-socials a {
-        color: var(--text-tertiary);
-        transition: color 0.2s;
-      }
-      .footer-socials a:hover {
-        color: var(--text);
-      }
-      .footer-socials svg {
-        width: 20px;
-        height: 20px;
-      }
-
-      /* ===== RESPONSIVE ===== */
-      @media (max-width: 1024px) {
-        .docs-layout {
-          flex-direction: column;
-          height: auto;
-        }
-        .docs-sidebar {
-          position: relative;
-          top: 0;
-          width: 100%;
-          height: auto;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 2px;
-          padding: 16px 16px 20px;
-          border-right: none;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .docs-sidebar .sidebar-heading {
-          width: 100%;
-          padding: 10px 4px 4px;
-        }
-        .docs-sidebar li {
-          margin-bottom: 0;
-        }
-        .docs-sidebar a {
-          padding: 4px 10px;
-          border-radius: 5px;
-          border-left: none;
-        }
-        .docs-content {
-          height: auto;
-          overflow-y: visible;
-        }
-        .docs-content section {
-          padding: 32px 24px 60px;
-        }
-      }
-
-      @media (max-width: 768px) {
-        .nav-links {
-          display: none;
-        }
-        .nav-right {
-          display: none;
-        }
-        .mobile-menu-btn {
-          display: block;
-        }
-        .footer-grid {
+      @media (max-width: 920px) {
+        .cli-grid {
           grid-template-columns: 1fr;
-          gap: 40px;
-        }
-        .cmd-table {
-          font-size: 13px;
-        }
-        .cmd-table td,
-        .cmd-table th {
-          padding: 8px 12px;
+          gap: 0;
         }
       }
 
-      @media (max-width: 480px) {
-        .page-header h1 {
-          font-size: 1.75rem;
-        }
-        .page-header p {
-          font-size: 16px;
-        }
+      /* CLI Options gets a wider column to fit 2-up table layout */
+      #cli-options {
+        max-width: 1080px !important;
       }
 
-      /* ===== SECTION NAV (prev / next) ===== */
+      /* Reveal — kept gentle; sections already animate on activate */
+      .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+
+      /* ─────────── Section prev/next nav (JS-injected) ─────────── */
       .section-nav {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        margin-top: 48px;
+        gap: 12px;
+        margin-top: 56px;
         padding-top: 24px;
-        border-top: 1px solid var(--border);
-        gap: 16px;
+        border-top: 1px solid var(--rule);
       }
-
       .section-nav-btn {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 10px 16px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: var(--bg);
-        color: var(--text-secondary);
+        padding: 12px 16px;
+        font-family: var(--font-body);
         font-size: 13px;
         font-weight: 500;
+        color: var(--ink-mid);
+        background: var(--bg-elev);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
         cursor: pointer;
-        text-decoration: none;
-        transition: all 0.15s;
-        font-family: inherit;
+        transition:
+          border-color 0.15s,
+          color 0.15s,
+          transform 0.15s;
+        max-width: 48%;
       }
       .section-nav-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-        background: rgba(249, 115, 22, 0.04);
-      }
-      .section-nav-btn.prev {
-        margin-right: auto;
-      }
-      .section-nav-btn.next {
-        margin-left: auto;
+        color: var(--ink);
+        border-color: var(--accent-rim);
+        transform: translateY(-1px);
       }
       .section-nav-btn svg {
         width: 14px;
         height: 14px;
         flex-shrink: 0;
-      }
-
-      /* ===== SECTION HEADER breadcrumb ===== */
-      .section-breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        color: var(--text-tertiary);
-        margin-bottom: 24px;
-        font-family: 'JetBrains Mono', monospace;
-        letter-spacing: 0.01em;
-      }
-      .section-breadcrumb span {
         color: var(--accent);
       }
-
-      /* ===== DOCS SEARCH ===== */
-      .sidebar-search {
-        padding: 12px 12px 8px;
+      .section-nav-btn.next {
+        margin-left: auto;
       }
-      .sidebar-search input {
-        width: 100%;
-        padding: 7px 10px 7px 30px;
-        background: var(--bg);
-        border: 1px solid var(--border);
+
+      /* ─────────── Section breadcrumb (if used inline) ─────────── */
+      .section-breadcrumb {
+        display: inline-block;
+        padding: 4px 10px;
+        margin-bottom: 14px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--ink-faint);
+        background: var(--bg-elev);
+        border: 1px solid var(--rule);
+        border-radius: 999px;
+      }
+
+      /* ============================================================
+         FOOTER — restrained, separator above, single row
+         ============================================================ */
+      footer {
+        margin-top: 64px;
+        padding: 40px 0 32px;
+        border-top: 1px solid var(--rule);
+        background: var(--bg-soft);
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 32px;
+      }
+      .footer-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr 1fr 1fr;
+        gap: 40px;
+        padding-bottom: 32px;
+      }
+      .footer-brand p {
+        font-size: 13px;
+        color: var(--ink-mute);
+        margin: 12px 0 0;
+        max-width: 280px;
+        line-height: 1.6;
+      }
+      .footer-logo {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-family: var(--font-display);
+        font-style: italic;
+        font-size: 19px;
+        color: var(--ink);
+      }
+      .footer-logo img {
+        width: 22px;
+        height: 22px;
+      }
+      .footer-col h4 {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--ink-faint);
+        margin: 0 0 12px;
+      }
+      .footer-col ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .footer-col li {
+        margin-bottom: 6px;
+      }
+      .footer-col a {
+        font-size: 13px;
+        color: var(--ink-mute);
+        transition: color 0.15s;
+      }
+      .footer-col a:hover {
+        color: var(--ink);
+      }
+      .footer-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 24px;
+        border-top: 1px solid var(--rule);
+        font-size: 12.5px;
+        color: var(--ink-faint);
+      }
+      .footer-socials {
+        display: flex;
+        gap: 8px;
+      }
+      .footer-socials a {
+        display: inline-flex;
+        width: 32px;
+        height: 32px;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-mute);
+        border: 1px solid var(--rule);
         border-radius: 6px;
-        color: var(--text);
-        font-size: 12px;
-        font-family: inherit;
-        outline: none;
-        transition: border-color 0.15s;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: 10px center;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
       }
-      .sidebar-search input::placeholder {
-        color: var(--text-tertiary);
+      .footer-socials a:hover {
+        color: var(--ink);
+        border-color: var(--rule-strong);
       }
-      .sidebar-search input:focus {
-        border-color: rgba(249, 115, 22, 0.4);
-        color: var(--text);
-      }
-      .sidebar-search input::-webkit-search-cancel-button {
-        display: none;
+      .footer-socials svg {
+        width: 14px;
+        height: 14px;
       }
 
-      .docs-sidebar li.hidden {
-        display: none;
+      /* ============================================================
+         RESPONSIVE — collapse sidebar to slide-down panel
+         ============================================================ */
+      @media (max-width: 900px) {
+        .nav-links {
+          display: none;
+        }
+        .nav-inner {
+          gap: 16px;
+          padding: 0 16px;
+        }
+        .mobile-menu-btn {
+          display: block;
+          margin-left: auto;
+        }
+        .nav-right {
+          display: none;
+        }
+
+        .page-header {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+
+        .docs-layout {
+          grid-template-columns: 1fr;
+        }
+        .docs-sidebar {
+          position: static;
+          width: 100%;
+          height: auto;
+          max-height: 38vh;
+          border-right: none;
+          border-bottom: 1px solid var(--rule);
+          padding: 16px 0 16px;
+        }
+        .sidebar-search {
+          margin-top: 0;
+          padding-top: 0;
+        }
+        .docs-content section {
+          padding: 32px 20px 64px;
+          max-width: 100%;
+        }
+        #cli-options {
+          max-width: 100% !important;
+        }
+        .footer-grid {
+          grid-template-columns: 1fr 1fr;
+          gap: 28px;
+        }
+        .footer-bottom {
+          flex-direction: column;
+          gap: 14px;
+          text-align: center;
+        }
+      }
+      @media (max-width: 540px) {
+        .footer-grid {
+          grid-template-columns: 1fr;
+        }
+        .docs-content h2 {
+          font-size: 30px;
+        }
+      }
+
+      /* Reduce motion */
+      @media (prefers-reduced-motion: reduce) {
+        .docs-content section.active {
+          animation: none;
+        }
       }
     </style>
   </head>
@@ -931,31 +1187,60 @@
       <div class="nav-inner">
         <a class="nav-logo" href="index.html">
           <img src="logo.svg" alt="AppClaw" />
-          <span>AppClaw</span>
+          <span class="nav-logo-name">AppClaw</span>
         </a>
         <ul class="nav-links">
           <li><a href="index.html#features">Features</a></li>
           <li><a href="index.html#how-it-works">How It Works</a></li>
           <li><a href="usage.html" class="active">Usage Guide</a></li>
-          <li>
-            <a href="https://github.com/AppiumTestDistribution/appclaw" target="_blank">GitHub</a>
-          </li>
         </ul>
         <div class="nav-right">
+          <button
+            class="theme-toggle"
+            id="themeToggle"
+            aria-label="Toggle theme"
+            title="Toggle theme"
+          >
+            <svg
+              class="icon-moon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+            </svg>
+            <svg
+              class="icon-sun"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+              />
+            </svg>
+          </button>
           <a
-            class="nav-github"
+            class="btn-ghost"
             href="https://github.com/AppiumTestDistribution/appclaw"
             target="_blank"
             rel="noopener"
           >
-            <svg viewBox="0 0 16 16" fill="currentColor">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
               <path
                 d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
               />
             </svg>
             Star
           </a>
-          <a class="nav-cta" href="https://github.com/AppiumTestDistribution/appclaw#quick-start"
+          <a class="btn-orange" href="https://github.com/AppiumTestDistribution/appclaw#quick-start"
             >Get Started</a
           >
         </div>
@@ -982,8 +1267,8 @@
           <input type="search" id="sidebar-search" placeholder="Search docs…" autocomplete="off" />
         </div>
 
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             Getting Started
             <svg
               class="sidebar-chevron"
@@ -1002,8 +1287,8 @@
           </ul>
         </div>
 
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             YAML Flows
             <svg
               class="sidebar-chevron"
@@ -1023,8 +1308,8 @@
           </ul>
         </div>
 
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             Commands
             <svg
               class="sidebar-chevron"
@@ -1049,8 +1334,8 @@
           </ul>
         </div>
 
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             Configuration
             <svg
               class="sidebar-chevron"
@@ -1068,8 +1353,8 @@
           </ul>
         </div>
 
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             LambdaTest Cloud
             <svg
               class="sidebar-chevron"
@@ -1086,8 +1371,8 @@
           </ul>
         </div>
 
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             Node.js SDK
             <svg
               class="sidebar-chevron"
@@ -1105,14 +1390,15 @@
             <li><a href="#sdk-run-flow">runFlow()</a></li>
             <li><a href="#sdk-run-goal">runGoal()</a></li>
             <li><a href="#sdk-run">run()</a></li>
+            <li><a href="#sdk-locator-cache">Locator Cache</a></li>
             <li><a href="#sdk-reports">Reports &amp; Video</a></li>
             <li><a href="#sdk-vitest">Vitest / Jest</a></li>
             <li><a href="#sdk-ci">CI Scripts</a></li>
             <li><a href="#sdk-options">Options Reference</a></li>
           </ul>
         </div>
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             GitHub Actions
             <svg
               class="sidebar-chevron"
@@ -1135,8 +1421,8 @@
           </ul>
         </div>
 
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             App Guides
             <svg
               class="sidebar-chevron"
@@ -1155,8 +1441,8 @@
           </ul>
         </div>
 
-        <div class="sidebar-group open">
-          <button class="sidebar-heading" aria-expanded="true">
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
             Agent CLI
             <svg
               class="sidebar-chevron"
@@ -2224,6 +2510,27 @@
                   (default: <code>.appclaw/exports</code>). Overridden by <code>--export-dir</code>.
                 </td>
               </tr>
+              <tr>
+                <td>LOCATOR_CACHE_ENABLED</td>
+                <td>
+                  SDK locator cache toggle: <code>on</code> or <code>off</code> (default:
+                  <code>off</code>). DOM mode only.
+                </td>
+              </tr>
+              <tr>
+                <td>LOCATOR_CACHE_PATH</td>
+                <td>
+                  Optional path for the SDK locator cache JSON file. Empty uses
+                  <code>~/.appclaw/locator-cache.json</code>.
+                </td>
+              </tr>
+              <tr>
+                <td>APPCLAW_MEMORY_NAMESPACE</td>
+                <td>
+                  Namespace for memory-backed stores, including locator cache. Useful for isolating
+                  branches, CI lanes, or test suites.
+                </td>
+              </tr>
             </tbody>
           </table>
 
@@ -2735,6 +3042,211 @@ console<span class="p">.</span>log<span class="p">(</span>result<span class="p">
           </div>
         </section>
 
+        <section id="sdk-locator-cache" class="reveal">
+          <h2>Locator Cache</h2>
+          <p>
+            The SDK locator cache is an opt-in DOM-mode speed path for repeated
+            <code>app.run()</code> calls. When the same app, screen, action, and label are seen
+            again, AppClaw can skip the page-source parse, DOM scoring, and multi-strategy probing
+            and go straight to the Appium locator that worked last time.
+          </p>
+
+          <div class="callout callout-warn">
+            <div class="callout-title">DOM mode only</div>
+            <p>
+              Locator cache is not used in <code>AGENT_MODE=vision</code>. Vision mode taps by
+              screenshot coordinates or vision-derived boxes, which are tied to the current
+              screenshot and should not be reused across sessions.
+            </p>
+          </div>
+
+          <h3>Enable it</h3>
+          <p>Enable per SDK instance:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  platform<span class="p">:</span> <span class="s">'android'</span><span class="p">,</span>
+  agentMode<span class="p">:</span> <span class="s">'dom'</span><span class="p">,</span>
+  locatorCache<span class="p">:</span> <span class="k">true</span>
+<span class="p">});</span></pre>
+          </div>
+
+          <p>Or isolate the cache file and namespace for CI:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span>
+  locatorCache<span class="p">:</span> <span class="p">{</span>
+    path<span class="p">:</span> <span class="s">'.appclaw/cache/locator-cache.json'</span><span class="p">,</span>
+    namespace<span class="p">:</span> process<span class="p">.</span>env<span class="p">.</span>GITHUB_REF_NAME <span class="p">??</span> <span class="s">'local'</span>
+  <span class="p">}</span>
+<span class="p">});</span></pre>
+          </div>
+
+          <p>You can also enable it through environment variables:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">.env</span>
+            </div>
+            <pre><span class="k">AGENT_MODE</span><span class="p">=</span><span class="s">dom</span>
+<span class="k">LOCATOR_CACHE_ENABLED</span><span class="p">=</span><span class="s">on</span>
+<span class="k">LOCATOR_CACHE_PATH</span><span class="p">=</span><span class="s">.appclaw/cache/locator-cache.json</span>
+<span class="k">APPCLAW_MEMORY_NAMESPACE</span><span class="p">=</span><span class="s">main</span></pre>
+          </div>
+
+          <h3>What gets stored</h3>
+          <p>
+            AppClaw stores the winning Appium locator, not the Appium element UUID. UUIDs are
+            session-scoped and change every run; locators such as accessibility IDs and resource IDs
+            can be re-resolved to a fresh UUID on the next run.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">~/.appclaw/locator-cache.json</span>
+            </div>
+            <pre><span class="p">{</span>
+  <span class="k">"version"</span><span class="p">:</span> <span class="n">1</span><span class="p">,</span>
+  <span class="k">"entries"</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="k">"namespace"</span><span class="p">:</span> <span class="s">"default"</span><span class="p">,</span>
+      <span class="k">"platform"</span><span class="p">:</span> <span class="s">"android"</span><span class="p">,</span>
+      <span class="k">"appId"</span><span class="p">:</span> <span class="s">"com.example.app"</span><span class="p">,</span>
+      <span class="k">"screenFingerprint"</span><span class="p">:</span> <span class="s">"68eda714f104"</span><span class="p">,</span>
+      <span class="k">"actionKind"</span><span class="p">:</span> <span class="s">"tap"</span><span class="p">,</span>
+      <span class="k">"label"</span><span class="p">:</span> <span class="s">"login button"</span><span class="p">,</span>
+      <span class="k">"locator"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="k">"strategy"</span><span class="p">:</span> <span class="s">"accessibility id"</span><span class="p">,</span>
+        <span class="k">"selector"</span><span class="p">:</span> <span class="s">"login"</span>
+      <span class="p">},</span>
+      <span class="k">"successCount"</span><span class="p">:</span> <span class="n">4</span><span class="p">,</span>
+      <span class="k">"failCount"</span><span class="p">:</span> <span class="n">0</span><span class="p">,</span>
+      <span class="k">"confidence"</span><span class="p">:</span> <span class="n">1</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span></pre>
+          </div>
+
+          <h3>How a cache hit works</h3>
+          <ol>
+            <li>
+              AppClaw reads page source and builds a cache key from namespace, platform, app ID,
+              semantic screen fingerprint, action kind, and label.
+            </li>
+            <li>
+              If an entry exists, AppClaw calls one Appium lookup:
+              <code>findElement(strategy, selector)</code>.
+            </li>
+            <li>
+              If Appium returns a fresh element UUID, AppClaw performs the action with that UUID.
+            </li>
+            <li>
+              On success, the report manifest records <code>"cacheHit": true</code> for that step.
+            </li>
+          </ol>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Report manifest</span>
+            </div>
+            <pre><span class="p">{</span>
+  <span class="k">"verbatim"</span><span class="p">:</span> <span class="s">"click on login button"</span><span class="p">,</span>
+  <span class="k">"message"</span><span class="p">:</span> <span class="s">"Tapped \"login button\""</span><span class="p">,</span>
+  <span class="k">"cacheHit"</span><span class="p">:</span> <span class="k">true</span>
+<span class="p">}</span></pre>
+          </div>
+
+          <h3>Loading screens and implicit waits</h3>
+          <p>
+            Cache misses do not bypass AppClaw's implicit wait. For DOM actions such as
+            <code>tap</code>, <code>longPress</code>, and <code>type</code>, AppClaw still polls
+            according to <code>waitTimeout</code> and <code>waitInterval</code>.
+          </p>
+
+          <p>Each poll attempt does this:</p>
+          <ol>
+            <li>Try the cached locator, if a cache entry exists.</li>
+            <li>
+              If the cached <code>findElement</code> returns no element, do not fail and do not mark
+              the cache stale. The page may still be loading.
+            </li>
+            <li>Fall back to normal DOM parsing, scoring, and locator probing.</li>
+            <li>If a matching element is found, perform the action and update the cache.</li>
+            <li>If no match is found, wait <code>waitInterval</code> and try again.</li>
+          </ol>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Slow API response</div>
+            <p>
+              If the app is waiting on an API and the target is not in the DOM yet, AppClaw keeps
+              polling until the wait budget is exhausted. A temporary absence does not reduce cache
+              confidence.
+            </p>
+          </div>
+
+          <h3>Locator changes and recovery</h3>
+          <p>
+            If the app changes and the cached selector no longer works, AppClaw recovers through the
+            normal DOM path. For example, if the cache contains
+            <code>{ strategy: "accessibility id", selector: "login1" }</code> but the real element
+            is now <code>login</code>:
+          </p>
+
+          <ol>
+            <li>The cached lookup for <code>login1</code> returns no element.</li>
+            <li>AppClaw falls back to DOM scoring in the same poll attempt.</li>
+            <li>The matching element is found and tapped.</li>
+            <li>
+              <code>recordHit()</code> overwrites the stale selector with the new winning locator.
+            </li>
+          </ol>
+
+          <p>
+            If the cached locator resolves to an element but the action fails against that UUID,
+            AppClaw marks the entry stale, lowers confidence, and falls back to normal DOM
+            resolution. Entries with very low effective confidence are evicted on save.
+          </p>
+
+          <h3>Screen transitions</h3>
+          <p>
+            During a transition, Appium can briefly return a mixed DOM containing labels from the
+            previous and next screens. To avoid recording cache entries against that transient
+            state, cache-enabled DOM actions wait briefly for two consecutive semantic screen
+            fingerprints to match before reading or writing cache entries.
+          </p>
+
+          <h3>Inspecting the cache</h3>
+          <p>The default file is:</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">cat</span> ~/.appclaw/locator-cache.json</pre>
+          </div>
+
+          <p>To see whether a step used the cache, inspect the latest SDK report manifest:</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">find</span> .appclaw/runs -name manifest.json -maxdepth 2 <span class="p">|</span> <span class="k">xargs</span> ls -t <span class="p">|</span> <span class="k">head</span> -1
+<span class="k">rg</span> <span class="s">"cacheHit|verbatim|message"</span> .appclaw/runs/*/manifest.json</pre>
+          </div>
+        </section>
+
         <section id="sdk-reports" class="reveal">
           <h2>Reports</h2>
           <p>
@@ -3108,6 +3620,15 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
                   <strong>Recording</strong> tab in the report. Recording starts on the first
                   <code>run()</code> call and stops automatically in <code>teardown()</code>.
                   Requires Appium screen recording support.
+                </td>
+              </tr>
+              <tr>
+                <td>locatorCache</td>
+                <td>boolean | object</td>
+                <td><code>false</code></td>
+                <td>
+                  Enable DOM-mode locator caching. Pass <code>true</code> for defaults, or
+                  <code>{ path, namespace }</code> to isolate cache files and namespaces.
                 </td>
               </tr>
               <tr>
@@ -4431,6 +4952,10 @@ APP_GUIDE (WhatsApp):
       const sections = Array.from(document.querySelectorAll('.docs-content section[id]'));
       const sideLinks = Array.from(document.querySelectorAll('.docs-sidebar a[href^="#"]'));
       const content = document.querySelector('.docs-content');
+      const docsSidebar = document.querySelector('.docs-sidebar');
+      const docsSubnav = document.createElement('div');
+      docsSubnav.className = 'docs-subnav';
+      docsSidebar.appendChild(docsSubnav);
 
       // Build ordered list from sidebar links
       const orderedIds = sideLinks.map((l) => l.getAttribute('href').slice(1));
@@ -4483,6 +5008,36 @@ APP_GUIDE (WhatsApp):
         sectionEl.appendChild(nav);
       }
 
+      function setActiveCategory(activeLink) {
+        const activeGroup = activeLink ? activeLink.closest('.sidebar-group') : null;
+        document.querySelectorAll('.sidebar-group').forEach((group) => {
+          const isActive = group === activeGroup;
+          group.classList.toggle('open', isActive);
+          const btn = group.querySelector('.sidebar-heading');
+          if (btn) btn.setAttribute('aria-expanded', String(isActive));
+        });
+        renderSubnav(activeGroup, activeLink);
+      }
+
+      function renderSubnav(activeGroup, activeLink) {
+        docsSubnav.replaceChildren();
+        if (!activeGroup) return;
+
+        activeGroup.querySelectorAll('li').forEach((li) => {
+          if (li.classList.contains('hidden')) return;
+          const source = li.querySelector('a[href^="#"]');
+          if (!source) return;
+
+          const link = source.cloneNode(true);
+          link.classList.toggle('active', source === activeLink);
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            showSection(link.getAttribute('href').slice(1));
+          });
+          docsSubnav.appendChild(link);
+        });
+      }
+
       function showSection(id) {
         const target = document.getElementById(id);
         if (!target) return;
@@ -4500,8 +5055,9 @@ APP_GUIDE (WhatsApp):
         const activeLink = document.querySelector(`.docs-sidebar a[href="#${id}"]`);
         if (activeLink) {
           activeLink.classList.add('active');
+          setActiveCategory(activeLink);
           // Scroll sidebar to keep active link visible
-          activeLink.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          activeLink.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
         }
 
         // Add prev/next
@@ -4509,19 +5065,13 @@ APP_GUIDE (WhatsApp):
 
         // Scroll content to top
         if (content) content.scrollTop = 0;
+        window.scrollTo({
+          top: document.querySelector('.docs-layout').offsetTop,
+          behavior: 'smooth',
+        });
 
         // Update URL
         history.replaceState(null, '', `#${id}`);
-
-        // Auto-expand the accordion group containing the active link
-        if (activeLink) {
-          const group = activeLink.closest('.sidebar-group');
-          if (group && !group.classList.contains('open')) {
-            group.classList.add('open');
-            const groupBtn = group.querySelector('.sidebar-heading');
-            if (groupBtn) groupBtn.setAttribute('aria-expanded', 'true');
-          }
-        }
 
         // Update breadcrumb
         const sectionLabel = document.getElementById('page-header-section');
@@ -4551,12 +5101,23 @@ APP_GUIDE (WhatsApp):
         }
       });
 
-      // Accordion toggle
+      // Category tab clicks
       document.querySelectorAll('.sidebar-heading').forEach((btn) => {
         btn.addEventListener('click', () => {
           const group = btn.closest('.sidebar-group');
-          const isOpen = group.classList.toggle('open');
-          btn.setAttribute('aria-expanded', String(isOpen));
+          const firstVisibleItem = Array.from(group.querySelectorAll('li')).find(
+            (li) => !li.classList.contains('hidden')
+          );
+          const firstLink = firstVisibleItem
+            ? firstVisibleItem.querySelector('a[href^="#"]')
+            : null;
+          if (firstLink) {
+            showSection(firstLink.getAttribute('href').slice(1));
+          } else {
+            setActiveCategory(null);
+            group.classList.add('open');
+            btn.setAttribute('aria-expanded', 'true');
+          }
         });
       });
 
@@ -4577,6 +5138,8 @@ APP_GUIDE (WhatsApp):
           document.querySelectorAll('.sidebar-group').forEach((group) => {
             if (!q) {
               group.style.display = '';
+              const activeLink = document.querySelector('.docs-sidebar a.active');
+              setActiveCategory(activeLink);
               return;
             }
             const allHidden = Array.from(group.querySelectorAll('li')).every((li) =>
@@ -4596,6 +5159,26 @@ APP_GUIDE (WhatsApp):
       // Initial load: show section from hash or first section
       const initialId = location.hash.slice(1) || orderedIds[0];
       showSection(initialId);
+
+      // ── Theme toggle ──────────────────────────────────────────────────────
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+          const current =
+            document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+          const next = current === 'light' ? 'dark' : 'light';
+          if (next === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+          }
+          try {
+            localStorage.setItem('appclaw-theme', next);
+          } catch (e) {
+            /* ignore */
+          }
+        });
+      }
     </script>
   </body>
 </html>
