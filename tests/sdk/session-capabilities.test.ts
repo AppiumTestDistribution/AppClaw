@@ -55,18 +55,20 @@ describe('normalizeCapabilitiesForPlatform', () => {
     });
   });
 
-  test('does not leak platform wrapper keys when selected platform has no section', () => {
-    expect(
+  test('throws when the file is platform-scoped but the requested platform has no section', () => {
+    // The user explicitly split caps by platform and forgot ios — refuse rather
+    // than silently running with just `common`, which masks the missing
+    // ios-specific values (app path, automationName, etc.).
+    expect(() =>
       normalizeCapabilitiesForPlatform(
         {
           common: { 'appium:noReset': true },
           android: { 'appium:app': '/tmp/android.apk' },
         },
-        'ios'
+        'ios',
+        'caps.json'
       )
-    ).toEqual({
-      'appium:noReset': true,
-    });
+    ).toThrow(/caps\.json declares platform sections \[android\] but no "ios" section/);
   });
 
   test('rejects non-object platform sections', () => {

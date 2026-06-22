@@ -165,7 +165,18 @@ export function normalizeCapabilitiesForPlatform(
 
   const platformCaps = parsed[platform];
   if (platformCaps === undefined) {
-    return { ...topLevelCaps, ...sharedCaps };
+    // The file is platform-scoped (at least one of android/ios is defined) but
+    // there's no section for the platform we're about to run on. That's almost
+    // always a misconfig — the user explicitly split caps by platform and
+    // forgot to cover this one. Refuse rather than silently running with just
+    // shared/top-level caps, which would mask the missing platform-specific
+    // values (app path, automationName, etc.).
+    const definedPlatforms = [...platformKeys].filter((k) => k in parsed);
+    throw new Error(
+      `${sourceLabel} declares platform sections [${definedPlatforms.join(', ')}] ` +
+        `but no "${platform}" section. Add a "${platform}" object, or remove the ` +
+        `platform wrapper if these capabilities apply to all platforms.`
+    );
   }
   if (!isPlainObject(platformCaps)) {
     throw new Error(`${sourceLabel} field "${platform}" must be a JSON object of capabilities`);
