@@ -1349,6 +1349,7 @@
           </button>
           <ul>
             <li><a href="#vision-modes">Vision Modes</a></li>
+            <li><a href="#custom-capabilities">Custom Capabilities</a></li>
             <li><a href="#env-vars">Environment Variables</a></li>
           </ul>
         </div>
@@ -1549,6 +1550,15 @@
                     <td>--env-path &lt;path&gt;</td>
                     <td>
                       Load a dotenv (<code>.env</code>) file into the environment for this run
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>--caps &lt;path&gt;</td>
+                    <td>
+                      JSON file of extra Appium capabilities merged into the session. Flat or
+                      platform-scoped (<code>android</code>/<code>ios</code>/<code>common</code>).
+                      Overrides <code>CAPABILITIES_FILE</code>. See
+                      <a href="#custom-capabilities">Custom Capabilities</a>.
                     </td>
                   </tr>
                   <tr>
@@ -2436,6 +2446,22 @@
                 <td>DEVICE_NAME</td>
                 <td>Same as <code>--device</code> flag</td>
               </tr>
+              <tr>
+                <td>APP_PATH</td>
+                <td>
+                  Path or URL to an APK/IPA installed via <code>appium:app</code> at session
+                  start. Override per-flow via the <code>app:</code> YAML header.
+                </td>
+              </tr>
+              <tr>
+                <td>CAPABILITIES_FILE</td>
+                <td>
+                  JSON file of extra Appium capabilities merged into <code>create_session</code>.
+                  Same as <code>--caps</code> flag and the SDK
+                  <code>capabilitiesFile</code> option. See
+                  <a href="#custom-capabilities">Custom Capabilities</a>.
+                </td>
+              </tr>
             </tbody>
           </table>
 
@@ -2558,6 +2584,140 @@
             </tbody>
           </table>
         </section>
+
+        <!-- ============================================ -->
+        <!-- CUSTOM CAPABILITIES                          -->
+        <!-- ============================================ -->
+        <section id="custom-capabilities" class="reveal">
+          <h2>Custom Capabilities</h2>
+          <p>
+            Sometimes the built-in capabilities aren't enough — you want to set
+            <code>appium:autoGrantPermissions</code>, force a specific
+            <code>appium:automationName</code>, or pre-install an APK. AppClaw accepts a JSON
+            file of extra capabilities merged into <code>create_session</code> on every run.
+          </p>
+
+          <h3>Where to set it</h3>
+          <ul>
+            <li>
+              <strong>CLI:</strong> <code>--caps path/to/caps.json</code> (interactive, YAML flow,
+              <code>--playground</code>, <code>--record</code> — every mode).
+            </li>
+            <li>
+              <strong>Env var:</strong> <code>CAPABILITIES_FILE=path/to/caps.json</code> in
+              <code>.env</code> or your shell.
+            </li>
+            <li>
+              <strong>SDK:</strong> <code>new AppClaw({ capabilitiesFile: 'path/to/caps.json' })</code>.
+            </li>
+          </ul>
+          <p>
+            <code>--caps</code> wins over the env var when both are set.
+          </p>
+
+          <h3>Flat format</h3>
+          <p>The simplest shape — a flat object of Appium capabilities. Applied to every session
+            regardless of platform.</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">caps.json</span>
+            </div>
+            <pre><code>{
+  <span class="s">"appium:autoGrantPermissions"</span>: <span class="k">true</span>,
+  <span class="s">"appium:noReset"</span>: <span class="k">true</span>,
+  <span class="s">"appium:newCommandTimeout"</span>: <span class="m">300</span>
+}</code></pre>
+          </div>
+
+          <h3>Platform-scoped format</h3>
+          <p>
+            When Android and iOS need different capabilities, split them under top-level
+            <code>android</code> and <code>ios</code> keys. Optionally use <code>common</code>
+            (alias: <code>default</code>, <code>shared</code>) for capabilities that apply to both.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">caps.json</span>
+            </div>
+            <pre><code>{
+  <span class="s">"common"</span>: {
+    <span class="s">"appium:newCommandTimeout"</span>: <span class="m">300</span>,
+    <span class="s">"appium:noReset"</span>: <span class="k">true</span>
+  },
+  <span class="s">"android"</span>: {
+    <span class="s">"appium:app"</span>: <span class="s">"/path/to/MyApp.apk"</span>,
+    <span class="s">"appium:automationName"</span>: <span class="s">"UiAutomator2"</span>,
+    <span class="s">"appium:autoGrantPermissions"</span>: <span class="k">true</span>
+  },
+  <span class="s">"ios"</span>: {
+    <span class="s">"appium:app"</span>: <span class="s">"/path/to/MyApp.ipa"</span>,
+    <span class="s">"appium:automationName"</span>: <span class="s">"XCUITest"</span>,
+    <span class="s">"appium:autoAcceptAlerts"</span>: <span class="k">true</span>
+  }
+}</code></pre>
+          </div>
+
+          <p>
+            The wrapper keys themselves (<code>android</code>, <code>ios</code>,
+            <code>common</code>) are stripped before sending to Appium — they're config metadata,
+            not W3C capabilities.
+          </p>
+
+          <h3>Precedence</h3>
+          <p>
+            When multiple sources set the same capability, later wins:
+          </p>
+          <ol>
+            <li>Built-in defaults (MJPEG port, app from <code>APP_PATH</code>, etc.)</li>
+            <li>Your capabilities file (top-level / <code>common</code> / platform-specific, in that order)</li>
+            <li>
+              Framework-managed caps (per-parallel-worker ports, pinned UDID from
+              <code>--udid</code>)
+            </li>
+          </ol>
+          <p>
+            So your file can override defaults, but framework values (parallel ports, device pinning)
+            still take final precedence — concurrent workers won't collide even if your file sets
+            the same key.
+          </p>
+
+          <div class="callout callout-warn">
+            <div class="callout-title">Strict platform check</div>
+            <p>
+              If your file declares <code>android</code> and/or <code>ios</code> sections but
+              <em>doesn't</em> cover the platform you're running on, AppClaw refuses to start with a
+              clear error. This catches the common misconfig where you split caps by platform and
+              forgot one. To opt out, drop the platform wrapper and use the flat format instead.
+            </p>
+          </div>
+
+          <h3>Notes</h3>
+          <ul>
+            <li>
+              The file is loaded once per session. Editing it during a long run has no effect
+              until the next session.
+            </li>
+            <li>
+              <code>appium:app</code> in the file takes precedence over the
+              <code>APP_PATH</code> env var, which itself is overridden by a per-flow
+              <code>app:</code> YAML header.
+            </li>
+            <li>
+              All values are sent through verbatim — AppClaw doesn't validate that
+              <code>appium:*</code> keys are recognised by your driver. Typos will surface as
+              Appium errors at session creation.
+            </li>
+            <li>
+              <strong>LambdaTest:</strong> capabilities from this file are merged into the
+              LambdaTest session too, so cloud runs share the same configuration as local.
+            </li>
+          </ul>
+        </section>
+
         <!-- ============================================ -->
         <!-- LAMBDATEST                                   -->
         <!-- ============================================ -->
@@ -3530,6 +3690,17 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
                 <td>string</td>
                 <td>—</td>
                 <td><code>'android'</code> | <code>'ios'</code></td>
+              </tr>
+              <tr>
+                <td>capabilitiesFile</td>
+                <td>string</td>
+                <td>—</td>
+                <td>
+                  Path to a JSON file of extra Appium capabilities merged into the session.
+                  Flat or platform-scoped (<code>android</code>/<code>ios</code>/<code>common</code>).
+                  Maps to <code>CAPABILITIES_FILE</code>. See
+                  <a href="#custom-capabilities">Custom Capabilities</a>.
+                </td>
               </tr>
               <tr>
                 <td>agentMode</td>
