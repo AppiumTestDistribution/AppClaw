@@ -1,3 +1,9 @@
+## [1.7.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.6.0...v1.7.0) (2026-06-22)
+
+### Features
+
+* add locator cache for dom mode ([#39](https://github.com/AppiumTestDistribution/AppClaw/issues/39)) ([cff9cb1](https://github.com/AppiumTestDistribution/AppClaw/commit/cff9cb13b0d0dccb812bbb8ff4d41e00d20b2368))
+
 ## [1.6.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.5.6...v1.6.0) (2026-06-20)
 
 ### Features
