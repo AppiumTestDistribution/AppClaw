@@ -17,10 +17,10 @@
  * 3. Edit freely. Treat this file as a draft: rename the test, add
  *    assertions (`app.verify(...)`), split into multiple `it()` blocks.
  */
-import { AppClaw } from '../src/sdk';
-import { describe, it } from 'vitest';
 import 'dotenv/config';
+import { describe, it } from 'vitest';
 import type { RunOptions } from '../src/sdk';
+import { AppClaw } from '../src/sdk';
 describe('Recorded flow', () => {
   it('launches vodqa and swipe the first slider to the right', async () => {
     const app = new AppClaw({
@@ -31,6 +31,8 @@ describe('Recorded flow', () => {
       silent: false,
       waitTimeout: 10000,
       waitInterval: 1000,
+      locatorCache: true,
+      capabilitiesFile: './tests/capabilities.json',
     });
 
     await app.run('open vodqa app');

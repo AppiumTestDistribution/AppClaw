@@ -18,11 +18,27 @@ import { parseIOSPageSource } from '../perception/ios-parser.js';
 import type { UIElement } from '../perception/types.js';
 import {
   findByIdStrategies,
+  findByIdStrategiesDetailed,
   findByVision,
   isAIElement,
   parseAIElementCoords,
   tapAtCoordinates,
 } from '../agent/element-finder.js';
+import { findElement as findElementByStrategy } from '../mcp/tools.js';
+import {
+  getActiveLocatorCache,
+  lookupLocator,
+  recordHit,
+  markStale,
+  type LocatorActionKind,
+  type LocatorCacheCtx,
+  type LocatorCacheKey,
+} from '../sdk/locator-cache.js';
+import {
+  extractScreenLabels,
+  computeSemanticFingerprint,
+  extractAppIdFromDom,
+} from '../memory/fingerprint.js';
 import {
   isVisionLocateEnabled,
   getStarkVisionApiKey,
@@ -421,6 +437,115 @@ function isVisionMode(): boolean {
   return Config.AGENT_MODE === 'vision' && isVisionLocateEnabled();
 }
 
+// ─── SDK locator cache helpers ──────────────────────────────────────────────
+//
+// These run only when an SDK caller opted into `locatorCache`. For YAML-flow,
+// playground, and goal-agent paths the active context is always undefined and
+// every helper below short-circuits — behavior unchanged.
+
+/** Build a cache key from the current page source + the action being performed. */
+function buildCacheKey(
+  ctx: LocatorCacheCtx,
+  pageSource: string,
+  actionKind: LocatorActionKind,
+  label: string
+): { key: LocatorCacheKey; screenLabels: string[]; appId: string } | null {
+  const platform = detectPlatform(pageSource);
+  const appId = extractAppIdFromDom(pageSource) ?? ctx.currentAppId;
+  // No app ID = no useful cache scoping (would collide across apps). Skip
+  // rather than persisting a polluting entry under appId="unknown".
+  if (!appId) return null;
+  const screenLabels = extractScreenLabels(pageSource);
+  const screenFingerprint = computeSemanticFingerprint(screenLabels);
+  return {
+    screenLabels,
+    appId,
+    key: {
+      namespace: ctx.namespace,
+      platform,
+      appId,
+      screenFingerprint,
+      actionKind,
+      label,
+    },
+  };
+}
+
+function screenFingerprintFromPageSource(pageSource: string): string {
+  return computeSemanticFingerprint(extractScreenLabels(pageSource));
+}
+
+/**
+ * During navigation, Appium can briefly return a mixed hierarchy containing
+ * labels from both the previous and next screens. If we key the locator cache
+ * from that transient DOM, repeat runs miss even though the target locator is
+ * stable. For cache-enabled DOM actions only, wait briefly for two consecutive
+ * semantic fingerprints to match and use that settled snapshot.
+ */
+async function getStablePageSourceForLocatorCache(mcp: MCPClient): Promise<string> {
+  let previous = await getPageSource(mcp);
+  let previousFingerprint = screenFingerprintFromPageSource(previous);
+
+  for (let i = 0; i < 2; i++) {
+    await sleep(250);
+    const next = await getPageSource(mcp);
+    const nextFingerprint = screenFingerprintFromPageSource(next);
+    if (nextFingerprint === previousFingerprint) return next;
+    previous = next;
+    previousFingerprint = nextFingerprint;
+  }
+
+  return previous;
+}
+
+/**
+ * Try the cached locator. On hit, runs `useUuid(uuid)`:
+ *   - if it returns a successful ActionResult, recordHit + return the result
+ *   - otherwise, markStale and return null so caller falls back
+ * On miss (no cache entry, or `findElement` returns null), returns null.
+ */
+async function tryCachedLocator(
+  ctx: LocatorCacheCtx,
+  mcp: MCPClient,
+  keyInfo: { key: LocatorCacheKey; screenLabels: string[] },
+  useUuid: (uuid: string) => Promise<ActionResult>
+): Promise<ActionResult | null> {
+  const hit = lookupLocator(ctx.store, keyInfo.key);
+  if (!hit) return null;
+  const uuid = await findElementByStrategy(mcp, hit.locator.strategy, hit.locator.selector).catch(
+    () => null
+  );
+  if (!uuid) {
+    // `findElement` null is ambiguous: the locator could be stale (UI changed)
+    // OR the element just hasn't rendered yet within the implicit-wait budget.
+    // Don't markStale here — just fall through so the caller's polling loop
+    // can retry on the next attempt. If the locator IS truly stale, the
+    // scoring fallback will resolve a different element and recordHit will
+    // overwrite this entry on the same key in place.
+    return null;
+  }
+  let result: ActionResult;
+  try {
+    result = await useUuid(uuid);
+  } catch {
+    // Gesture failed against the cached UUID — mark stale and return null so
+    // the caller falls through to today's scoring path within the SAME poll
+    // attempt. Returning the error result here would short-circuit the
+    // fallback (every callsite treats a non-null return as a final answer).
+    markStale(ctx.store, hit.id);
+    ctx.dirty = true;
+    return null;
+  }
+  if (result.success) {
+    recordHit(ctx.store, keyInfo.key, keyInfo.screenLabels, hit.locator);
+    ctx.dirty = true;
+    return { ...result, cacheHit: true };
+  }
+  markStale(ctx.store, hit.id);
+  ctx.dirty = true;
+  return null;
+}
+
 /** Try to tap an element using vision locate. Returns null if vision can't find it. */
 async function tryTapByVision(mcp: MCPClient, label: string): Promise<ActionResult | null> {
   const uuid = await findByVision(mcp, `UI element labeled or showing "${label}"`);
@@ -450,7 +575,23 @@ async function tryTapByLabelOnDom(
   mcp: MCPClient,
   label: string
 ): Promise<ActionResult | 'no_match' | null> {
-  const pageSource = await getPageSource(mcp);
+  const cacheCtx = getActiveLocatorCache();
+  const pageSource = cacheCtx
+    ? await getStablePageSourceForLocatorCache(mcp)
+    : await getPageSource(mcp);
+
+  // SDK locator cache fast-path: skip parse + score + multi-strategy probe when
+  // we already know the (strategy, selector) that won for this label on this
+  // screen. On miss / stale, falls through to the existing path below.
+  const keyInfo = cacheCtx ? buildCacheKey(cacheCtx, pageSource, 'tap', label) : null;
+  if (cacheCtx && keyInfo) {
+    const hit = await tryCachedLocator(cacheCtx, mcp, keyInfo, async (uuid) => {
+      await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
+      return { success: true, message: `Tapped "${label}"` };
+    });
+    if (hit) return hit;
+  }
+
   const platform = detectPlatform(pageSource);
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
@@ -473,11 +614,25 @@ async function tryTapByLabelOnDom(
   const pick = scored[0]?.el;
   if (!pick) return 'no_match';
 
-  const uuid = await findByIdStrategies(mcp, pick.accessibilityId || pick.id, pick.text);
-  if (!uuid) return null;
+  const resolved = await findByIdStrategiesDetailed(
+    mcp,
+    pick.accessibilityId || pick.id,
+    pick.text
+  );
+  if (!resolved) return null;
 
-  await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
+  await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: resolved.uuid });
   const coords = pick.center;
+  // Record the winning locator so the next run for the same label on the same
+  // screen hits the cache fast-path above.
+  if (cacheCtx && keyInfo) {
+    recordHit(cacheCtx.store, keyInfo.key, keyInfo.screenLabels, {
+      strategy: resolved.strategy,
+      selector: resolved.selector,
+      text: resolved.text,
+    });
+    cacheCtx.dirty = true;
+  }
   return { success: true, message: `Tapped "${label}" at [${coords[0]}, ${coords[1]}]` };
 }
 
@@ -569,7 +724,21 @@ async function longPressByLabel(
   }
 
   // DOM mode: find element UUID → long press by UUID
-  const pageSource = await getPageSource(mcp);
+  const cacheCtx = getActiveLocatorCache();
+  const pageSource = cacheCtx
+    ? await getStablePageSourceForLocatorCache(mcp)
+    : await getPageSource(mcp);
+
+  // SDK locator cache fast-path (same shape as tryTapByLabelOnDom).
+  const keyInfo = cacheCtx ? buildCacheKey(cacheCtx, pageSource, 'longPress', label) : null;
+  if (cacheCtx && keyInfo) {
+    const hit = await tryCachedLocator(cacheCtx, mcp, keyInfo, async (uuid) => {
+      await mcp.callTool('appium_gesture', { action: 'long_press', elementUUID: uuid, duration });
+      return { success: true, message: `Long-pressed "${label}" (${duration}ms)` };
+    });
+    if (hit) return hit;
+  }
+
   const platform = detectPlatform(pageSource);
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
@@ -590,10 +759,27 @@ async function longPressByLabel(
   const pick = scored[0]?.el;
   if (!pick) return { success: false, message: `No matching element for "${label}"` };
 
-  const uuid = await findByIdStrategies(mcp, pick.accessibilityId || pick.id, pick.text);
-  if (!uuid) return { success: false, message: `Found "${label}" but could not locate element` };
+  const resolved = await findByIdStrategiesDetailed(
+    mcp,
+    pick.accessibilityId || pick.id,
+    pick.text
+  );
+  if (!resolved)
+    return { success: false, message: `Found "${label}" but could not locate element` };
 
-  await mcp.callTool('appium_gesture', { action: 'long_press', elementUUID: uuid, duration });
+  await mcp.callTool('appium_gesture', {
+    action: 'long_press',
+    elementUUID: resolved.uuid,
+    duration,
+  });
+  if (cacheCtx && keyInfo) {
+    recordHit(cacheCtx.store, keyInfo.key, keyInfo.screenLabels, {
+      strategy: resolved.strategy,
+      selector: resolved.selector,
+      text: resolved.text,
+    });
+    cacheCtx.dirty = true;
+  }
   return { success: true, message: `Long-pressed "${label}" (${duration}ms)` };
 }
 
@@ -676,27 +862,55 @@ async function flowTypeText(
   }
 
   // ── DOM mode ──
-  const pageSource = await getPageSource(mcp);
-  const platform = detectPlatform(pageSource);
+  const cacheCtx = getActiveLocatorCache();
+  const pageSource = cacheCtx
+    ? await getStablePageSourceForLocatorCache(mcp)
+    : await getPageSource(mcp);
 
+  // SDK locator cache fast-path. Cache key for `type` is keyed on the optional
+  // target label (or the implicit-input sentinel when none) so two distinct
+  // editable fields on the same screen don't collide.
+  const cacheLabel = target ?? '__implicit_input__';
+  const keyInfo = cacheCtx ? buildCacheKey(cacheCtx, pageSource, 'type', cacheLabel) : null;
+  if (cacheCtx && keyInfo) {
+    const hit = await tryCachedLocator(cacheCtx, mcp, keyInfo, async (uuid) => {
+      await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
+      await mcp.callTool('appium_set_value', { elementUUID: uuid, text: '' }).catch(() => {});
+      const setResult = await mcp.callTool('appium_set_value', {
+        ...(Config.CLOUD_PROVIDER ? { w3cActions: true } : { elementUUID: uuid }),
+        text,
+      });
+      const setText =
+        setResult.content
+          ?.map((c: { type: string; text?: string }) => (c.type === 'text' ? c.text : ''))
+          .join('') ?? '';
+      if (setText.toLowerCase().includes('error') || setText.toLowerCase().includes('failed')) {
+        return { success: false, message: setText.slice(0, 200) };
+      }
+      return { success: true, message: `Typed "${text}"` };
+    });
+    if (hit) return hit;
+  }
+
+  const platform = detectPlatform(pageSource);
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
   const editable = elements.find((e) => e.editable && e.enabled !== false);
   if (!editable) {
     return { success: false, message: 'No editable field found for type' };
   }
-  const uuid = await findByIdStrategies(
+  const resolved = await findByIdStrategiesDetailed(
     mcp,
     editable.accessibilityId || editable.id,
     editable.text
   );
-  if (!uuid) {
+  if (!resolved) {
     return { success: false, message: 'Could not resolve editable element' };
   }
-  await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
-  await mcp.callTool('appium_set_value', { elementUUID: uuid, text: '' }).catch(() => {});
+  await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: resolved.uuid });
+  await mcp.callTool('appium_set_value', { elementUUID: resolved.uuid, text: '' }).catch(() => {});
   const setResult = await mcp.callTool('appium_set_value', {
-    ...(Config.CLOUD_PROVIDER ? { w3cActions: true } : { elementUUID: uuid }),
+    ...(Config.CLOUD_PROVIDER ? { w3cActions: true } : { elementUUID: resolved.uuid }),
     text,
   });
   const setText =
@@ -705,6 +919,14 @@ async function flowTypeText(
       .join('') ?? '';
   if (setText.toLowerCase().includes('error') || setText.toLowerCase().includes('failed')) {
     return { success: false, message: setText.slice(0, 200) };
+  }
+  if (cacheCtx && keyInfo) {
+    recordHit(cacheCtx.store, keyInfo.key, keyInfo.screenLabels, {
+      strategy: resolved.strategy,
+      selector: resolved.selector,
+      text: resolved.text,
+    });
+    cacheCtx.dirty = true;
   }
   return { success: true, message: `Typed "${text}"` };
 }
@@ -1225,6 +1447,10 @@ export async function executeStep(
         return { success: false, message: 'launchApp requires appId in the YAML header' };
       }
       const r = await activateAppWithFallback(mcp, id);
+      if (r.success) {
+        const cacheCtx = getActiveLocatorCache();
+        if (cacheCtx) cacheCtx.currentAppId = id;
+      }
       return { success: r.success, message: r.message };
     }
     case 'openApp': {
@@ -1242,6 +1468,10 @@ export async function executeStep(
         };
       }
       const r = await activateAppWithFallback(mcp, pkg);
+      if (r.success) {
+        const cacheCtx = getActiveLocatorCache();
+        if (cacheCtx) cacheCtx.currentAppId = pkg;
+      }
       return {
         success: r.success,
         message: r.success ? `Launched ${step.query} (${pkg})` : r.message,

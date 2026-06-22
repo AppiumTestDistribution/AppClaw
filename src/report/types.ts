@@ -41,6 +41,13 @@ export interface StepArtifact {
   screenshotSize?: { width: number; height: number };
   /** Ms elapsed from run startedAt to when this step began executing — used to sync video playback */
   videoOffsetMs?: number;
+  /**
+   * True when the SDK locator cache served this step's element resolution
+   * (bypassed DOM parse + multi-strategy probe). Surfaced in run-manifest.json
+   * so users can grep cache hit-rate during rollout. Not yet rendered in HTML —
+   * follow-up if it proves useful enough to be a first-class badge.
+   */
+  cacheHit?: boolean;
 }
 
 /* ─── Run manifest (per-run JSON) ────────────────────────── */

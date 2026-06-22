@@ -40,6 +40,7 @@ import { tryParseNaturalFlowLine } from './natural-line.js';
 import { resolveNaturalStep } from './llm-parser.js';
 import { visionExecute } from './vision-execute.js';
 import { executeStep, type FlowTapPollOptions, type ScrollControl } from './run-yaml-flow.js';
+import { locatorCacheStorage, type LocatorCacheCtx } from '../sdk/locator-cache.js';
 
 /**
  * Minimum matchScore (1-10) for a vision tap to be considered "found". Below
@@ -60,6 +61,12 @@ export interface RunInstructionOptions {
   tapPoll?: FlowTapPollOptions;
   /** Per-command scroll/swipe overrides (distance + repeat/maxScroll count). */
   scroll?: ScrollControl;
+  /**
+   * SDK locator cache context — when set, DOM-mode element-bearing actions
+   * try the cached (strategy, selector) first before today's resolution path.
+   * Forwarded into `executeStep`. See `src/sdk/locator-cache.ts`.
+   */
+  locatorCache?: LocatorCacheCtx;
 }
 
 export interface RunInstructionResult {
@@ -85,6 +92,22 @@ export interface RunInstructionResult {
 }
 
 export async function runOneInstruction(
+  mcp: MCPClient,
+  instruction: string,
+  options?: RunInstructionOptions
+): Promise<RunInstructionResult> {
+  // Establish the SDK locator cache context for the whole pipeline below
+  // (regex → vision → LLM → executeStep → action helpers). The ctx propagates
+  // through every `await` via AsyncLocalStorage so helpers in run-yaml-flow.ts
+  // can read it without us having to thread a new parameter through
+  // executeStep + 6 helper signatures. `undefined` is the normal case for
+  // non-SDK callers (playground, YAML, replayer) → no behavior change.
+  return locatorCacheStorage.run(options?.locatorCache, () =>
+    runOneInstructionInner(mcp, instruction, options)
+  );
+}
+
+async function runOneInstructionInner(
   mcp: MCPClient,
   instruction: string,
   options?: RunInstructionOptions

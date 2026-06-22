@@ -35,7 +35,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run tests/flow tests/sdk tests/ui",
     "test:e2e": "vitest run tests/e2e/",
-    "test:e2e:android": "vitest run tests/vodqa.test.ts",
+    "test:e2e:android": "MCP_DEBUG=1 vitest run tests/vodqa.test.ts",
     "test:watch": "vitest tests/flow tests/sdk tests/ui",
     "build:vsix": "cd vscode-extension && npm run build && npx vsce package",
     "deploy:landing": "npm run deploy --prefix landing"

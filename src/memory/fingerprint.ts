@@ -152,8 +152,12 @@ const IOS_APP_NAME_TO_BUNDLE_ID: Record<string, string> = {
 export function extractAppIdFromDom(dom: string): string | undefined {
   if (!dom) return undefined;
 
-  // Android: resource ID prefix e.g. rid="com.google.android.gm:id/..."
-  const androidMatch = dom.match(/rid="([a-z][a-z0-9_.]*):id\//);
+  // Android: resource ID prefix.
+  //   - Trimmed DOM (episodic memory's normal input): `rid="com.foo:id/xyz"`
+  //   - Raw Appium XML (the SDK locator cache feeds this in directly via
+  //     `getPageSource`, no trim step): `resource-id="com.foo:id/xyz"`
+  // Match either form so callers don't have to remember which they hold.
+  const androidMatch = dom.match(/(?:resource-id|rid)="([a-z][a-z0-9_.]*):id\//);
   if (androidMatch) return androidMatch[1];
 
   // iOS: XCUIElementTypeApplication name attribute e.g. name="Gmail"

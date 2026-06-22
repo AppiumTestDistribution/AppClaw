@@ -86,6 +86,12 @@ export interface StepCollectorEntry {
   screenshotSize?: { width: number; height: number };
   /** Ms from run start to step start — for accurate video timestamp sync */
   videoOffsetMs?: number;
+  /**
+   * True when the SDK locator cache served this step's element resolution
+   * (bypassed DOM parse + multi-strategy probe). Surfaced in HTML reports so
+   * users can see hit-rate during rollout.
+   */
+  cacheHit?: boolean;
 }
 
 /**
@@ -205,6 +211,7 @@ export class RunArtifactCollector {
         deviceScreenSize: step.deviceScreenSize,
         screenshotSize: step.screenshotSize,
         videoOffsetMs: step.videoOffsetMs,
+        cacheHit: step.cacheHit,
       });
     }
 

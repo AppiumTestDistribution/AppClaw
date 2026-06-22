@@ -131,6 +131,20 @@ export interface AppClawOptions {
    * keeping test output clean. When `true`, forces them on. When unset, defers to MCP_DEBUG.
    */
   mcpDebug?: boolean;
+  /**
+   * Persist the resolved (strategy, selector) per (app, screen, label) so the
+   * second time the same test runs we skip page-source fetch + DOM scoring +
+   * multi-strategy probe and go straight to the one `findElement` call that
+   * won last time. Stale entries fall back to today's resolution path and
+   * overwrite themselves on success.
+   *
+   * Pass `true` to enable with defaults (`~/.appclaw/locator-cache.json`,
+   * namespace = `APPCLAW_MEMORY_NAMESPACE` or `"default"`). Pass an object to
+   * override the file path or namespace for CI-isolated stores. Also enabled
+   * by the `LOCATOR_CACHE_ENABLED=on` env var. DOM mode only — vision mode's
+   * coordinate-based locators don't survive resolution/theme changes.
+   */
+  locatorCache?: boolean | { path?: string; namespace?: string };
 }
 
 /** Result returned by AppClaw.runFlow() */
