@@ -70,9 +70,9 @@
         --hover-tint-strong: var(--hover-tint-strong);
 
         /* ── type ── */
-        --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
-        --font-body: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-        --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+        --font-display: 'Menlo', 'SF Mono', 'JetBrains Mono', monospace;
+        --font-body: 'Menlo', 'SF Mono', 'JetBrains Mono', monospace;
+        --font-mono: 'Menlo', 'SF Mono', 'JetBrains Mono', monospace;
 
         /* ── shape ── */
         --radius: 8px;
@@ -1322,7 +1322,9 @@
             </svg>
           </button>
           <ul>
+            <li><a href="#open-close-app">Open / Close App</a></li>
             <li><a href="#tap-click">Tap / Click</a></li>
+            <li><a href="#proximity">Proximity Selectors</a></li>
             <li><a href="#type-text">Type Text</a></li>
             <li><a href="#wait">Wait / Pause</a></li>
             <li><a href="#wait-until">Wait Until</a></li>
@@ -1918,6 +1920,50 @@
         <!-- ============================================ -->
         <!-- COMMANDS                                     -->
         <!-- ============================================ -->
+        <section id="open-close-app" class="reveal">
+          <h2>Open / Close App</h2>
+          <p>
+            Launch an app by name, or close (terminate) it when you&rsquo;re done. Closing uses
+            appium-mcp&rsquo;s terminate under the hood.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Natural language</span>
+            </div>
+            <pre><span class="c"># Open</span>
+<span class="p">-</span> open YouTube
+<span class="p">-</span> launch Settings app
+
+<span class="c"># Close — by name</span>
+<span class="p">-</span> close YouTube
+<span class="p">-</span> close the YouTube app
+<span class="p">-</span> terminate Settings
+<span class="p">-</span> quit Chrome
+
+<span class="c"># Close — the current foreground app</span>
+<span class="p">-</span> close app
+<span class="p">-</span> close the app</pre>
+          </div>
+
+          <p>
+            App names resolve against the device&rsquo;s installed apps (well-known names like
+            <code>YouTube</code> work out of the box). Omitting the name closes whatever app is in
+            the foreground.
+          </p>
+
+          <div class="callout callout-info">
+            <div class="callout-title">Not an app close</div>
+            <p>
+              <code>close the dialog</code>, <code>close the keyboard</code>, and similar UI
+              dismissals are treated as taps, not app terminations &mdash; only
+              <code>close &lt;app&gt;</code>/<code>close the app</code> (or
+              <code>terminate</code>/<code>quit</code>/<code>kill</code>) end an app.
+            </p>
+          </div>
+        </section>
+
         <section id="tap-click" class="reveal">
           <h2>Tap / Click</h2>
           <p>
@@ -1954,6 +2000,87 @@
               <span class="code-block-label">Structured YAML</span>
             </div>
             <pre><span class="p">-</span> <span class="k">tap</span><span class="p">:</span> <span class="s">"Login Button"</span></pre>
+          </div>
+        </section>
+
+        <section id="proximity" class="reveal">
+          <h2>Proximity Selectors</h2>
+          <p>
+            When several elements share the same label &mdash; e.g. a &ldquo;Login&rdquo; tab, a
+            &ldquo;Login&rdquo; nav item, and the actual <code>LOGIN</code> button &mdash; add a
+            spatial qualifier to pick the right one by its position relative to another element.
+            Works on both <code>tap</code> and <code>type</code>.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Natural language</span>
+            </div>
+            <pre><span class="p">-</span> tap the login button below the password field
+<span class="p">-</span> tap the icon to the right of the title
+<span class="p">-</span> tap the arrow to the left of the heading
+<span class="p">-</span> tap the star above the rating
+<span class="p">-</span> click the checkbox next to Terms
+<span class="p">-</span> tap the submit button within the form
+<span class="p">-</span> type <span class="s">"secret"</span> in the field below the email</pre>
+          </div>
+
+          <p>
+            The phrase after the target names the <em>relation</em> and the <em>anchor</em> element.
+            Modeled on Taiko&rsquo;s proximity selectors:
+          </p>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Phrase</th>
+                <th>Relation</th>
+                <th>Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>above / over</td>
+                <td>above</td>
+                <td>Target sits above the anchor</td>
+              </tr>
+              <tr>
+                <td>below / under / underneath</td>
+                <td>below</td>
+                <td>Target sits below the anchor</td>
+              </tr>
+              <tr>
+                <td>left of / to the left of</td>
+                <td>toLeftOf</td>
+                <td>Target is to the left of the anchor</td>
+              </tr>
+              <tr>
+                <td>right of / to the right of</td>
+                <td>toRightOf</td>
+                <td>Target is to the right of the anchor</td>
+              </tr>
+              <tr>
+                <td>near / next to / beside</td>
+                <td>near</td>
+                <td>Target is closest to the anchor (any direction)</td>
+              </tr>
+              <tr>
+                <td>within / inside</td>
+                <td>within</td>
+                <td>Target is contained inside the anchor (e.g. a form/card)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">How it resolves</div>
+            <p>
+              Among elements matching the target label, AppClaw keeps the interactive (clickable)
+              candidates, then picks the one best satisfying the relation &mdash; ranked by distance
+              for ties. If the anchor isn&rsquo;t found or nothing satisfies the relation, the step
+              fails loudly rather than tapping the wrong element.
+            </p>
           </div>
         </section>
 
@@ -2253,6 +2380,11 @@
                 <td>Launch app defined in <code>appId</code> metadata</td>
               </tr>
               <tr>
+                <td>closeApp</td>
+                <td>query?</td>
+                <td>Close/terminate an app by name, or the current app when omitted</td>
+              </tr>
+              <tr>
                 <td>tap</td>
                 <td>label</td>
                 <td>Tap element by visible text/label</td>
@@ -2449,17 +2581,16 @@
               <tr>
                 <td>APP_PATH</td>
                 <td>
-                  Path or URL to an APK/IPA installed via <code>appium:app</code> at session
-                  start. Override per-flow via the <code>app:</code> YAML header.
+                  Path or URL to an APK/IPA installed via <code>appium:app</code> at session start.
+                  Override per-flow via the <code>app:</code> YAML header.
                 </td>
               </tr>
               <tr>
                 <td>CAPABILITIES_FILE</td>
                 <td>
                   JSON file of extra Appium capabilities merged into <code>create_session</code>.
-                  Same as <code>--caps</code> flag and the SDK
-                  <code>capabilitiesFile</code> option. See
-                  <a href="#custom-capabilities">Custom Capabilities</a>.
+                  Same as <code>--caps</code> flag and the SDK <code>capabilitiesFile</code> option.
+                  See <a href="#custom-capabilities">Custom Capabilities</a>.
                 </td>
               </tr>
             </tbody>
@@ -2593,8 +2724,8 @@
           <p>
             Sometimes the built-in capabilities aren't enough — you want to set
             <code>appium:autoGrantPermissions</code>, force a specific
-            <code>appium:automationName</code>, or pre-install an APK. AppClaw accepts a JSON
-            file of extra capabilities merged into <code>create_session</code> on every run.
+            <code>appium:automationName</code>, or pre-install an APK. AppClaw accepts a JSON file
+            of extra capabilities merged into <code>create_session</code> on every run.
           </p>
 
           <h3>Where to set it</h3>
@@ -2608,16 +2739,17 @@
               <code>.env</code> or your shell.
             </li>
             <li>
-              <strong>SDK:</strong> <code>new AppClaw({ capabilitiesFile: 'path/to/caps.json' })</code>.
+              <strong>SDK:</strong>
+              <code>new AppClaw({ capabilitiesFile: 'path/to/caps.json' })</code>.
             </li>
           </ul>
-          <p>
-            <code>--caps</code> wins over the env var when both are set.
-          </p>
+          <p><code>--caps</code> wins over the env var when both are set.</p>
 
           <h3>Flat format</h3>
-          <p>The simplest shape — a flat object of Appium capabilities. Applied to every session
-            regardless of platform.</p>
+          <p>
+            The simplest shape — a flat object of Appium capabilities. Applied to every session
+            regardless of platform.
+          </p>
 
           <div class="code-block">
             <div class="code-block-header">
@@ -2634,8 +2766,9 @@
           <h3>Platform-scoped format</h3>
           <p>
             When Android and iOS need different capabilities, split them under top-level
-            <code>android</code> and <code>ios</code> keys. Optionally use <code>common</code>
-            (alias: <code>default</code>, <code>shared</code>) for capabilities that apply to both.
+            <code>android</code> and <code>ios</code> keys. Optionally use
+            <code>common</code> (alias: <code>default</code>, <code>shared</code>) for capabilities
+            that apply to both.
           </p>
 
           <div class="code-block">
@@ -2668,21 +2801,22 @@
           </p>
 
           <h3>Precedence</h3>
-          <p>
-            When multiple sources set the same capability, later wins:
-          </p>
+          <p>When multiple sources set the same capability, later wins:</p>
           <ol>
             <li>Built-in defaults (MJPEG port, app from <code>APP_PATH</code>, etc.)</li>
-            <li>Your capabilities file (top-level / <code>common</code> / platform-specific, in that order)</li>
+            <li>
+              Your capabilities file (top-level / <code>common</code> / platform-specific, in that
+              order)
+            </li>
             <li>
               Framework-managed caps (per-parallel-worker ports, pinned UDID from
               <code>--udid</code>)
             </li>
           </ol>
           <p>
-            So your file can override defaults, but framework values (parallel ports, device pinning)
-            still take final precedence — concurrent workers won't collide even if your file sets
-            the same key.
+            So your file can override defaults, but framework values (parallel ports, device
+            pinning) still take final precedence — concurrent workers won't collide even if your
+            file sets the same key.
           </p>
 
           <div class="callout callout-warn">
@@ -2698,8 +2832,8 @@
           <h3>Notes</h3>
           <ul>
             <li>
-              The file is loaded once per session. Editing it during a long run has no effect
-              until the next session.
+              The file is loaded once per session. Editing it during a long run has no effect until
+              the next session.
             </li>
             <li>
               <code>appium:app</code> in the file takes precedence over the
@@ -2708,8 +2842,8 @@
             </li>
             <li>
               All values are sent through verbatim — AppClaw doesn't validate that
-              <code>appium:*</code> keys are recognised by your driver. Typos will surface as
-              Appium errors at session creation.
+              <code>appium:*</code> keys are recognised by your driver. Typos will surface as Appium
+              errors at session creation.
             </li>
             <li>
               <strong>LambdaTest:</strong> capabilities from this file are merged into the
@@ -3696,9 +3830,9 @@ console<span class="p">.</span>log<span class="p">(</span><span class="s">'All f
                 <td>string</td>
                 <td>—</td>
                 <td>
-                  Path to a JSON file of extra Appium capabilities merged into the session.
-                  Flat or platform-scoped (<code>android</code>/<code>ios</code>/<code>common</code>).
-                  Maps to <code>CAPABILITIES_FILE</code>. See
+                  Path to a JSON file of extra Appium capabilities merged into the session. Flat or
+                  platform-scoped (<code>android</code>/<code>ios</code>/<code>common</code>). Maps
+                  to <code>CAPABILITIES_FILE</code>. See
                   <a href="#custom-capabilities">Custom Capabilities</a>.
                 </td>
               </tr>

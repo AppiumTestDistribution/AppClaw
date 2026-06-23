@@ -10,7 +10,7 @@
 
 import type { MCPClient } from '../mcp/types.js';
 import { getPageSource, findElementByVision } from '../mcp/tools.js';
-import { activateAppWithFallback } from '../mcp/activate-app.js';
+import { activateAppWithFallback, terminateApp } from '../mcp/activate-app.js';
 import { detectDeviceUdid, typeViaKeyboard, typeViaSetValue } from '../mcp/keyboard.js';
 import { detectPlatform } from '../perception/screen.js';
 import { parseAndroidPageSource } from '../perception/android-parser.js';
@@ -54,7 +54,15 @@ import { promisify } from 'util';
 import type { ActionResult } from '../llm/schemas.js';
 
 const execAsync = promisify(exec);
-import type { FlowMeta, FlowStep, FlowPhase, PhasedStep, PhaseResult } from './types.js';
+import type {
+  FlowMeta,
+  FlowStep,
+  FlowPhase,
+  PhasedStep,
+  PhaseResult,
+  Proximity,
+  ProximityRelation,
+} from './types.js';
 import type { AppResolver } from '../agent/app-resolver.js';
 import type { RunArtifactCollector } from '../report/writer.js';
 import { lastVisionScreenshot } from './vision-execute.js';
@@ -280,6 +288,8 @@ function stepLabel(step: FlowStep): string {
       return 'launchApp';
     case 'openApp':
       return `open "${step.query}"`;
+    case 'closeApp':
+      return step.query ? `close "${step.query}"` : 'close app';
     case 'wait':
       return `wait ${step.seconds}s`;
     case 'waitUntil':
@@ -390,6 +400,249 @@ export function scoreTapMatch(el: UIElement, needle: string): number {
     }
   }
   return best;
+}
+
+// ─── Spatial / proximity ranking ─────────────────────────────────────
+//
+// Modeled on Taiko's proximity selectors
+// (https://github.com/getgauge/taiko/wiki/Taiko's-Proximity-Selector):
+// `above`, `below`, `toLeftOf`, `toRightOf`, `near`, `within`. The edge
+// comparisons follow Taiko's geometry exactly; ranking among multiple matches
+// uses Taiko's bounding-box distance (sum of the four edge differences).
+//
+// The one deliberate divergence: Taiko's `near` offset is a fixed CSS-pixel
+// constant, which is meaningless across mobile device-pixel densities (a phone
+// page source runs to ~1080–1440 × ~2400–3200). So `near` here uses an offset
+// that is RELATIVE to the anchor's own size and EXPANDS until something matches
+// — Taiko's behavior, made density-correct.
+
+interface Rect {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** Axis-aligned bounding box from an element's center + size. */
+function rectOf(el: UIElement): Rect {
+  const [cx, cy] = el.center;
+  const [w, h] = el.size;
+  return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 };
+}
+
+/** Taiko's ranking metric: sum of |Δ| across all four edges. Lower = closer. */
+function bboxDistance(a: Rect, b: Rect): number {
+  return (
+    Math.abs(a.left - b.left) +
+    Math.abs(a.right - b.right) +
+    Math.abs(a.top - b.top) +
+    Math.abs(a.bottom - b.bottom)
+  );
+}
+
+/** Whether `cand` satisfies `relation` w.r.t. `anchor` (Taiko geometry). `tol` only used by `near`. */
+function satisfiesRelation(
+  cand: Rect,
+  anchor: Rect,
+  relation: ProximityRelation,
+  tol = 0
+): boolean {
+  switch (relation) {
+    case 'above':
+      return cand.bottom < anchor.top;
+    case 'below':
+      return cand.top > anchor.bottom;
+    case 'toLeftOf':
+      return cand.right <= anchor.left;
+    case 'toRightOf':
+      return cand.left >= anchor.right;
+    case 'within':
+      return (
+        cand.left >= anchor.left &&
+        cand.right <= anchor.right &&
+        cand.top >= anchor.top &&
+        cand.bottom <= anchor.bottom
+      );
+    case 'near': {
+      // `cand` intersects `anchor` expanded by `tol` on every side.
+      const exp: Rect = {
+        left: anchor.left - tol,
+        right: anchor.right + tol,
+        top: anchor.top - tol,
+        bottom: anchor.bottom + tol,
+      };
+      return (
+        cand.left <= exp.right &&
+        cand.right >= exp.left &&
+        cand.top <= exp.bottom &&
+        cand.bottom >= exp.top
+      );
+    }
+  }
+}
+
+/**
+ * Rank `candidates` by how well they satisfy a spatial `relation` to `anchor`,
+ * best first. Candidates that don't satisfy the relation are dropped. The anchor
+ * element itself is never returned. Returns [] when nothing qualifies.
+ *
+ * `near` starts with an offset of one anchor-dimension and grows (×1.6, capped)
+ * until at least one candidate is in range — so it adapts to element scale and
+ * device density instead of a fixed pixel constant.
+ */
+export function rankBySpatial(
+  candidates: UIElement[],
+  anchor: UIElement,
+  relation: ProximityRelation
+): UIElement[] {
+  const anchorRect = rectOf(anchor);
+  const pool = candidates.filter((c) => c !== anchor && c.enabled !== false);
+
+  const sortByDistance = (els: UIElement[]): UIElement[] =>
+    els
+      .map((el) => ({ el, d: bboxDistance(rectOf(el), anchorRect) }))
+      .sort((a, b) => a.d - b.d)
+      .map((x) => x.el);
+
+  if (relation === 'near') {
+    const base = Math.max(
+      anchorRect.right - anchorRect.left,
+      anchorRect.bottom - anchorRect.top,
+      1
+    );
+    let tol = base;
+    for (let i = 0; i < 6; i++) {
+      const hits = pool.filter((c) => satisfiesRelation(rectOf(c), anchorRect, 'near', tol));
+      if (hits.length > 0) return sortByDistance(hits);
+      tol *= 1.6;
+    }
+    return [];
+  }
+
+  const hits = pool.filter((c) => satisfiesRelation(rectOf(c), anchorRect, relation));
+  return sortByDistance(hits);
+}
+
+/** Human-readable phrase for a relation, for error messages. */
+function relationPhrase(r: ProximityRelation): string {
+  switch (r) {
+    case 'toLeftOf':
+      return 'to the left of';
+    case 'toRightOf':
+      return 'to the right of';
+    default:
+      return r; // above | below | near | within
+  }
+}
+
+/** Best textual match for an anchor label among parsed elements, or null. */
+function resolveAnchorElement(elements: UIElement[], anchorLabel: string): UIElement | null {
+  const scored = elements
+    .map((el) => ({ el, s: scoreTapMatch(el, anchorLabel) }))
+    .filter((x) => x.s >= 0)
+    .sort((a, b) => a.s - b.s);
+  return scored[0]?.el ?? null;
+}
+
+/**
+ * Resolve which element a `tap` should act on.
+ *
+ * Scores every element textually (with the clickable nudge the tap path uses),
+ * then — when a `proximity` qualifier is present — restricts to clickable
+ * candidates (so stray text that merely contains the word can't win on distance)
+ * and ranks them spatially against the resolved anchor. Returns `{ el: null,
+ * reason }` when nothing qualifies so the caller can retry / hard-fail.
+ */
+export function resolveTapTarget(
+  elements: UIElement[],
+  label: string,
+  proximity?: Proximity
+): { el: UIElement | null; reason?: string } {
+  const wantsClickable = trailingRoleWord(label) != null;
+  const scored = elements
+    .map((el) => ({ el, s: scoreTapMatch(el, label) }))
+    .filter((x) => x.s >= 0)
+    .map((x) => ({ ...x, eff: x.s + (wantsClickable && !x.el.clickable ? 0.5 : 0) }))
+    .sort((a, b) => {
+      if (a.eff !== b.eff) return a.eff - b.eff;
+      if (a.el.clickable !== b.el.clickable) return a.el.clickable ? -1 : 1;
+      return 0;
+    });
+
+  if (scored.length === 0) return { el: null, reason: `no element matches "${label}"` };
+  if (!proximity) return { el: scored[0].el };
+
+  const anchorEl = resolveAnchorElement(elements, proximity.anchor);
+  if (!anchorEl) return { el: null, reason: `anchor "${proximity.anchor}" not found` };
+
+  // A spatial pick ranks purely by distance, so it must not consider stray text
+  // that merely contains the word (e.g. a help paragraph mentioning "login
+  // button") — those can sit closer to the anchor than the real control. Prefer
+  // clickable candidates whenever any exist before ranking by position.
+  const candidateEls = scored.map((x) => x.el);
+  const clickable = candidateEls.filter((e) => e.clickable);
+  const pool = clickable.length > 0 ? clickable : candidateEls;
+  const ranked = rankBySpatial(pool, anchorEl, proximity.relation);
+  if (ranked.length === 0) {
+    return { el: null, reason: `no "${label}" ${relationPhrase(proximity.relation)} the anchor` };
+  }
+  return { el: ranked[0] };
+}
+
+/**
+ * Resolve which editable field a `type` should write into.
+ *
+ * Tiers:
+ *   1. Direct  — `target` matches an editable element's own text/hint/id/aid.
+ *   2. Label   — `target` matches a non-editable label; the nearest editable wins
+ *                (covers the "Username" label sitting above its input).
+ *   3. Spatial — a `proximity` qualifier narrows the pool by relation to an anchor.
+ *
+ * Returns `{ el: null, reason }` when nothing qualifies — the caller hard-fails
+ * rather than silently typing into the first field on screen.
+ */
+export function resolveEditableForTarget(
+  elements: UIElement[],
+  target?: string,
+  proximity?: Proximity
+): { el: UIElement | null; reason?: string } {
+  const editables = elements.filter((e) => e.editable && e.enabled !== false);
+  if (editables.length === 0) return { el: null, reason: 'no editable field on screen' };
+
+  let candidates: UIElement[] = editables;
+  if (target) {
+    // 1. Direct match among editable fields.
+    candidates = editables
+      .map((el) => ({ el, s: scoreTapMatch(el, target) }))
+      .filter((x) => x.s >= 0)
+      .sort((a, b) => a.s - b.s)
+      .map((x) => x.el);
+    // 2. Otherwise treat target as a nearby label and find the closest input.
+    if (candidates.length === 0) {
+      const labelEl = resolveAnchorElement(elements, target);
+      if (labelEl) candidates = rankBySpatial(editables, labelEl, 'near');
+    }
+  }
+
+  // 3. Spatial qualifier narrows by relation to a named anchor.
+  if (proximity) {
+    const anchorEl = resolveAnchorElement(elements, proximity.anchor);
+    if (!anchorEl) return { el: null, reason: `anchor "${proximity.anchor}" not found on screen` };
+    const pool = candidates.length > 0 ? candidates : editables;
+    const ranked = rankBySpatial(pool, anchorEl, proximity.relation);
+    if (ranked.length === 0) {
+      return {
+        el: null,
+        reason: `no input field ${relationPhrase(proximity.relation)} "${proximity.anchor}"`,
+      };
+    }
+    return { el: ranked[0] };
+  }
+
+  if (candidates.length === 0) {
+    return { el: null, reason: `"${target}" did not match any input field` };
+  }
+  return { el: candidates[0] };
 }
 
 /**
@@ -573,7 +826,8 @@ async function tryTapByVision(mcp: MCPClient, label: string): Promise<ActionResu
 /** Returns: ActionResult on success, "no_match" if label not in DOM, null if matched but UUID failed */
 async function tryTapByLabelOnDom(
   mcp: MCPClient,
-  label: string
+  label: string,
+  proximity?: Proximity
 ): Promise<ActionResult | 'no_match' | null> {
   const cacheCtx = getActiveLocatorCache();
   const pageSource = cacheCtx
@@ -582,8 +836,11 @@ async function tryTapByLabelOnDom(
 
   // SDK locator cache fast-path: skip parse + score + multi-strategy probe when
   // we already know the (strategy, selector) that won for this label on this
-  // screen. On miss / stale, falls through to the existing path below.
-  const keyInfo = cacheCtx ? buildCacheKey(cacheCtx, pageSource, 'tap', label) : null;
+  // screen. On miss / stale, falls through to the existing path below. The cache
+  // label folds in the proximity qualifier so a plain "login" and a spatially
+  // qualified "login below password" never share a cached locator.
+  const cacheLabel = proximity ? `${label}|${proximity.relation}:${proximity.anchor}` : label;
+  const keyInfo = cacheCtx ? buildCacheKey(cacheCtx, pageSource, 'tap', cacheLabel) : null;
   if (cacheCtx && keyInfo) {
     const hit = await tryCachedLocator(cacheCtx, mcp, keyInfo, async (uuid) => {
       await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
@@ -596,22 +853,11 @@ async function tryTapByLabelOnDom(
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
 
-  // When the user named a tappable role ("...button/link/tab"), an equally-good
-  // but non-clickable text match (e.g. a header title) must not out-rank the
-  // real control. Nudge non-clickable candidates back by half a score level so
-  // they still beat a clearly worse clickable match, but lose ties.
-  const wantsClickable = trailingRoleWord(label) != null;
-  const scored = elements
-    .map((el) => ({ el, s: scoreTapMatch(el, label) }))
-    .filter((x) => x.s >= 0)
-    .map((x) => ({ ...x, eff: x.s + (wantsClickable && !x.el.clickable ? 0.5 : 0) }))
-    .sort((a, b) => {
-      if (a.eff !== b.eff) return a.eff - b.eff;
-      if (a.el.clickable !== b.el.clickable) return a.el.clickable ? -1 : 1;
-      return 0;
-    });
-
-  const pick = scored[0]?.el;
+  // Score textually (with the clickable nudge) and, when a proximity qualifier is
+  // present, narrow to clickable candidates and rank spatially. Any miss (no text
+  // match, anchor not found, no spatial survivor) becomes 'no_match' so the
+  // caller's poll loop keeps waiting — the screen may still be rendering.
+  const pick = resolveTapTarget(elements, label, proximity).el;
   if (!pick) return 'no_match';
 
   const resolved = await findByIdStrategiesDetailed(
@@ -633,13 +879,18 @@ async function tryTapByLabelOnDom(
     });
     cacheCtx.dirty = true;
   }
-  return { success: true, message: `Tapped "${label}" at [${coords[0]}, ${coords[1]}]` };
+  const where = proximity ? ` (${relationPhrase(proximity.relation)} "${proximity.anchor}")` : '';
+  return {
+    success: true,
+    message: `Tapped "${label}"${where} at [${coords[0]}, ${coords[1]}]`,
+  };
 }
 
 async function tapByLabel(
   mcp: MCPClient,
   label: string,
-  poll: FlowTapPollOptions
+  poll: FlowTapPollOptions,
+  proximity?: Proximity
 ): Promise<ActionResult> {
   // ── Vision-first mode: skip DOM entirely ──
   // Poll the full budget so the element is implicitly waited for until it
@@ -665,11 +916,15 @@ async function tapByLabel(
   // On the FIRST no_match we try vision once: catches icon-only elements that
   // are already on screen (no text to match) without burning the whole wait
   // budget on DOM polls before falling over to vision.
+  // Vision locates by bare label and can't honor a spatial qualifier, so it's
+  // disabled when a proximity is set — falling back to it could tap the very
+  // element the qualifier was meant to exclude.
+  const visionOk = isVisionLocateEnabled() && !proximity;
   let triedVisionEarly = false;
   for (let attempt = 0; attempt < poll.maxAttempts; attempt++) {
-    const domTap = await tryTapByLabelOnDom(mcp, label);
+    const domTap = await tryTapByLabelOnDom(mcp, label, proximity);
     if (domTap && domTap !== 'no_match') return domTap;
-    if (domTap === 'no_match' && !triedVisionEarly && isVisionLocateEnabled()) {
+    if (domTap === 'no_match' && !triedVisionEarly && visionOk) {
       triedVisionEarly = true;
       const visionTap = await tryTapByVision(mcp, label);
       if (visionTap) return visionTap;
@@ -686,13 +941,18 @@ async function tapByLabel(
 
   // Last resort: one more vision attempt after the wait budget is exhausted
   // (the element may have only just rendered on the final DOM poll).
-  if (isVisionLocateEnabled()) {
+  if (visionOk) {
     ui.printAgentBullet(`"${label}" not found in page source, trying vision…`);
     const visionTap = await tryTapByVision(mcp, label);
     if (visionTap) return visionTap;
   }
 
-  return { success: false, message: `No matching element for "${label}"` };
+  return {
+    success: false,
+    message: proximity
+      ? `No "${label}" found ${relationPhrase(proximity.relation)} "${proximity.anchor}" on screen`
+      : `No matching element for "${label}"`,
+  };
 }
 
 /** Long-press an element by visual label. Uses vision locate if available, falls back to DOM. */
@@ -812,12 +1072,17 @@ async function flowTypeText(
   text: string,
   target?: string,
   deviceUdid?: string,
-  poll: FlowTapPollOptions = { maxAttempts: 10, intervalMs: 300 }
+  poll: FlowTapPollOptions = { maxAttempts: 10, intervalMs: 300 },
+  proximity?: Proximity
 ): Promise<ActionResult> {
-  if (appclawDebug) ui.printAgentBullet(`[type] text="${text}", target=${target ?? '(none)'}`);
+  if (appclawDebug)
+    ui.printAgentBullet(
+      `[type] text="${text}", target=${target ?? '(none)'}` +
+        (proximity ? `, proximity=${proximity.relation}:"${proximity.anchor}"` : '')
+    );
   // ── If a target field is specified, tap it first to focus (implicit wait) ──
   if (target) {
-    const tapResult = await tapByLabel(mcp, target, poll);
+    const tapResult = await tapByLabel(mcp, target, poll, proximity);
     // Vision mode: a literal label like "search box"/"textbox" usually won't match a field
     // that only shows a placeholder. Fall back to locating the input field by kind before
     // giving up, so `type "x" → search box` works the same as the no-target path.
@@ -868,9 +1133,12 @@ async function flowTypeText(
     : await getPageSource(mcp);
 
   // SDK locator cache fast-path. Cache key for `type` is keyed on the optional
-  // target label (or the implicit-input sentinel when none) so two distinct
-  // editable fields on the same screen don't collide.
-  const cacheLabel = target ?? '__implicit_input__';
+  // target label (or the implicit-input sentinel when none) plus any proximity
+  // qualifier, so two distinct editable fields on the same screen don't collide.
+  const baseCacheLabel = target ?? '__implicit_input__';
+  const cacheLabel = proximity
+    ? `${baseCacheLabel}|${proximity.relation}:${proximity.anchor}`
+    : baseCacheLabel;
   const keyInfo = cacheCtx ? buildCacheKey(cacheCtx, pageSource, 'type', cacheLabel) : null;
   if (cacheCtx && keyInfo) {
     const hit = await tryCachedLocator(cacheCtx, mcp, keyInfo, async (uuid) => {
@@ -895,9 +1163,23 @@ async function flowTypeText(
   const platform = detectPlatform(pageSource);
   const elements =
     platform === 'android' ? parseAndroidPageSource(pageSource) : parseIOSPageSource(pageSource);
-  const editable = elements.find((e) => e.editable && e.enabled !== false);
-  if (!editable) {
-    return { success: false, message: 'No editable field found for type' };
+
+  // With a named target (or a spatial qualifier), type into THAT field — not the
+  // first editable on screen. Without one, the implicit-input case keeps using
+  // the first editable field.
+  let editable: UIElement | null;
+  if (target || proximity) {
+    const r = resolveEditableForTarget(elements, target, proximity);
+    if (!r.el) {
+      const what = target ? `target "${target}"` : 'an input';
+      return { success: false, message: `Could not find ${what} to type into: ${r.reason}` };
+    }
+    editable = r.el;
+  } else {
+    editable = elements.find((e) => e.editable && e.enabled !== false) ?? null;
+    if (!editable) {
+      return { success: false, message: 'No editable field found for type' };
+    }
   }
   const resolved = await findByIdStrategiesDetailed(
     mcp,
@@ -1460,7 +1742,14 @@ export async function executeStep(
           message: 'open … app steps need the installed-apps list (internal: pass AppResolver)',
         };
       }
-      const pkg = resolveAppId(step.query, appResolver);
+      let pkg = resolveAppId(step.query, appResolver);
+      if (!pkg) {
+        // The app list is cached at session start, so an app installed mid-session
+        // won't be found. Re-fetch the device list once and retry before failing.
+        if (await appResolver.refresh()) {
+          pkg = resolveAppId(step.query, appResolver);
+        }
+      }
       if (!pkg) {
         return {
           success: false,
@@ -1477,17 +1766,66 @@ export async function executeStep(
         message: r.success ? `Launched ${step.query} (${pkg})` : r.message,
       };
     }
+    case 'closeApp': {
+      // Resolve which app to terminate: an explicit name → package, otherwise the
+      // app launched this session (locator-cache currentAppId) or the YAML appId.
+      let pkg: string | null = null;
+      if (step.query) {
+        if (!appResolver) {
+          return {
+            success: false,
+            message: 'close <app> steps need the installed-apps list (internal: pass AppResolver)',
+          };
+        }
+        pkg = resolveAppId(step.query, appResolver);
+        if (!pkg && (await appResolver.refresh())) {
+          pkg = resolveAppId(step.query, appResolver);
+        }
+        if (!pkg) {
+          return {
+            success: false,
+            message: `Could not resolve app name "${step.query}" to a package`,
+          };
+        }
+      } else {
+        // No name: close the current foreground app. Read it from the live page
+        // source (its package), falling back to session state — so this works even
+        // when the locator cache isn't active (playground / SDK).
+        const pageSource = await getPageSource(mcp).catch(() => '');
+        pkg =
+          extractAppIdFromDom(pageSource) ??
+          getActiveLocatorCache()?.currentAppId ??
+          meta.appId?.trim() ??
+          null;
+        if (!pkg) {
+          return {
+            success: false,
+            message:
+              'close app: could not determine the current app — name it (e.g. "close youtube") or set appId in the YAML header',
+          };
+        }
+      }
+      const r = await terminateApp(mcp, pkg);
+      if (r.success) {
+        const cacheCtx = getActiveLocatorCache();
+        if (cacheCtx && cacheCtx.currentAppId === pkg) cacheCtx.currentAppId = undefined;
+      }
+      return {
+        success: r.success,
+        message: r.success ? `Closed ${step.query ?? pkg} (${pkg})` : r.message,
+      };
+    }
     case 'wait':
       await sleep(Math.round(step.seconds * 1000));
       return { success: true, message: `Waited ${step.seconds}s` };
     case 'waitUntil':
       return waitUntilCondition(mcp, step.condition, step.text, step.timeoutSeconds, tapPoll);
     case 'tap':
-      return tapByLabel(mcp, step.label, tapPoll);
+      return tapByLabel(mcp, step.label, tapPoll, step.proximity);
     case 'longPress':
       return longPressByLabel(mcp, step.label, step.duration);
     case 'type':
-      return flowTypeText(mcp, step.text, step.target, deviceUdid, tapPoll);
+      return flowTypeText(mcp, step.text, step.target, deviceUdid, tapPoll, step.proximity);
     case 'enter':
       return pressEnterKey(mcp);
     case 'back':

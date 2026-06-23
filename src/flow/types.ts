@@ -54,9 +54,24 @@ export interface ParsedSuite {
 /** Set when the step was parsed from a natural-language YAML string (shown in CLI). */
 type Verbatim = { verbatim?: string };
 
+/**
+ * Spatial selectors for disambiguating which matching element to act on, modeled
+ * on Taiko's proximity selectors. Applied via the `proximity` qualifier on
+ * element-bearing steps (tap/type). See `rankBySpatial` in run-yaml-flow.ts.
+ */
+export type ProximityRelation = 'above' | 'below' | 'toLeftOf' | 'toRightOf' | 'near' | 'within';
+
+/**
+ * Optional spatial qualifier: "<target> below <anchor>", "<target> near <anchor>".
+ * Both fields are set together — `relation` is the geometric relation and
+ * `anchor` is the natural-language label of the reference element.
+ */
+export type Proximity = { relation: ProximityRelation; anchor: string };
+
 export type FlowStep =
   | ({ kind: 'launchApp' } & Verbatim)
   | ({ kind: 'openApp'; query: string } & Verbatim)
+  | ({ kind: 'closeApp'; query?: string } & Verbatim)
   | ({ kind: 'wait'; seconds: number } & Verbatim)
   | ({
       kind: 'waitUntil';
@@ -64,9 +79,9 @@ export type FlowStep =
       text?: string;
       timeoutSeconds: number;
     } & Verbatim)
-  | ({ kind: 'tap'; label: string } & Verbatim)
+  | ({ kind: 'tap'; label: string; proximity?: Proximity } & Verbatim)
   | ({ kind: 'longPress'; label: string; duration?: number } & Verbatim)
-  | ({ kind: 'type'; text: string; target?: string } & Verbatim)
+  | ({ kind: 'type'; text: string; target?: string; proximity?: Proximity } & Verbatim)
   | ({ kind: 'enter' } & Verbatim)
   | ({ kind: 'back' } & Verbatim)
   | ({ kind: 'home' } & Verbatim)

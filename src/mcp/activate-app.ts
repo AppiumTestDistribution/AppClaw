@@ -69,3 +69,16 @@ export async function activateAppWithFallback(
     message: t0.slice(0, 400) || `Failed to activate ${packageId}`,
   };
 }
+
+/** Terminate (close) an app by package/bundle id via appium-mcp. */
+export async function terminateApp(
+  mcp: MCPClient,
+  packageId: string
+): Promise<{ success: boolean; message: string }> {
+  const r = await mcp.callTool('appium_app_lifecycle', { action: 'terminate', id: packageId });
+  const t = extractText(r);
+  if (responseLooksLikeFailure(t)) {
+    return { success: false, message: t.slice(0, 400) || `Failed to close ${packageId}` };
+  }
+  return { success: true, message: t.slice(0, 240) || `Closed ${packageId}` };
+}
