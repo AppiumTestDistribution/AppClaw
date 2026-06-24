@@ -1,3 +1,9 @@
+## [1.8.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.7.0...v1.8.0) (2026-06-24)
+
+### Features
+
+* proximity selectors for dom ([#40](https://github.com/AppiumTestDistribution/AppClaw/issues/40)) ([9eff1c6](https://github.com/AppiumTestDistribution/AppClaw/commit/9eff1c67638bb24646b10950e360525de1cfa60e))
+
 ## [1.7.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.6.0...v1.7.0) (2026-06-22)
 
 ### Features
