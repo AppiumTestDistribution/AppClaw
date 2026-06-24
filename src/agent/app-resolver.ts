@@ -114,10 +114,13 @@ export class AppResolver {
   private packageSegments: Array<{ segment: string; packageName: string }> = [];
   private initialized = false;
   private platform: 'android' | 'ios' = 'android';
+  /** Kept so the device app list can be re-fetched after init (e.g. on a resolve miss) */
+  private mcp: MCPClient | null = null;
 
   /** Fetch installed apps from device and build lookup */
   async initialize(mcp: MCPClient, platform?: 'android' | 'ios'): Promise<void> {
     if (platform) this.platform = platform;
+    this.mcp = mcp;
 
     // Populate well-known apps first (always available, even if device fetch fails)
     const wellKnownApps = this.platform === 'ios' ? WELL_KNOWN_IOS_APPS : WELL_KNOWN_ANDROID_APPS;
@@ -126,35 +129,62 @@ export class AppResolver {
     }
 
     try {
-      const result = await mcp.callTool('appium_app_lifecycle', { action: 'list' });
-      const text = result.content?.map((c: any) => c.text ?? '').join('\n') ?? '';
-
-      this.apps = parseAppList(text);
-
-      // Build name → packageName lookup from device data
-      for (const app of this.apps) {
-        if (app.label && app.label !== app.packageName) {
-          this.appsByName.set(app.label.toLowerCase(), app.packageName);
-        }
-
-        // Index all meaningful segments of the package name
-        const segments = app.packageName.split('.');
-        for (const seg of segments) {
-          if (
-            seg.length >= 3 &&
-            !['com', 'org', 'net', 'android', 'app', 'sec', 'google', 'samsung'].includes(seg)
-          ) {
-            this.appsByName.set(seg.toLowerCase(), app.packageName);
-            this.packageSegments.push({ segment: seg.toLowerCase(), packageName: app.packageName });
-          }
-        }
-      }
-
+      await this.fetchAndIndexApps(mcp);
       this.initialized = true;
       ui.printSetupOk(`Device connected (${this.apps.length} apps)`);
     } catch (err) {
       ui.printWarning(`Could not fetch app list: ${err}`);
       this.initialized = true;
+    }
+  }
+
+  /**
+   * Re-fetch the installed-app list from the device and rebuild the lookup.
+   *
+   * The list is otherwise cached at init time, so an app installed *after* the
+   * session started (the common playground case: launch → sideload app → "open X")
+   * would never resolve. Callers use this to retry once on a resolution miss.
+   * Returns true if the list was refreshed, false if no device handle is available.
+   */
+  async refresh(mcp?: MCPClient): Promise<boolean> {
+    const client = mcp ?? this.mcp;
+    if (!client) return false;
+    try {
+      await this.fetchAndIndexApps(client);
+      return true;
+    } catch (err) {
+      ui.printWarning(`Could not refresh app list: ${err}`);
+      return false;
+    }
+  }
+
+  /** Fetch the device app list and (re)build the device-derived lookup maps. */
+  private async fetchAndIndexApps(mcp: MCPClient): Promise<void> {
+    const result = await mcp.callTool('appium_app_lifecycle', { action: 'list' });
+    const text = result.content?.map((c: any) => c.text ?? '').join('\n') ?? '';
+
+    // Reset device-derived state — well-known apps are kept (populated separately).
+    this.apps = parseAppList(text);
+    this.appsByName.clear();
+    this.packageSegments = [];
+
+    // Build name → packageName lookup from device data
+    for (const app of this.apps) {
+      if (app.label && app.label !== app.packageName) {
+        this.appsByName.set(app.label.toLowerCase(), app.packageName);
+      }
+
+      // Index all meaningful segments of the package name
+      const segments = app.packageName.split('.');
+      for (const seg of segments) {
+        if (
+          seg.length >= 3 &&
+          !['com', 'org', 'net', 'android', 'app', 'sec', 'google', 'samsung'].includes(seg)
+        ) {
+          this.appsByName.set(seg.toLowerCase(), app.packageName);
+          this.packageSegments.push({ segment: seg.toLowerCase(), packageName: app.packageName });
+        }
+      }
     }
   }
 

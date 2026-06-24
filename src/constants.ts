@@ -1,6 +1,6 @@
 // Default models per provider
 export const DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'claude-sonnet-4-20250514',
+  anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   gemini: 'gemini-3.1-flash-lite',
   groq: 'llama-3.3-70b-versatile',
@@ -43,8 +43,11 @@ export const MODEL_PRICING: Record<string, [number, number]> = {
   'gpt-4.1-mini': [0.4, 1.6],
   'gpt-4.1-nano': [0.1, 0.4],
   // Anthropic
-  'claude-sonnet-4-20250514': [3.0, 15.0],
+  'claude-sonnet-4-6': [3.0, 15.0],
+  'claude-opus-4-8': [5.0, 25.0],
   'claude-haiku-4-5-20251001': [0.8, 4.0],
+  // Retired 2026-06-15 — kept for cost lookup on historical runs only
+  'claude-sonnet-4-20250514': [3.0, 15.0],
   // Groq (free tier / no cost)
   'llama-3.3-70b-versatile': [0, 0],
 };

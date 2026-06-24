@@ -65,7 +65,7 @@
         --cyan-glow: rgba(97, 196, 214, 0.12);
         --green: #6db970;
         --red: #e96a6a;
-        --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+        --font-display: 'Menlo', 'SF Mono', 'JetBrains Mono', monospace;
         --font-body: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
         --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
 
@@ -2058,6 +2058,65 @@
       </div>
     </section>
 
+    <!-- PROXIMITY SELECTORS -->
+    <section class="appguide-section" id="proximity">
+      <div class="container">
+        <div class="appguide-inner">
+          <!-- Left: copy + relation pills -->
+          <div class="reveal">
+            <div class="section-eyebrow">Smart Locators</div>
+            <h2>Pinpoint the right<br />element by where<br />it sits.</h2>
+            <p class="section-sub" style="margin-top: 16px">
+              Three buttons all say &ldquo;Login&rdquo;? Skip the brittle selectors — describe the
+              one you mean by its position relative to another element. AppClaw locates it
+              geometrically, the way you&rsquo;d point at the screen.
+            </p>
+            <div class="appguide-apps">
+              <div class="appguide-app-pill">below</div>
+              <div class="appguide-app-pill">above</div>
+              <div class="appguide-app-pill">left of</div>
+              <div class="appguide-app-pill">right of</div>
+              <div class="appguide-app-pill">near</div>
+              <div class="appguide-app-pill">within</div>
+            </div>
+            <div class="appguide-hint">
+              <span class="appguide-hint-icon">🎯</span>
+              <span
+                >Works on <code>tap</code> and <code>type</code>. Picks the interactive match
+                closest to your anchor — and fails loudly if nothing fits, so it never taps the
+                wrong thing.</span
+              >
+            </div>
+          </div>
+          <!-- Right: terminal showing the disambiguation -->
+          <div class="mini-term reveal reveal-delay-1">
+            <div class="mini-term-bar">
+              <div class="mdot" style="background: #ff5f57"></div>
+              <div class="mdot" style="background: #febc2e"></div>
+              <div class="mdot" style="background: #28c840"></div>
+              <span class="mini-term-title">Proximity</span>
+            </div>
+            <div class="mini-term-body">
+              <span style="color: var(--text-3)"># ambiguous — grabs the nav bar</span><br />
+              <span style="color: var(--green)">pg&gt;</span>
+              <span style="color: var(--text)">tap login button</span><br />
+              <span style="color: #ff5f57">✗</span>
+              <span style="color: var(--text-3)">Tapped "Login" (nav) — wrong element</span><br />
+              <br />
+              <span style="color: var(--text-3)"># pinpoint it by position</span><br />
+              <span style="color: var(--green)">pg&gt;</span>
+              <span style="color: var(--text)">tap login button below the password field</span
+              ><br />
+              <span style="color: var(--green)">✓</span>
+              <span style="color: var(--text-3)"
+                >Tapped "login button" (below "password field")</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- APP GUIDE / CONTEXT ENGINEERING -->
     <section class="appguide-section" id="appguide">
       <div class="container">
@@ -2370,6 +2429,7 @@
               <li><a href="#features">Agent Mode</a></li>
               <li><a href="#features">YAML Flows</a></li>
               <li><a href="#features">Playground</a></li>
+              <li><a href="#proximity">Proximity Selectors</a></li>
               <li><a href="#appguide">AppGuide</a></li>
               <li><a href="#parallel">Parallel Runs</a></li>
               <li><a href="#architecture">Architecture</a></li>

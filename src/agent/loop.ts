@@ -1528,7 +1528,12 @@ async function executeMetaTool(
           return { success: false, message: 'No appId provided for launch_app' };
         }
         if (appResolver && !appId.includes('.')) {
-          const resolved = resolveAppId(appId, appResolver);
+          let resolved = resolveAppId(appId, appResolver);
+          // App list is cached at session start — re-fetch once if an app installed
+          // mid-session isn't found yet.
+          if (!resolved && (await appResolver.refresh())) {
+            resolved = resolveAppId(appId, appResolver);
+          }
           if (resolved) appId = resolved;
         }
         ui.printStepDetail(`activateApp("${appId}")`);

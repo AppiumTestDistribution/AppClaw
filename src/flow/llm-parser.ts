@@ -11,9 +11,32 @@ import { buildModel } from '../llm/provider.js';
 import { Config } from '../config.js';
 import type { FlowStep } from './types.js';
 
+// Spatial qualifier disambiguating which matching element to act on, e.g.
+// "the login button below the password field". Set BOTH fields together or neither.
+const proximitySchema = z
+  .object({
+    relation: z
+      .enum(['above', 'below', 'toLeftOf', 'toRightOf', 'near', 'within'])
+      .describe('Spatial relation of the target element to the anchor'),
+    anchor: z.string().describe('Label/text of the reference element the target is positioned by'),
+  })
+  .optional()
+  .describe('Only when the instruction positions the target relative to another element');
+
 const stepSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('openApp'), query: z.string().describe('App name to open') }),
-  z.object({ kind: z.literal('tap'), label: z.string().describe('Element label/text to tap') }),
+  z.object({
+    kind: z.literal('closeApp'),
+    query: z
+      .string()
+      .optional()
+      .describe('App name to close/terminate; omit to close the current foreground app'),
+  }),
+  z.object({
+    kind: z.literal('tap'),
+    label: z.string().describe('Element label/text to tap'),
+    proximity: proximitySchema,
+  }),
   z.object({
     kind: z.literal('longPress'),
     label: z.string().describe('Element label/text to long-press'),
@@ -23,6 +46,7 @@ const stepSchema = z.discriminatedUnion('kind', [
     kind: z.literal('type'),
     text: z.string().describe('Text to type'),
     target: z.string().optional().describe('Target field to type into'),
+    proximity: proximitySchema,
   }),
   z.object({ kind: z.literal('enter') }),
   z.object({ kind: z.literal('back') }),
@@ -71,6 +95,7 @@ const SYSTEM_PROMPT =
   `You are a mobile app test step interpreter. Convert the user's natural language instruction into a structured test step.\n\n` +
   `Rules:\n` +
   `- "open/launch/start <app>" → openApp\n` +
+  `- "close/terminate/quit/kill <app>" → closeApp (query = app name); "close the app" → closeApp with no query (closes current app)\n` +
   `- "click/tap/press/select <element>" → tap\n` +
   `- "long press/long-press/press and hold <element>" → longPress\n` +
   `- "type/enter/input <text>" or "search for <text>" → type\n` +
@@ -87,6 +112,12 @@ const SYSTEM_PROMPT =
   `- "go back" → back, "go home" → home\n` +
   `- "press enter/submit/search" → enter\n` +
   `- "done" → done\n` +
+  `When a tap/type names a target positioned relative to another element ` +
+  `("the login button below the password field", "the icon to the right of the title", ` +
+  `"the field inside the form"), set proximity={relation, anchor}: relation is one of ` +
+  `above|below|toLeftOf|toRightOf|near|within, anchor is the reference element's label. ` +
+  `Put only the target's own label in label/target — not the relation or anchor. ` +
+  `Omit proximity entirely when there is no relative positioning.\n` +
   `Extract the relevant parameters. Works with any language.`;
 
 export interface ResolvedStep {
@@ -100,9 +131,14 @@ export interface ResolvedStep {
 export async function resolveNaturalStep(instruction: string): Promise<ResolvedStep> {
   const model = buildModel(Config);
 
+  // Wrap the discriminated union in an object so the generated JSON schema has a
+  // top-level `type: "object"`. A bare top-level union serializes to `anyOf`/`oneOf`
+  // with no root `type`, which the Anthropic tool API rejects with
+  // `tools.0.custom.input_schema.type: Field required` (older provider versions
+  // silently normalized this; @ai-sdk/anthropic v3 forwards the schema verbatim).
   const { object, usage } = await generateObject({
     model: model as any,
-    schema: stepSchema,
+    schema: z.object({ step: stepSchema }),
     system: SYSTEM_PROMPT,
     prompt: instruction,
     providerOptions: {
@@ -112,7 +148,7 @@ export async function resolveNaturalStep(instruction: string): Promise<ResolvedS
   });
 
   return {
-    step: { ...object, verbatim: instruction } as FlowStep,
+    step: { ...object.step, verbatim: instruction } as FlowStep,
     usage: {
       inputTokens: usage.inputTokens ?? 0,
       outputTokens: usage.outputTokens ?? 0,

@@ -42,6 +42,37 @@ describe('natural-line: tap/click', () => {
     expectStep('tap the Login button', { kind: 'tap', label: 'Login button' }));
 });
 
+// ── Close/terminate app ─────────────────────────────────────────────
+
+describe('natural-line: close app', () => {
+  test('close app → closeApp (no query)', () => {
+    const r = tryParseNaturalFlowLine('close app');
+    expect(r?.kind).toBe('closeApp');
+    expect(r?.kind === 'closeApp' && r.query).toBeUndefined();
+  });
+  test('close the app → closeApp (no query)', () => {
+    const r = tryParseNaturalFlowLine('close the app');
+    expect(r?.kind === 'closeApp' && r.query).toBeUndefined();
+  });
+  test('close <name> app', () =>
+    expectStep('close youtube app', { kind: 'closeApp', query: 'youtube' }));
+  test('close the <name> app', () =>
+    expectStep('close the youtube app', { kind: 'closeApp', query: 'youtube' }));
+  test('terminate <name>', () =>
+    expectStep('terminate youtube', { kind: 'closeApp', query: 'youtube' }));
+  test('quit <name>', () => expectStep('quit settings', { kind: 'closeApp', query: 'settings' }));
+  test('kill the <name> app', () =>
+    expectStep('kill the chrome app', { kind: 'closeApp', query: 'chrome' }));
+  test('terminate the app → no query', () => {
+    const r = tryParseNaturalFlowLine('terminate the app');
+    expect(r?.kind === 'closeApp' && r.query).toBeUndefined();
+  });
+  test('"close the dialog" is NOT a closeApp (no app keyword)', () => {
+    const r = tryParseNaturalFlowLine('close the dialog');
+    expect(r?.kind === 'closeApp').toBe(false);
+  });
+});
+
 // ── Navigate ────────────────────────────────────────────────────────
 
 describe('natural-line: navigate', () => {
@@ -78,6 +109,84 @@ describe('natural-line: type', () => {
       expect(result!.text).toBe('appium 3.0');
       expect(result!.target).toBe('search bar');
     }
+  });
+});
+
+// ── Type: field-first "as/to/with" ──────────────────────────────────
+
+describe('natural-line: type field-first', () => {
+  const typed = (input: string) => {
+    const r = tryParseNaturalFlowLine(input);
+    expect(r?.kind).toBe('type');
+    return r as Extract<FlowStep, { kind: 'type' }>;
+  };
+  test('type the <field> as <value>', () => {
+    const r = typed('type the username as appclaw@gmail.com');
+    expect(r.target).toBe('username');
+    expect(r.text).toBe('appclaw@gmail.com');
+  });
+  test('set the <field> to <value>', () => {
+    const r = typed('set the quantity to 5');
+    expect(r.target).toBe('quantity');
+    expect(r.text).toBe('5');
+  });
+  test('fill the <field> with <value>', () => {
+    const r = typed('fill the email with test@x.com');
+    expect(r.target).toBe('email');
+    expect(r.text).toBe('test@x.com');
+  });
+  test('literal text without leading "the" is not split', () => {
+    const r = typed('type save as draft');
+    expect(r.text).toBe('save as draft');
+    expect(r.target).toBeUndefined();
+  });
+});
+
+// ── Proximity qualifiers (tap + type) ────────────────────────────────
+
+describe('natural-line: proximity', () => {
+  test('tap <target> below <anchor>', () => {
+    const r = tryParseNaturalFlowLine('click login button below password field');
+    expect(r?.kind).toBe('tap');
+    if (r?.kind === 'tap') {
+      expect(r.label).toBe('login button');
+      expect(r.proximity).toEqual({ relation: 'below', anchor: 'password field' });
+    }
+  });
+  test.each([
+    ['tap the title above the form', 'above'],
+    ['tap icon under the header', 'below'],
+    ['tap the arrow to the left of the title', 'toLeftOf'],
+    ['tap the icon right of the label', 'toRightOf'],
+    ['tap the checkbox next to Terms', 'near'],
+    ['tap the star beside the rating', 'near'],
+    ['tap the button inside the dialog', 'within'],
+    ['tap login within the form', 'within'],
+  ])('%s → %s', (input, relation) => {
+    const r = tryParseNaturalFlowLine(input);
+    expect(r?.kind === 'tap' && r.proximity?.relation).toBe(relation);
+  });
+  test('anchor strips leading "the"', () => {
+    const r = tryParseNaturalFlowLine('tap the arrow to the left of the title');
+    expect(r?.kind === 'tap' && r.proximity?.anchor).toBe('title');
+  });
+  test('type target carries proximity too', () => {
+    const r = tryParseNaturalFlowLine('enter hi in the field below the header');
+    expect(r?.kind).toBe('type');
+    if (r?.kind === 'type') {
+      expect(r.text).toBe('hi');
+      expect(r.target).toBe('field');
+      expect(r.proximity).toEqual({ relation: 'below', anchor: 'header' });
+    }
+  });
+  test('no false positive: plain tap', () => {
+    const r = tryParseNaturalFlowLine('tap Settings');
+    expect(r?.kind === 'tap' && r.proximity).toBeUndefined();
+  });
+  test('no false positive: relation word with no anchor stays literal', () => {
+    const r = tryParseNaturalFlowLine('tap show more below');
+    expect(r?.kind === 'tap' && r.label).toBe('show more below');
+    expect(r?.kind === 'tap' && r.proximity).toBeUndefined();
   });
 });
 

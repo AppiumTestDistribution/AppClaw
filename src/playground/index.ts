@@ -786,7 +786,7 @@ function printHelp(): void {
   const examples: Array<{ category: string; lines: string[] }> = [
     {
       category: 'Apps',
-      lines: ['open YouTube', 'launch Settings app'],
+      lines: ['open YouTube', 'launch Settings app', 'close YouTube', 'close the app'],
     },
     {
       category: 'Tap & Navigate',
@@ -795,6 +795,15 @@ function printHelp(): void {
         'click Search button',
         'select English',
         'navigate to Settings screen',
+      ],
+    },
+    {
+      category: 'Proximity (disambiguate by position)',
+      lines: [
+        'tap the login button below the password field',
+        'tap the icon to the right of the title',
+        'click the checkbox next to Terms',
+        'type "pass" in the field below the email',
       ],
     },
     {

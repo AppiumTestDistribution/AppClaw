@@ -3,10 +3,77 @@
  * Returns null if the line does not match any supported pattern — caller may error or fall through.
  */
 
-import type { FlowStep } from './types.js';
+import type { FlowStep, Proximity, ProximityRelation } from './types.js';
 
 function trimPunct(s: string): string {
   return s.replace(/[.!?]+$/g, '').trim();
+}
+
+// UI elements a bare "close the X" usually dismisses — not an app-close. Keeps
+// "close the dialog" out of the closeApp path (terminate/quit/kill bypass this).
+const NON_APP_CLOSE_TARGETS =
+  /^(?:dialog|popup|pop-?up|modal|menu|drawer|keyboard|notifications?|banner|sheet|bottom\s*sheet|tab|window|panel|alert|toast|overlay|ad|ads|popup\s*ad)$/i;
+
+/** Natural-language relation phrase → ProximityRelation. Order-insensitive (lowercased, single-spaced). */
+const PROXIMITY_RELATIONS: Record<string, ProximityRelation> = {
+  above: 'above',
+  over: 'above',
+  below: 'below',
+  under: 'below',
+  underneath: 'below',
+  'left of': 'toLeftOf',
+  'to the left of': 'toLeftOf',
+  'right of': 'toRightOf',
+  'to the right of': 'toRightOf',
+  near: 'near',
+  beside: 'near',
+  'next to': 'near',
+  within: 'within',
+  inside: 'within',
+  'inside of': 'within',
+};
+
+// Alternation of relation phrases, longest-first so "to the left of" wins over "left of".
+const RELATION_ALT = Object.keys(PROXIMITY_RELATIONS)
+  .sort((a, b) => b.length - a.length)
+  .map((p) => p.replace(/\s+/g, '\\s+'))
+  .join('|');
+const PROXIMITY_RE = new RegExp(`^(.+?)\\s+(${RELATION_ALT})\\s+(?:the\\s+)?(.+)$`, 'i');
+
+/**
+ * Split a "<target> <relation> <anchor>" phrase into the bare target label plus a
+ * Proximity qualifier. e.g. "login button below password field" →
+ * { label: "login button", proximity: { relation: 'below', anchor: 'password field' } }.
+ * Returns just the label unchanged when no relation phrase is present.
+ */
+export function splitProximity(label: string): { label: string; proximity?: Proximity } {
+  const m = label.match(PROXIMITY_RE);
+  if (!m) return { label };
+  const target = trimPunct(m[1].trim());
+  const relWord = m[2].toLowerCase().replace(/\s+/g, ' ');
+  const anchor = trimPunct(m[3].trim());
+  const relation = PROXIMITY_RELATIONS[relWord];
+  if (!relation || !target || !anchor) return { label };
+  return { label: target, proximity: { relation, anchor } };
+}
+
+/** Build a tap step, peeling off any trailing proximity qualifier. */
+function tapStep(label: string, verbatim: string): FlowStep {
+  const { label: bare, proximity } = splitProximity(label);
+  return { kind: 'tap', label: bare, ...(proximity ? { proximity } : {}), verbatim };
+}
+
+/** Build a type step, peeling off any trailing proximity qualifier from the target field. */
+function typeStep(text: string, rawTarget: string | undefined, verbatim: string): FlowStep {
+  if (!rawTarget) return { kind: 'type', text, verbatim };
+  const { label, proximity } = splitProximity(rawTarget);
+  return {
+    kind: 'type',
+    text,
+    target: label || undefined,
+    ...(proximity ? { proximity } : {}),
+    verbatim,
+  };
 }
 
 /** Strip common natural-language prefixes like "the text", "text", "element" from captured text. */
@@ -28,6 +95,26 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   if (openMatch) {
     const query = trimPunct(openMatch[1].trim());
     if (query) return { kind: 'openApp', query, verbatim };
+  }
+
+  // "close/terminate/quit/kill [the] [<name>] [app]" → closeApp.
+  //   - bare ("close app" / "close the app" / "terminate the app") closes the current app
+  //   - named ("close youtube", "close the youtube app", "quit settings") closes that app
+  // For the `close` verb, a bare UI-element noun ("close the dialog", "close keyboard")
+  // is NOT an app-close — those stay null so they fall through to the tap/LLM path.
+  // terminate/quit/kill are unambiguous about app lifecycle, so they skip that guard.
+  const closeAppMatch = t.match(
+    /^(close|terminate|quit|kill)(?:\s+the)?\s+(.+?)(?:\s+(?:app|application))?$/i
+  );
+  if (closeAppMatch) {
+    const verb = closeAppMatch[1].toLowerCase();
+    let query: string | undefined = trimPunct(closeAppMatch[2].trim());
+    if (/^(?:app|application)$/i.test(query)) query = undefined; // "close the app" → current app
+    if (query && verb === 'close' && NON_APP_CLOSE_TARGETS.test(query)) {
+      // "close the dialog/keyboard/menu…" — a UI dismissal, not an app close.
+    } else {
+      return { kind: 'closeApp', ...(query ? { query } : {}), verbatim };
+    }
   }
 
   // "navigate to X" / "go to X screen" — tap-style navigation
@@ -60,13 +147,13 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   const clickMatch = t.match(/^(?:click|tap|select|choose|pick)(?:\s+on)?\s+(?:the\s+)?(.+)$/i);
   if (clickMatch) {
     const label = trimPunct(clickMatch[1].trim());
-    if (label) return { kind: 'tap', label, verbatim };
+    if (label) return tapStep(label, verbatim);
   }
 
   const pressMatch = t.match(/^press(?:\s+on)?\s+(?:the\s+)?(.+)$/i);
   if (pressMatch) {
     const label = trimPunct(pressMatch[1].trim());
-    if (label) return { kind: 'tap', label, verbatim };
+    if (label) return tapStep(label, verbatim);
   }
 
   const typeMatch = t.match(/^(?:type|enter\s+text|input)\s+["'](.+)["']$/i);
@@ -80,7 +167,7 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   if (typeQuotedInMatch) {
     const text = typeQuotedInMatch[1].trim();
     const target = trimPunct(typeQuotedInMatch[2].trim());
-    if (text) return { kind: 'type', text, target: target || undefined, verbatim };
+    if (text) return typeStep(text, target, verbatim);
   }
   // "Enter X in Y" / "Type X in Y" — unquoted text + target
   // Use greedy (.+) with \s+(?:in|into) so the last "in/into" wins.
@@ -88,7 +175,19 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
   if (typeInMatch) {
     const text = trimPunct(typeInMatch[1].trim());
     const target = trimPunct(typeInMatch[2].trim());
-    if (text) return { kind: 'type', text, target: target || undefined, verbatim };
+    if (text) return typeStep(text, target, verbatim);
+  }
+  // "Type the <field> as <value>" / "set the <field> to <value>" / "fill the <field> with <value>"
+  // — FIELD-first ordering, the inverse of "enter <value> in <field>" above. The leading
+  // "the" is required as the disambiguator so literal text containing "as"/"to"/"with"
+  // (e.g. `type save as draft`) still falls through to the bare-text rule below.
+  const typeFieldAssignMatch = t.match(
+    /^(?:type|enter|input|fill|set)\s+the\s+(.+?)\s+(?:as|to|with)\s+["']?(.+?)["']?$/i
+  );
+  if (typeFieldAssignMatch) {
+    const target = trimPunct(typeFieldAssignMatch[1].trim());
+    const text = trimPunct(typeFieldAssignMatch[2].trim());
+    if (text) return typeStep(text, target, verbatim);
   }
   const typeBare = t.match(/^(?:type|input)\s+(.+)$/i);
   if (typeBare && !t.match(/^type\s*:/i)) {
@@ -105,7 +204,7 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     if (searchInMatch) {
       const target = trimPunct(searchInMatch[2].trim());
       text = trimPunct(searchInMatch[1].trim());
-      if (text) return { kind: 'type', text, target: target || undefined, verbatim };
+      if (text) return typeStep(text, target, verbatim);
     }
     if (text) return { kind: 'type', text, verbatim };
   }
@@ -118,7 +217,7 @@ export function tryParseNaturalFlowLine(line: string): FlowStep | null {
     if (enterInMatch) {
       const target = trimPunct(enterInMatch[2].trim());
       text = trimPunct(enterInMatch[1].trim());
-      if (text) return { kind: 'type', text, target: target || undefined, verbatim };
+      if (text) return typeStep(text, target, verbatim);
     }
     if (text) return { kind: 'type', text, verbatim };
   }
