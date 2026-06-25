@@ -27,12 +27,12 @@ describe('Recorded flow', () => {
       apiKey: process.env.LLM_API_KEY,
       platform: 'android',
       video: true,
-      mcpDebug: false,
-      silent: false,
+      mcpDebug: true,
+      silent: true,
       waitTimeout: 10000,
       waitInterval: 1000,
       locatorCache: true,
-      capabilitiesFile: './tests/capabilities.json',
+      capabilitiesFile: './tests/caps.json',
     });
 
     await app.run('open vodqa app');
@@ -41,6 +41,7 @@ describe('Recorded flow', () => {
     await app.run('scroll down 2 times until Karma is visible', {
       scrollMode: 'short',
     } as RunOptions);
+    await app.verify('if the text Karmaaa is visible');
     await app.teardown();
   }, 120000);
 });

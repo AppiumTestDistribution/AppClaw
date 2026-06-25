@@ -16,17 +16,17 @@
       href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="color-scheme" content="light dark" />
     <script>
-      // Apply theme BEFORE first paint to avoid flash. Stored choice wins over system preference.
+      // Apply theme BEFORE first paint to avoid flash. Shares state with the landing
+      // page: localStorage "theme" === "dark" → add html.dark; default is light/paper.
       (function () {
         try {
-          var stored = localStorage.getItem('appclaw-theme');
-          var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-          var theme = stored || (prefersLight ? 'light' : 'dark');
-          if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+          if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
         } catch (e) {
-          /* localStorage blocked → default dark */
+          /* localStorage blocked → default light */
         }
       })();
     </script>
@@ -44,94 +44,158 @@
       }
 
       :root {
-        /* ── DARK (default): warm near-black, off-white, single accent ── */
-        --bg: #0e0d0b;
-        --bg-elev: #16140f;
-        --bg-soft: #131210;
-        --bg-code: #16140f;
-        --ink: #ebe7df;
-        --ink-mid: #b8b1a4;
-        --ink-mute: #8a8377;
-        --ink-faint: #5b554c;
-        --rule: rgba(235, 231, 223, 0.07);
-        --rule-mid: rgba(235, 231, 223, 0.12);
-        --rule-strong: rgba(235, 231, 223, 0.18);
-        --accent: #ff7a1a;
-        --accent-soft: rgba(255, 122, 26, 0.13);
-        --accent-rim: rgba(255, 122, 26, 0.28);
-        --mark: #ffd180;
-        --green: #6db970;
-        --red: #e96a6a;
-        --purple: #b29cf2;
-        --teal: #61c4d6;
-
-        --grain-opacity: 0.04;
-        --hover-tint: var(--hover-tint);
-        --hover-tint-strong: var(--hover-tint-strong);
-
-        /* ── type ── */
-        --font-display: 'Menlo', 'SF Mono', 'JetBrains Mono', monospace;
-        --font-body: 'Menlo', 'SF Mono', 'JetBrains Mono', monospace;
-        --font-mono: 'Menlo', 'SF Mono', 'JetBrains Mono', monospace;
-
-        /* ── shape ── */
-        --radius: 8px;
-        --radius-lg: 12px;
-      }
-
-      /* ── LIGHT theme — warm paper, deeper ink, restrained accent ── */
-      [data-theme='light'] {
-        --bg: #faf8f3;
-        --bg-elev: #f1eee5;
-        --bg-soft: #f5f2ea;
-        --bg-code: #1f1c17; /* code blocks stay dark on light — better readability */
-        --ink: #1a1612;
-        --ink-mid: #4d463c;
-        --ink-mute: #7a7367;
-        --ink-faint: #a89f91;
-        --rule: rgba(26, 22, 18, 0.08);
-        --rule-mid: rgba(26, 22, 18, 0.14);
-        --rule-strong: rgba(26, 22, 18, 0.22);
-        --accent: #e65100;
-        --accent-soft: rgba(230, 81, 0, 0.1);
-        --accent-rim: rgba(230, 81, 0, 0.3);
-        --mark: #b85700;
+        /* ── LIGHT (default): paper, deep ink, teal accent — matches landing ── */
+        --bg: #fbfbf9;
+        --bg-elev: #ffffff;
+        --bg-soft: #f4f4f0;
+        --bg-code: #0e1116; /* code blocks stay dark on paper — better readability */
+        --ink: #14161b;
+        --ink-mid: #5b606a;
+        --ink-mute: #787d86;
+        --ink-faint: #9499a2;
+        --rule: rgba(20, 22, 27, 0.08);
+        --rule-mid: rgba(20, 22, 27, 0.14);
+        --rule-strong: rgba(20, 22, 27, 0.22);
+        --accent: #0b7c8b; /* readable teal on paper */
+        --accent-soft: #e6f4f6;
+        --accent-rim: #cde9ec;
+        --mark: #0b7c8b;
         --green: #2f7d33;
         --red: #c4322e;
         --purple: #6845c1;
         --teal: #117a8b;
 
         --grain-opacity: 0.025;
-        --hover-tint: rgba(26, 22, 18, 0.04);
-        --hover-tint-strong: rgba(26, 22, 18, 0.07);
+        --hover-tint: rgba(20, 22, 27, 0.04);
+        --hover-tint-strong: rgba(20, 22, 27, 0.07);
+
+        /* ── type ── */
+        --font-display: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --font-body: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, ui-monospace, monospace;
+
+        /* ── shape ── */
+        --radius: 8px;
+        --radius-lg: 12px;
+      }
+
+      /* ── DARK (toggled) — deep ink, off-white, brighter teal — matches landing ── */
+      html.dark {
+        --bg: #0e1116;
+        --bg-elev: #181d24;
+        --bg-soft: #14181e;
+        --bg-code: #0a0c10;
+        --ink: #e8edf2;
+        --ink-mid: #9aa3ae;
+        --ink-mute: #80878f;
+        --ink-faint: #6a727d;
+        --rule: rgba(232, 237, 242, 0.07);
+        --rule-mid: rgba(232, 237, 242, 0.12);
+        --rule-strong: rgba(232, 237, 242, 0.18);
+        --accent: #2ec7d8;
+        --accent-soft: rgba(46, 199, 216, 0.13);
+        --accent-rim: rgba(46, 199, 216, 0.28);
+        --mark: #2ec7d8;
+        --green: #6db970;
+        --red: #e96a6a;
+        --purple: #b29cf2;
+        --teal: #61c4d6;
+
+        --grain-opacity: 0.04;
+        --hover-tint: rgba(232, 237, 242, 0.04);
+        --hover-tint-strong: rgba(232, 237, 242, 0.07);
+        color-scheme: dark;
+      }
+
+      /* per-section accent palettes — same system as the landing's acc-* classes.
+         Apply an acc-* class to any container to retint its accent locally. */
+      .acc-indigo {
+        --accent: #4453d6;
+        --accent-soft: #eceeff;
+        --accent-rim: #d6dbff;
+      }
+      .acc-emerald {
+        --accent: #0c7d5d;
+        --accent-soft: #e3f5ee;
+        --accent-rim: #c8ebdd;
+      }
+      .acc-amber {
+        --accent: #a8680a;
+        --accent-soft: #fbf0dc;
+        --accent-rim: #f2e0bd;
+      }
+      .acc-rose {
+        --accent: #c23a62;
+        --accent-soft: #fce8ee;
+        --accent-rim: #f7d4de;
+      }
+      .acc-blue {
+        --accent: #1f6fbf;
+        --accent-soft: #e4f1fb;
+        --accent-rim: #c5e2f5;
+      }
+      .acc-violet {
+        --accent: #6a48e0;
+        --accent-soft: #efebff;
+        --accent-rim: #ddd4ff;
+      }
+      html.dark .acc-indigo {
+        --accent: #8b97ff;
+        --accent-soft: rgba(139, 151, 255, 0.14);
+        --accent-rim: rgba(139, 151, 255, 0.3);
+      }
+      html.dark .acc-emerald {
+        --accent: #2fd6a3;
+        --accent-soft: rgba(47, 214, 163, 0.14);
+        --accent-rim: rgba(47, 214, 163, 0.3);
+      }
+      html.dark .acc-amber {
+        --accent: #f0b44e;
+        --accent-soft: rgba(240, 180, 78, 0.14);
+        --accent-rim: rgba(240, 180, 78, 0.3);
+      }
+      html.dark .acc-rose {
+        --accent: #ff7fa3;
+        --accent-soft: rgba(255, 127, 163, 0.14);
+        --accent-rim: rgba(255, 127, 163, 0.3);
+      }
+      html.dark .acc-blue {
+        --accent: #5aa9ee;
+        --accent-soft: rgba(90, 169, 238, 0.14);
+        --accent-rim: rgba(90, 169, 238, 0.3);
+      }
+      html.dark .acc-violet {
+        --accent: #9d86ff;
+        --accent-soft: rgba(157, 134, 255, 0.15);
+        --accent-rim: rgba(157, 134, 255, 0.3);
       }
 
       /* Light-mode adjustments — code blocks keep dark "terminal" aesthetic
          (more legible code) but reset their internal token colors to dark-mode palette */
-      [data-theme='light'] .code-block,
-      [data-theme='light'] .code-block-header {
+      html:not(.dark) .code-block,
+      html:not(.dark) .code-block-header {
         background: var(--bg-code);
         border-color: rgba(255, 255, 255, 0.08);
       }
-      [data-theme='light'] .code-block-header {
+      html:not(.dark) .code-block-header {
         background: var(--hover-tint);
       }
-      [data-theme='light'] .code-block pre {
+      html:not(.dark) .code-block pre {
         color: #ebe7df;
       }
-      [data-theme='light'] .code-block-label {
+      html:not(.dark) .code-block-label {
         color: #8a8377;
       }
-      [data-theme='light'] .code-block-dots span {
+      html:not(.dark) .code-block-dots span {
         background: #4a4641;
       }
-      [data-theme='light'] .code-block .c {
+      html:not(.dark) .code-block .c {
         color: #5b554c;
       }
-      [data-theme='light'] .code-block .p {
+      html:not(.dark) .code-block .p {
         color: #8a8377;
       }
-      [data-theme='light'] .code-block .n {
+      html:not(.dark) .code-block .n {
         color: #ebe7df;
       }
 
@@ -308,11 +372,11 @@
         letter-spacing: 0.01em;
       }
       .btn-orange:hover {
-        background: #ff8e3d;
+        background: #1fb0c2;
         transform: translateY(-1px);
       }
-      [data-theme='light'] .btn-orange:hover {
-        background: #ff7a14;
+      html:not(.dark) .btn-orange:hover {
+        background: #0a6f7d;
       }
 
       /* Theme toggle — matches index.html (36px square, transparent bg) */
@@ -343,17 +407,17 @@
         width: 18px;
         height: 18px;
       }
-      /* Default = dark; show sun (click to go light). Flip in light. */
+      /* Dark mode shows the sun (click → light); light mode shows the moon (click → dark). */
       .theme-toggle .icon-moon {
         display: none;
       }
       .theme-toggle .icon-sun {
         display: block;
       }
-      [data-theme='light'] .theme-toggle .icon-moon {
+      html:not(.dark) .theme-toggle .icon-moon {
         display: block;
       }
-      [data-theme='light'] .theme-toggle .icon-sun {
+      html:not(.dark) .theme-toggle .icon-sun {
         display: none;
       }
 
@@ -797,6 +861,13 @@
       .code-block .v {
         color: #61c4d6;
       } /* variable */
+      .code-block .p.dash {
+        color: #2ec7d8;
+      } /* natural-language list marker */
+      .code-block .err {
+        color: #e96a6a;
+        font-weight: 500;
+      } /* error / assertion-failure line */
 
       /* ─────────── Callouts — quiet left-bar, no heavy bg ─────────── */
       .callout {
@@ -878,6 +949,28 @@
       .cmd-table tr:hover td {
         background: var(--hover-tint);
       }
+      /* first column = the flag itself — mono, emphasised, kept on one line */
+      .cmd-table td:first-child {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--ink);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      /* category sub-header rows inside a unified table */
+      .cmd-table tr.grp td {
+        background: var(--bg-soft);
+        font-size: 11.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--accent);
+        padding: 9px 18px;
+        white-space: normal;
+      }
+      .cmd-table tr.grp:hover td {
+        background: var(--bg-soft);
+      }
       /* Inline code inside table cells — bump above the generic td-code rule */
       .docs-content .cmd-table td code,
       .docs-content .cmd-table th code,
@@ -918,31 +1011,6 @@
         color: var(--purple);
         background: rgba(178, 156, 242, 0.1);
         border: 1px solid rgba(178, 156, 242, 0.25);
-      }
-
-      /* ─────────── CLI grid (used on CLI Options page) ─────────── */
-      .cli-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 28px;
-        margin: 8px 0 16px;
-      }
-      .cli-grid .cli-col h3 {
-        margin-top: 0;
-      }
-      .cli-full {
-        margin-top: 12px;
-      }
-      @media (max-width: 920px) {
-        .cli-grid {
-          grid-template-columns: 1fr;
-          gap: 0;
-        }
-      }
-
-      /* CLI Options gets a wider column to fit 2-up table layout */
-      #cli-options {
-        max-width: 1080px !important;
       }
 
       /* Reveal — kept gentle; sections already animate on activate */
@@ -1190,8 +1258,8 @@
           <span class="nav-logo-name">AppClaw</span>
         </a>
         <ul class="nav-links">
-          <li><a href="index.html#features">Features</a></li>
-          <li><a href="index.html#how-it-works">How It Works</a></li>
+          <li><a href="index.html#modes">Features</a></li>
+          <li><a href="index.html#how">How It Works</a></li>
           <li><a href="usage.html" class="active">Usage Guide</a></li>
         </ul>
         <div class="nav-right">
@@ -1393,6 +1461,7 @@
             <li><a href="#sdk-run-flow">runFlow()</a></li>
             <li><a href="#sdk-run-goal">runGoal()</a></li>
             <li><a href="#sdk-run">run()</a></li>
+            <li><a href="#sdk-verify">verify()</a></li>
             <li><a href="#sdk-locator-cache">Locator Cache</a></li>
             <li><a href="#sdk-reports">Reports &amp; Video</a></li>
             <li><a href="#sdk-vitest">Vitest / Jest</a></li>
@@ -1500,139 +1569,116 @@
           <h2>CLI Options</h2>
           <p>All the flags you can pass to <code>appclaw</code>.</p>
 
-          <div class="cli-grid">
-            <div class="cli-col">
-              <h3>Platform &amp; Device</h3>
-              <table class="cmd-table">
-                <thead>
-                  <tr>
-                    <th>Flag</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>--platform &lt;os&gt;</td>
-                    <td>Target platform: <code>android</code> or <code>ios</code></td>
-                  </tr>
-                  <tr>
-                    <td>--device-type &lt;type&gt;</td>
-                    <td>iOS only: <code>simulator</code> or <code>real</code></td>
-                  </tr>
-                  <tr>
-                    <td>--device &lt;name&gt;</td>
-                    <td>Device name (partial match, e.g. "iPhone 17 Pro")</td>
-                  </tr>
-                  <tr>
-                    <td>--udid &lt;udid&gt;</td>
-                    <td>Device UDID (skips the device picker)</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="cli-col">
-              <h3>Execution</h3>
-              <table class="cmd-table">
-                <thead>
-                  <tr>
-                    <th>Flag</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>--flow &lt;file&gt;</td>
-                    <td>Run a declarative YAML flow file</td>
-                  </tr>
-                  <tr>
-                    <td>--env &lt;name&gt;</td>
-                    <td>Environment for variable/secret resolution</td>
-                  </tr>
-                  <tr>
-                    <td>--env-path &lt;path&gt;</td>
-                    <td>
-                      Load a dotenv (<code>.env</code>) file into the environment for this run
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>--caps &lt;path&gt;</td>
-                    <td>
-                      JSON file of extra Appium capabilities merged into the session. Flat or
-                      platform-scoped (<code>android</code>/<code>ios</code>/<code>common</code>).
-                      Overrides <code>CAPABILITIES_FILE</code>. See
-                      <a href="#custom-capabilities">Custom Capabilities</a>.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>--playground</td>
-                    <td>Launch the interactive REPL for building flows</td>
-                  </tr>
-                  <tr>
-                    <td>--export [path]</td>
-                    <td>Write a replayable SDK vitest spec after a goal completes</td>
-                  </tr>
-                  <tr>
-                    <td>--export-dir &lt;dir&gt;</td>
-                    <td>Directory for bare-filename exports (overrides <code>EXPORT_DIR</code>)</td>
-                  </tr>
-                  <tr>
-                    <td>--record</td>
-                    <td>Record a goal execution for later replay</td>
-                  </tr>
-                  <tr>
-                    <td>--replay &lt;file&gt;</td>
-                    <td>Replay a previously recorded session</td>
-                  </tr>
-                  <tr>
-                    <td>--plan</td>
-                    <td>Decompose a complex goal into sub-goals</td>
-                  </tr>
-                  <tr>
-                    <td>--json</td>
-                    <td>JSON output mode (for IDE extensions)</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Flag</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="grp">
+                <td colspan="2">Platform &amp; Device</td>
+              </tr>
+              <tr>
+                <td>--platform &lt;os&gt;</td>
+                <td>Target platform: <code>android</code> or <code>ios</code></td>
+              </tr>
+              <tr>
+                <td>--device-type &lt;type&gt;</td>
+                <td>iOS only: <code>simulator</code> or <code>real</code></td>
+              </tr>
+              <tr>
+                <td>--device &lt;name&gt;</td>
+                <td>Device name (partial match, e.g. "iPhone 17 Pro")</td>
+              </tr>
+              <tr>
+                <td>--udid &lt;udid&gt;</td>
+                <td>Device UDID (skips the device picker)</td>
+              </tr>
 
-          <div class="cli-full">
-            <h3>Explorer (Test Generation)</h3>
-            <table class="cmd-table">
-              <thead>
-                <tr>
-                  <th>Flag</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>--explore &lt;prd&gt;</td>
-                  <td>Generate test flows from a PRD document</td>
-                </tr>
-                <tr>
-                  <td>--num-flows &lt;N&gt;</td>
-                  <td>Number of flows to generate (default: 5)</td>
-                </tr>
-                <tr>
-                  <td>--no-crawl</td>
-                  <td>Skip device crawling, use PRD only</td>
-                </tr>
-                <tr>
-                  <td>--output-dir &lt;dir&gt;</td>
-                  <td>Output directory (default: generated-flows)</td>
-                </tr>
-                <tr>
-                  <td>--max-screens &lt;N&gt;</td>
-                  <td>Max screens to crawl (default: 10)</td>
-                </tr>
-                <tr>
-                  <td>--max-depth &lt;N&gt;</td>
-                  <td>Max navigation depth (default: 3)</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+              <tr class="grp">
+                <td colspan="2">Execution</td>
+              </tr>
+              <tr>
+                <td>--flow &lt;file&gt;</td>
+                <td>Run a declarative YAML flow file</td>
+              </tr>
+              <tr>
+                <td>--env &lt;name&gt;</td>
+                <td>Environment for variable/secret resolution</td>
+              </tr>
+              <tr>
+                <td>--env-path &lt;path&gt;</td>
+                <td>Load a dotenv (<code>.env</code>) file into the environment for this run</td>
+              </tr>
+              <tr>
+                <td>--caps &lt;path&gt;</td>
+                <td>
+                  JSON file of extra Appium capabilities merged into the session. Flat or
+                  platform-scoped (<code>android</code>/<code>ios</code>/<code>common</code>).
+                  Overrides <code>CAPABILITIES_FILE</code>. See
+                  <a href="#custom-capabilities">Custom Capabilities</a>.
+                </td>
+              </tr>
+              <tr>
+                <td>--playground</td>
+                <td>Launch the interactive REPL for building flows</td>
+              </tr>
+              <tr>
+                <td>--export [path]</td>
+                <td>Write a replayable SDK vitest spec after a goal completes</td>
+              </tr>
+              <tr>
+                <td>--export-dir &lt;dir&gt;</td>
+                <td>Directory for bare-filename exports (overrides <code>EXPORT_DIR</code>)</td>
+              </tr>
+              <tr>
+                <td>--record</td>
+                <td>Record a goal execution for later replay</td>
+              </tr>
+              <tr>
+                <td>--replay &lt;file&gt;</td>
+                <td>Replay a previously recorded session</td>
+              </tr>
+              <tr>
+                <td>--plan</td>
+                <td>Decompose a complex goal into sub-goals</td>
+              </tr>
+              <tr>
+                <td>--json</td>
+                <td>JSON output mode (for IDE extensions)</td>
+              </tr>
+
+              <tr class="grp">
+                <td colspan="2">Explorer (Test Generation)</td>
+              </tr>
+              <tr>
+                <td>--explore &lt;prd&gt;</td>
+                <td>Generate test flows from a PRD document</td>
+              </tr>
+              <tr>
+                <td>--num-flows &lt;N&gt;</td>
+                <td>Number of flows to generate (default: 5)</td>
+              </tr>
+              <tr>
+                <td>--no-crawl</td>
+                <td>Skip device crawling, use PRD only</td>
+              </tr>
+              <tr>
+                <td>--output-dir &lt;dir&gt;</td>
+                <td>Output directory (default: generated-flows)</td>
+              </tr>
+              <tr>
+                <td>--max-screens &lt;N&gt;</td>
+                <td>Max screens to crawl (default: 10)</td>
+              </tr>
+              <tr>
+                <td>--max-depth &lt;N&gt;</td>
+                <td>Max navigation depth (default: 3)</td>
+              </tr>
+            </tbody>
+          </table>
         </section>
 
         <section id="execution-modes" class="reveal">
@@ -3210,29 +3256,18 @@ console<span class="p">.</span>log<span class="p">(</span>result<span class="p">
 
 <span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">({</span> provider<span class="p">:</span> <span class="s">'gemini'</span><span class="p">,</span> apiKey<span class="p">:</span> process<span class="p">.</span>env<span class="p">.</span>GEMINI_API_KEY<span class="p">,</span> platform<span class="p">:</span> <span class="s">'android'</span> <span class="p">});</span>
 
-<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'open YouTube app'</span><span class="p">);</span>       <span class="c">// regex match — no LLM call</span>
-<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap Search'</span><span class="p">);</span>             <span class="c">// regex match — no LLM call</span>
-<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'type Appium 3.0'</span><span class="p">);</span>        <span class="c">// regex match — no LLM call</span>
-<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap the search button'</span><span class="p">);</span>  <span class="c">// LLM fallback → tap</span>
-<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'wait 2 seconds'</span><span class="p">);</span>         <span class="c">// regex match — no LLM call</span>
-<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'scroll down'</span><span class="p">);</span>            <span class="c">// regex match — no LLM call</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'open YouTube app'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap Search'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'type Appium 3.0'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'tap the search button'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'wait 2 seconds'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'scroll down'</span><span class="p">);</span>
+
+<span class="c">// Assertion — throws AppClawAssertionError if the claim is false</span>
+<span class="k">await</span> app<span class="p">.</span>verify<span class="p">(</span><span class="s">'the TestMu AI video is visible'</span><span class="p">);</span>
 
 <span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span>  <span class="c">// report written to .appclaw/runs/</span></pre>
           </div>
-
-          <h3>How instructions are resolved</h3>
-          <ol>
-            <li>
-              <strong>Regex match</strong> — common patterns (<code>open X</code>,
-              <code>tap X</code>, <code>type X</code>, <code>wait N seconds</code>,
-              <code>scroll down</code>, …) are resolved instantly with zero LLM cost.
-            </li>
-            <li>
-              <strong>LLM fallback</strong> — anything that doesn't match a regex is sent to the
-              configured LLM, which classifies it into a structured action (<code>tap</code>,
-              <code>type</code>, <code>swipe</code>, etc.).
-            </li>
-          </ol>
 
           <h3>Per-command options</h3>
           <p>
@@ -3332,6 +3367,71 @@ console<span class="p">.</span>log<span class="p">(</span>result<span class="p">
               time, easy to integrate with any test framework. Use <strong>runGoal()</strong> when
               you want the agent to figure out the steps itself. Use <strong>runFlow()</strong> for
               declarative YAML test cases you want to version-control.
+            </p>
+          </div>
+        </section>
+
+        <section id="sdk-verify" class="reveal">
+          <h2>verify()</h2>
+          <p>
+            Assert that something is true on the current screen. <code>verify()</code> takes a
+            natural-language <em>claim</em>, captures the screen, and checks whether it holds — the
+            programmatic counterpart to a YAML <a href="#assert">assertion step</a>. Unlike
+            <code>run()</code>, it <strong>throws</strong> when the claim is false, so it drops
+            straight into any test runner.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">TypeScript</span>
+            </div>
+            <pre><span class="k">import</span> <span class="p">{</span> AppClaw <span class="p">}</span> <span class="k">from</span> <span class="s">'appclaw'</span><span class="p">;</span>
+
+<span class="k">const</span> app <span class="p">=</span> <span class="k">new</span> AppClaw<span class="p">();</span>
+
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'open YouTube app'</span><span class="p">);</span>
+<span class="k">await</span> app<span class="p">.</span>run<span class="p">(</span><span class="s">'search for Appium 3.0'</span><span class="p">);</span>
+
+<span class="c">// Throws AppClawAssertionError if the claim is false — no try/catch needed,</span>
+<span class="c">// the throw fails the test and the error carries the on-screen context.</span>
+<span class="k">await</span> app<span class="p">.</span>verify<span class="p">(</span><span class="s">'the TestMu AI video is visible'</span><span class="p">);</span>
+
+<span class="k">await</span> app<span class="p">.</span>teardown<span class="p">();</span></pre>
+          </div>
+
+          <p>
+            On failure it raises <code>AppClawAssertionError</code>, which carries the original
+            <code>claim</code>, the underlying <code>result</code>, and — in DOM mode — the
+            <code>screenContents</code> captured from the page source, so the failure message shows
+            what was actually on screen. In vision mode the model's reasoning is already included in
+            <code>result.message</code>.
+          </p>
+
+          <p>When a claim fails, the thrown error reads like this:</p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Assertion failure</span>
+            </div>
+            <pre><span class="err">AppClawAssertionError: Verify failed: "the TestMu AI video is visible"</span>
+  Reason: "TestMu AI" not found on screen
+    Screen contains: Search, Appium 3.0 | What's new in Appium 3 | Appium 3.0 Tutorial | Mobile Testing 101 | Selenium vs Appium
+  On screen now:
+    • Search, Appium 3.0
+    • What's new in Appium 3
+    • Appium 3.0 Tutorial
+    • Mobile Testing 101
+    • Selenium vs Appium</pre>
+          </div>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">run() vs verify()</div>
+            <p>
+              <code>run()</code> performs an action and returns a result <em>without</em> throwing.
+              <code>verify()</code> makes an assertion and <em>throws</em> on failure. Use
+              <code>run()</code> to drive the app, <code>verify()</code> to assert the outcome.
             </p>
           </div>
         </section>
@@ -5171,11 +5271,11 @@ APP_GUIDE (WhatsApp):
           <div class="footer-col">
             <h4>Product</h4>
             <ul>
-              <li><a href="index.html#features">Agent Mode</a></li>
-              <li><a href="index.html#features">YAML Flows</a></li>
-              <li><a href="index.html#features">Playground</a></li>
-              <li><a href="index.html#appguide">AppGuide</a></li>
-              <li><a href="index.html#architecture">Architecture</a></li>
+              <li><a href="index.html#modes">Agent Mode</a></li>
+              <li><a href="index.html#modes">YAML Flows</a></li>
+              <li><a href="index.html#modes">Playground</a></li>
+              <li><a href="index.html#context">AppGuide</a></li>
+              <li><a href="index.html#arch">Architecture</a></li>
             </ul>
           </div>
           <div class="footer-col">
@@ -5469,21 +5569,103 @@ APP_GUIDE (WhatsApp):
       const themeToggle = document.getElementById('themeToggle');
       if (themeToggle) {
         themeToggle.addEventListener('click', () => {
-          const current =
-            document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-          const next = current === 'light' ? 'dark' : 'light';
-          if (next === 'light') {
-            document.documentElement.setAttribute('data-theme', 'light');
-          } else {
-            document.documentElement.removeAttribute('data-theme');
-          }
+          // Shares state with the landing page: html.dark class + localStorage "theme".
+          const dark = document.documentElement.classList.toggle('dark');
           try {
-            localStorage.setItem('appclaw-theme', next);
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
           } catch (e) {
             /* ignore */
           }
         });
       }
+
+      // ── Natural-language terminal coloring ───────────────────────────────
+      // Colors raw text inside every .code-block <pre>: command verbs, quoted
+      // strings and numbers. Only touches bare text nodes, so the manually
+      // tokenized shell examples (.k/.s/.fl spans) are left exactly as-is.
+      (function () {
+        const VERBS = new Set([
+          'open',
+          'launch',
+          'relaunch',
+          'close',
+          'terminate',
+          'quit',
+          'kill',
+          'tap',
+          'click',
+          'double-tap',
+          'press',
+          'long-press',
+          'type',
+          'enter',
+          'input',
+          'fill',
+          'clear',
+          'scroll',
+          'swipe',
+          'drag',
+          'wait',
+          'assert',
+          'verify',
+          'check',
+          'navigate',
+          'back',
+          'hide',
+          'dismiss',
+          'select',
+          'toggle',
+          'set',
+          'go',
+          'find',
+          'see',
+          'should',
+        ]);
+        const TOKEN = /("[^"]*"|'[^']*')|(\d+(?:\.\d+)?)|([A-Za-z][A-Za-z-]*)|([\s\S])/g;
+
+        function colorize(text) {
+          const frag = document.createDocumentFragment();
+          const parts = [];
+          let m;
+          while ((m = TOKEN.exec(text)) !== null) {
+            if (m[1])
+              parts.push(['s', m[1]]); // quoted string
+            else if (m[2])
+              parts.push(['m', m[2]]); // number
+            else if (m[3])
+              parts.push([VERBS.has(m[3]) ? 'k' : null, m[3]]); // verb
+            else {
+              // plain char — coalesce
+              const prev = parts[parts.length - 1];
+              if (prev && prev[0] === null) prev[1] += m[4];
+              else parts.push([null, m[4]]);
+            }
+          }
+          for (const [cls, txt] of parts) {
+            if (cls) {
+              const s = document.createElement('span');
+              s.className = cls;
+              s.textContent = txt;
+              frag.appendChild(s);
+            } else {
+              frag.appendChild(document.createTextNode(txt));
+            }
+          }
+          return frag;
+        }
+
+        document.querySelectorAll('.code-block pre').forEach((pre) => {
+          Array.from(pre.childNodes).forEach((node) => {
+            if (node.nodeType === 3 && /[A-Za-z0-9"']/.test(node.nodeValue)) {
+              pre.replaceChild(colorize(node.nodeValue), node);
+            }
+          });
+          // tint the leading "-" list markers with the brand teal
+          pre.querySelectorAll('span.p').forEach((sp) => {
+            if (sp.textContent.trim() === '-') sp.classList.add('dash');
+          });
+        });
+      })();
     </script>
   </body>
 </html>

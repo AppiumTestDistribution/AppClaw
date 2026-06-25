@@ -1,0 +1,156 @@
+@import 'tailwindcss';
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-support: hsl(var(--support));
+  --color-destructive: hsl(var(--destructive));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-italic: 'Newsreader', 'Plus Jakarta Sans', Georgia, serif;
+  --font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --shadow-dashboard: 0 25px 80px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* ── LIGHT (toggled), clean neutrals, deep cyan that reads on white ── */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 216 30% 12%;
+  --primary: 191 91% 37%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 200 28% 96%;
+  --secondary-foreground: 216 30% 12%;
+  --muted: 200 20% 96%;
+  --muted-foreground: 215 14% 42%;
+  --accent: 192 88% 34%;
+  --accent-foreground: 0 0% 100%;
+  --support: 243 75% 58%;
+  --destructive: 0 84% 60%;
+  --border: 214 22% 90%;
+  --input: 214 22% 90%;
+  --ring: 191 85% 40%;
+  --radius: 0.625rem;
+}
+
+/* ── DARK (default), deep ink, off-white, bright cyan accent ── */
+.dark {
+  --background: 220 28% 6%;
+  --foreground: 210 24% 92%;
+  --primary: 187 92% 53%;
+  --primary-foreground: 196 90% 8%;
+  --secondary: 218 20% 12%;
+  --secondary-foreground: 210 24% 92%;
+  --muted: 218 18% 12%;
+  --muted-foreground: 215 16% 62%;
+  --accent: 187 92% 53%;
+  --accent-foreground: 196 90% 8%;
+  --support: 239 84% 74%;
+  --destructive: 0 70% 62%;
+  --border: 216 16% 18%;
+  --input: 216 16% 18%;
+  --ring: 187 85% 56%;
+}
+
+/* Smooth color transitions when toggling theme */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    fill 220ms ease,
+    stroke 220ms ease !important;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Italic text routes through Newsreader, an editorial serif that pairs
+   against Plus Jakarta Sans for contrast. */
+em,
+i,
+.italic {
+  font-family: var(--font-italic);
+  font-style: italic;
+  font-weight: 400 !important;
+  font-optical-sizing: auto;
+}
+
+.font-code {
+  font-family: var(--font-code);
+}
+
+/* Faint grid texture, masked to a soft center fade */
+.bg-grid {
+  background-image:
+    linear-gradient(hsl(var(--accent) / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--accent) / 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+.bg-grid-fade {
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 100%);
+}
+
+/* Reveal-on-scroll, progressive enhancement, no-op without JS */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 {
+  transition-delay: 0.1s;
+}
+.reveal-delay-2 {
+  transition-delay: 0.2s;
+}
+.reveal-delay-3 {
+  transition-delay: 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

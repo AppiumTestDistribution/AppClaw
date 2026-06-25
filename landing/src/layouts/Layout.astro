@@ -1,0 +1,53 @@
+---
+import "../index.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "AppClaw, AI-Powered Mobile Automation Agent",
+  description = "Tell AppClaw what to do in plain English. It figures out what to tap, type, and swipe, across Android and iOS. Use the CLI, the Agent CLI, or the Cursor / VS Code Marketplace extension. YAML flows, playground, parallel runs.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" id="themeColorMeta" content="#0b0e14" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>{title}</title>
+    <script is:inline>
+      // Apply theme before first paint. Default: dark. Stored choice wins.
+      (function () {
+        try {
+          var stored = localStorage.getItem("theme");
+          var theme = stored === "light" ? "light" : "dark";
+          var meta = document.getElementById("themeColorMeta");
+          if (theme === "dark") {
+            document.documentElement.classList.add("dark");
+            if (meta) meta.setAttribute("content", "#0b0e14");
+          } else {
+            if (meta) meta.setAttribute("content", "#ffffff");
+          }
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+  </head>
+  <body class="font-body antialiased bg-background bg-grid text-foreground overflow-x-hidden">
+    <slot />
+  </body>
+</html>
