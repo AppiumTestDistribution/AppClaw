@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
@@ -25,16 +25,15 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --font-display: "Plus Jakarta Sans", sans-serif;
-  --font-body: "Inter", sans-serif;
-  --font-italic: "Newsreader", "Plus Jakarta Sans", Georgia, serif;
-  --font-code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-italic: 'Newsreader', 'Plus Jakarta Sans', Georgia, serif;
+  --font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --shadow-dashboard: 0 25px 80px -12px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-dashboard: 0 25px 80px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
-/* ── LIGHT (toggled) — clean neutrals, deep cyan that reads on white ── */
+/* ── LIGHT (toggled), clean neutrals, deep cyan that reads on white ── */
 :root {
   --background: 0 0% 100%;
   --foreground: 216 30% 12%;
@@ -54,7 +53,7 @@
   --radius: 0.625rem;
 }
 
-/* ── DARK (default) — deep ink, off-white, bright cyan accent ── */
+/* ── DARK (default), deep ink, off-white, bright cyan accent ── */
 .dark {
   --background: 220 28% 6%;
   --foreground: 210 24% 92%;
@@ -98,7 +97,7 @@ body {
   color: hsl(var(--foreground));
 }
 
-/* Italic text routes through Newsreader — an editorial serif that pairs
+/* Italic text routes through Newsreader, an editorial serif that pairs
    against Plus Jakarta Sans for contrast. */
 em,
 i,
@@ -126,7 +125,7 @@ i,
   mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 100%);
 }
 
-/* Reveal-on-scroll — progressive enhancement, no-op without JS */
+/* Reveal-on-scroll, progressive enhancement, no-op without JS */
 .reveal {
   opacity: 0;
   transform: translateY(24px);
@@ -138,9 +137,15 @@ i,
   opacity: 1;
   transform: translateY(0);
 }
-.reveal-delay-1 { transition-delay: 0.1s; }
-.reveal-delay-2 { transition-delay: 0.2s; }
-.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-1 {
+  transition-delay: 0.1s;
+}
+.reveal-delay-2 {
+  transition-delay: 0.2s;
+}
+.reveal-delay-3 {
+  transition-delay: 0.3s;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .reveal {

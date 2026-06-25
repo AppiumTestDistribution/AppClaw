@@ -1,22 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-type Theme = "light" | "dark";
+type Theme = 'light' | 'dark';
 
 const TRANSITION_MS = 220;
 
 function applyTheme(next: Theme) {
   const root = document.documentElement;
-  root.classList.add("theme-transitioning");
-  if (next === "dark") {
-    root.classList.add("dark");
+  root.classList.add('theme-transitioning');
+  if (next === 'dark') {
+    root.classList.add('dark');
   } else {
-    root.classList.remove("dark");
+    root.classList.remove('dark');
   }
   window.setTimeout(() => {
-    root.classList.remove("theme-transitioning");
+    root.classList.remove('theme-transitioning');
   }, TRANSITION_MS + 40);
   try {
-    localStorage.setItem("theme", next);
+    localStorage.setItem('theme', next);
   } catch {}
 }
 
@@ -24,18 +24,18 @@ export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme | null>(null);
 
   useEffect(() => {
-    const isDark = document.documentElement.classList.contains("dark");
-    setTheme(isDark ? "dark" : "light");
+    const isDark = document.documentElement.classList.contains('dark');
+    setTheme(isDark ? 'dark' : 'light');
   }, []);
 
   const toggle = () => {
     if (!theme) return;
-    const next: Theme = theme === "light" ? "dark" : "light";
+    const next: Theme = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
     applyTheme(next);
   };
 
-  const isDark = theme === "dark";
+  const isDark = theme === 'dark';
   const ready = theme !== null;
 
   return (
@@ -43,7 +43,7 @@ export default function ThemeToggle() {
       type="button"
       role="switch"
       aria-checked={isDark}
-      aria-label={`Switch to ${isDark ? "light" : "dark"} theme`}
+      aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
       onClick={toggle}
       className="group relative inline-flex h-7 w-[64px] items-center rounded-full border border-border bg-secondary/60 hover:bg-secondary hover:border-foreground/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
@@ -67,17 +67,17 @@ export default function ThemeToggle() {
 
       <span
         className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-background border border-border shadow-[0_1px_3px_rgba(0,0,0,0.18)] flex items-center justify-center transition-[left,opacity,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:shadow-[0_2px_6px_rgba(0,0,0,0.22)] ${
-          isDark ? "left-[40px]" : "left-[2px]"
-        } ${ready ? "opacity-100" : "opacity-0"}`}
+          isDark ? 'left-[40px]' : 'left-[2px]'
+        } ${ready ? 'opacity-100' : 'opacity-0'}`}
       >
         <SunIcon
           className={`absolute h-3 w-3 text-accent transition-opacity duration-200 ${
-            !isDark ? "opacity-100" : "opacity-0"
+            !isDark ? 'opacity-100' : 'opacity-0'
           }`}
         />
         <MoonIcon
           className={`absolute h-3 w-3 text-accent transition-opacity duration-200 ${
-            isDark ? "opacity-100" : "opacity-0"
+            isDark ? 'opacity-100' : 'opacity-0'
           }`}
         />
       </span>
@@ -85,7 +85,7 @@ export default function ThemeToggle() {
   );
 }
 
-function SunIcon({ className = "" }: { className?: string }) {
+function SunIcon({ className = '' }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -103,7 +103,7 @@ function SunIcon({ className = "" }: { className?: string }) {
   );
 }
 
-function MoonIcon({ className = "" }: { className?: string }) {
+function MoonIcon({ className = '' }: { className?: string }) {
   return (
     <svg
       className={className}

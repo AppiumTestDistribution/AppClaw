@@ -1,13 +1,13 @@
-import { useState } from "react";
-import ThemeToggle from "./ThemeToggle";
+import { useState } from 'react';
+import ThemeToggle from './ThemeToggle';
 
 const NAV_LINKS = [
-  { label: "Parallel", href: "#parallel" },
-  { label: "Features", href: "#features" },
-  { label: "AppGuide", href: "#appguide" },
-  { label: "How It Works", href: "#how-it-works" },
-  { label: "Architecture", href: "#architecture" },
-  { label: "Usage Guide", href: "/usage.html" },
+  { label: 'Parallel', href: '#parallel' },
+  { label: 'Features', href: '#features' },
+  { label: 'AppGuide', href: '#appguide' },
+  { label: 'How It Works', href: '#how-it-works' },
+  { label: 'Architecture', href: '#architecture' },
+  { label: 'Usage Guide', href: '/usage.html' },
 ];
 
 export default function MobileMenu() {
@@ -21,13 +21,13 @@ export default function MobileMenu() {
         aria-label="Toggle menu"
       >
         <span
-          className={`block h-[1.5px] w-5 bg-foreground transition-transform duration-200 ${open ? "translate-y-[4.5px] rotate-45" : ""}`}
+          className={`block h-[1.5px] w-5 bg-foreground transition-transform duration-200 ${open ? 'translate-y-[4.5px] rotate-45' : ''}`}
         />
         <span
-          className={`block h-[1.5px] w-5 bg-foreground transition-opacity duration-200 ${open ? "opacity-0" : ""}`}
+          className={`block h-[1.5px] w-5 bg-foreground transition-opacity duration-200 ${open ? 'opacity-0' : ''}`}
         />
         <span
-          className={`block h-[1.5px] w-5 bg-foreground transition-transform duration-200 ${open ? "-translate-y-[4.5px] -rotate-45" : ""}`}
+          className={`block h-[1.5px] w-5 bg-foreground transition-transform duration-200 ${open ? '-translate-y-[4.5px] -rotate-45' : ''}`}
         />
       </button>
 
