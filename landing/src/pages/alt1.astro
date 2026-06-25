@@ -1,0 +1,443 @@
+---
+// Alternative landing #2 — "Editorial infographic / glossary poster".
+// Cream + electric blue + lime, Archivo display + JetBrains Mono labels,
+// hairline cards with monoline icons. Self-contained, served at /alt1.
+
+const GH = "https://github.com/AppiumTestDistribution/appclaw";
+const QUICKSTART = `${GH}#quick-start`;
+const MARKETPLACE =
+  "https://marketplace.visualstudio.com/items?itemName=AppClaw.appclaw";
+
+// pixel bitmap for the giant "9"
+const NINE = ["01110", "10001", "10001", "01111", "00001", "00001", "01110"];
+
+const CARDS = [
+  { n: "01", t: "Agent Mode", icon: "agent", d: "Describe a goal in plain English. AppClaw reads the screen, reasons, and acts until it's done." },
+  { n: "02", t: "YAML Flows", icon: "yaml", d: "Deterministic plain-English steps. No LLM cost at runtime — fast, repeatable, with vision fallback." },
+  { n: "03", t: "Spatial Locators", icon: "locate", d: "Resolve the right element by position — below, above, near — even when many elements match." },
+  { n: "04", t: "Dual Perception", icon: "vision", d: "Reads the structured accessibility tree, and falls back to AI vision when there's no DOM." },
+  { n: "05", t: "Episodic Memory", icon: "memory", d: "Records the winning steps on success and recalls them on the next run. Self-improving." },
+  { n: "06", t: "Parallel Runs", icon: "parallel", d: "Add one line and fan your suite across the whole device rack — each with its own pass/fail." },
+  { n: "07", t: "Playground", icon: "playground", d: "A live REPL on a real device. Type commands, watch them run, and export straight to YAML." },
+  { n: "08", t: "AppGuides", icon: "appguide", d: "Per-app navigation maps injected into context, so the agent knows your app before it opens it." },
+  { n: "09", t: "MCP-native", icon: "mcp", d: "Every device action flows through the open MCP protocol — no proprietary drivers, no lock-in." },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AppClaw — 6 ways it automates mobile</title>
+    <meta name="description" content="The mobile automation agent. Say what you want in plain English — AppClaw locates the right element and taps, types, and swipes across real Android and iOS devices." />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style is:global>
+      :root {
+        --paper: #f2efe6;
+        --card: #faf9f3;
+        --ink: #100f0d;
+        --ink-soft: #55534b;
+        --blue: #2b4bff;
+        --lime: #c2f23f;
+        --lime-edge: #a9d92f;
+        --line: #d9d6c8;
+        --line-2: #c8c5b5;
+        --black: #0b0b0a;
+        --font-display: "Archivo", -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", "SF Mono", monospace;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { font-family: var(--font-display); background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+      ::selection { background: var(--lime); color: var(--ink); }
+      a { color: inherit; text-decoration: none; }
+      .wrap { max-width: 1220px; margin: 0 auto; padding: 0 32px; }
+
+      .mono { font-family: var(--font-mono); }
+      .hl { background: linear-gradient(transparent 58%, var(--lime) 58%, var(--lime) 92%, transparent 92%); padding: 0 2px; }
+      .bl { color: var(--blue); }
+
+      /* reveal */
+      .rv { opacity: 0; transform: translateY(18px); }
+      .rv.in { opacity: 1; transform: none; transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.16,1,0.3,1); }
+      .d1 { transition-delay: 0.08s; } .d2 { transition-delay: 0.16s; }
+
+      /* TOP BAR */
+      .top { border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 50; background: rgba(242,239,230,0.85); backdrop-filter: blur(10px); }
+      .top-in { display: flex; align-items: center; justify-content: space-between; height: 66px; }
+      .brand { font-family: var(--font-mono); font-weight: 700; font-size: 17px; letter-spacing: 0.01em; }
+      .brand b { color: var(--blue); }
+      .top-r { display: flex; align-items: center; gap: 22px; }
+      .top-tag { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; color: var(--ink-soft); }
+      .top-cta { font-family: var(--font-mono); font-weight: 700; font-size: 13px; background: var(--blue); color: #fff; padding: 9px 16px; border-radius: 7px; transition: background 0.15s, transform 0.15s; }
+      .top-cta:hover { background: #1d39d6; transform: translateY(-1px); }
+
+      /* HERO */
+      .hero { padding: 56px 0 50px; position: relative; }
+      .eyebrow { font-family: var(--font-mono); font-weight: 700; font-size: 14px; letter-spacing: 0.04em; display: inline-block; }
+      .eyebrow u { text-decoration: none; box-shadow: inset 0 -7px 0 var(--lime); }
+      .hero-top { display: flex; align-items: flex-start; gap: 30px; margin-top: 22px; }
+      .six { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: 128px; flex-shrink: 0; }
+      .six i { aspect-ratio: 1; border-radius: 3px; }
+      .six i.on { background: var(--blue); }
+      h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 4.4vw, 60px); line-height: 0.9; letter-spacing: -0.025em; }
+      h1 .scrib { position: relative; white-space: nowrap; }
+      h1 .scrib svg { position: absolute; left: 0; bottom: -0.16em; width: 100%; height: 0.2em; overflow: visible; }
+      .hero-sub { font-family: var(--font-mono); font-size: clamp(15px, 1.7vw, 20px); line-height: 1.6; margin-top: 26px; max-width: 640px; color: var(--ink); }
+      .hero-btns { display: flex; gap: 13px; margin-top: 30px; flex-wrap: wrap; }
+      .btn { font-family: var(--font-mono); font-weight: 700; font-size: 14px; padding: 13px 22px; border-radius: 8px; border: 1.5px solid var(--ink); background: var(--blue); border-color: var(--blue); color: #fff; cursor: pointer; transition: transform 0.15s, background 0.15s; display: inline-flex; align-items: center; gap: 8px; }
+      .btn:hover { transform: translateY(-2px); background: #1d39d6; }
+      .btn.alt { background: transparent; color: var(--ink); border-color: var(--ink); }
+      .btn.alt:hover { background: var(--ink); color: var(--paper); }
+
+      /* HERO two-column + phone */
+      .hero-grid2 { display: grid; grid-template-columns: 1.18fr 0.82fr; gap: 44px; align-items: center; }
+      .hero-r { position: relative; display: flex; flex-direction: column; align-items: center; }
+      .hero-r .blkA { position: absolute; right: 6px; top: -8px; width: 92px; height: 116px; background: #e6e3d6; z-index: -1; }
+      .hero-r .blkB { position: absolute; left: 2px; bottom: 44px; width: 84px; height: 84px; background: var(--lime); opacity: 0.45; z-index: -1; }
+      .device { width: 248px; aspect-ratio: 248 / 516; background: #0c0e12; border: 1px solid #000; border-radius: 40px; padding: 8px; box-shadow: 0 28px 56px -28px rgba(16,15,13,0.45); }
+      .screen { width: 100%; height: 100%; background: #fff; border-radius: 33px; overflow: hidden; display: flex; flex-direction: column; }
+      .statusbar { display: flex; justify-content: space-between; align-items: center; padding: 13px 18px 7px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
+      .sig { display: flex; align-items: flex-end; gap: 2px; }
+      .sig i { display: block; width: 3px; background: var(--ink); border-radius: 1px; }
+      .sig i:nth-child(1){height:4px}.sig i:nth-child(2){height:6px}.sig i:nth-child(3){height:8px}.sig i:nth-child(4){height:10px}
+      .batt { width: 20px; height: 11px; border: 1.4px solid var(--ink); border-radius: 3px; position: relative; margin-left: 5px; }
+      .batt::before { content: ""; position: absolute; right: -3px; top: 3px; width: 2px; height: 5px; background: var(--ink); border-radius: 0 2px 2px 0; }
+      .batt::after { content: ""; position: absolute; inset: 2px; width: 62%; background: var(--blue); border-radius: 1px; }
+      .appbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 18px 14px; border-bottom: 1px solid var(--line); }
+      .appbar .app { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+      .appbar svg { width: 18px; height: 18px; stroke: var(--ink-soft); fill: none; stroke-width: 1.7; stroke-linecap: round; }
+      .scr-body { padding: 18px; display: flex; flex-direction: column; gap: 11px; }
+      .scr-body h5 { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+      .field { height: 40px; border: 1px solid var(--line-2); border-radius: 9px; display: flex; align-items: center; padding: 0 12px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+      .loginbtn { position: relative; margin-top: 6px; height: 46px; border-radius: 9px; background: var(--blue); color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 14px; }
+      .reticle { position: absolute; inset: -9px; border: 1.5px solid var(--blue); border-radius: 13px; pointer-events: none; }
+      .reticle::before, .reticle::after { content: ""; position: absolute; width: 7px; height: 7px; background: var(--blue); border-radius: 1px; }
+      .reticle::before { top: -4px; left: -4px; } .reticle::after { bottom: -4px; right: -4px; }
+      .rlabel { position: absolute; top: 0; left: 50%; transform: translate(-50%, -55%); font-family: var(--font-mono); font-size: 10px; color: #fff; background: var(--blue); padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+      .signup { text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); }
+      .signup b { color: var(--ink); font-weight: 400; border-bottom: 1px solid var(--line-2); }
+      .phone-cap { margin-top: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); text-align: center; }
+      .phone-cap b { color: var(--blue); font-weight: 700; }
+
+      /* GRID 6 */
+      .glossary { padding: 14px 0 70px; }
+      .grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      .gc { border: 1px solid var(--line); background: var(--card); border-radius: 4px; padding: 24px 24px 26px; display: flex; flex-direction: column; transition: border-color 0.18s, transform 0.18s; }
+      .gc:hover { border-color: var(--ink); transform: translateY(-2px); }
+      .gc .num { font-family: var(--font-mono); font-weight: 700; font-size: 15px; color: var(--blue); }
+      .gc h3 { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.01em; margin-top: 9px; }
+      .gc p { font-size: 15px; line-height: 1.5; color: var(--ink-soft); margin-top: auto; }
+      .icns { display: flex; align-items: center; height: 64px; margin: 20px 0 22px; }
+      .ib { width: 42px; height: 42px; border: 1px solid var(--line-2); border-radius: 9px; display: grid; place-items: center; color: var(--ink); flex-shrink: 0; background: var(--paper); }
+      .ib.sm { width: 30px; height: 30px; border-radius: 7px; }
+      .ib.sp { background: var(--blue); border-color: var(--blue); color: #fff; }
+      .ib.ck { background: var(--lime); border-color: var(--lime-edge); color: var(--ink); }
+      .ib.bl { border-color: var(--blue); color: var(--blue); }
+      .dash { flex: 1; min-width: 12px; border-top: 1.5px dashed var(--line-2); margin: 0 7px; }
+      .ico { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+      .ico.sm { width: 15px; height: 15px; }
+      .inbox { flex: 1; height: 44px; border: 1px solid var(--line-2); border-radius: 10px; display: flex; align-items: center; gap: 8px; padding: 0 7px 0 14px; background: var(--paper); }
+      .inbox .ph { flex: 1; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+      .minirack { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; width: 100%; }
+      .minirack i { aspect-ratio: 1 / 1.4; border: 1px solid var(--line-2); border-radius: 4px; background: var(--paper); }
+      .minirack i.b { background: var(--blue); border-color: var(--blue); }
+      .minirack i.l { background: var(--lime); border-color: var(--lime-edge); }
+
+      /* STATS */
+      .stats { border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr); }
+      .stat { padding: 46px 22px; border-right: 1px solid var(--line); }
+      .stat:last-child { border-right: none; }
+      .stat .v { font-family: var(--font-display); font-weight: 800; font-size: clamp(40px, 5vw, 72px); color: var(--blue); line-height: 0.85; letter-spacing: -0.03em; }
+      .stat .l { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-soft); margin-top: 10px; }
+
+      /* STATEMENT */
+      .statement { border-top: 1px solid var(--line); padding: 46px 0; display: grid; grid-template-columns: 1.5fr 1fr; gap: 44px; align-items: center; }
+      .st-l { display: flex; gap: 18px; align-items: flex-start; }
+      .st-sp { width: 52px; height: 52px; border-radius: 11px; background: var(--blue); display: grid; place-items: center; flex-shrink: 0; }
+      .st-text { font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 2.8vw, 33px); line-height: 1.18; letter-spacing: -0.01em; }
+      .st-text .u { color: var(--blue); position: relative; white-space: nowrap; }
+      .st-text .u svg { position: absolute; left: 0; bottom: -0.18em; width: 100%; height: 0.2em; overflow: visible; }
+      .st-r { display: flex; gap: 14px; align-items: flex-start; }
+      .st-r .grn { color: #1f9d57; flex-shrink: 0; margin-top: 2px; }
+      .st-note { font-size: 14.5px; line-height: 1.55; color: var(--ink-soft); }
+
+      /* CTA */
+      .cta { border-top: 1px solid var(--line); padding: 52px 0; text-align: center; }
+      .cta h2 { font-family: var(--font-display); font-weight: 800; font-size: clamp(30px, 4vw, 52px); letter-spacing: -0.02em; }
+      .cta h2 .bl { color: var(--blue); }
+      .install { display: inline-flex; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 16px; background: var(--ink); color: var(--paper); border-radius: 10px; padding: 13px 18px; margin: 24px 0; }
+      .install .pp { color: var(--lime); }
+      .install button { font-family: var(--font-mono); font-weight: 700; font-size: 12px; cursor: pointer; background: transparent; color: var(--lime); border: 1px solid #3a3a36; border-radius: 6px; padding: 5px 11px; }
+      .cta-btns { display: flex; gap: 13px; justify-content: center; flex-wrap: wrap; }
+
+      /* BLACK BAR */
+      .blackbar { background: var(--black); color: #d7d5cb; }
+      .blackbar-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 20px 0; font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.08em; }
+      .blackbar a { color: var(--lime); }
+
+      .ribbon { position: fixed; bottom: 16px; left: 16px; z-index: 80; font-family: var(--font-mono); font-size: 11px; background: var(--card); border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 12px; box-shadow: 0 6px 18px -10px rgba(0,0,0,0.3); }
+      .ribbon a { color: var(--blue); }
+
+      @media (max-width: 900px) {
+        .mock { display: none; }
+        .grid6 { grid-template-columns: 1fr 1fr; }
+        .stats { grid-template-columns: repeat(3, 1fr); }
+        .stat:nth-child(3n) { border-right: none; }
+        .statement { grid-template-columns: 1fr; gap: 26px; }
+        .hero-grid2 { grid-template-columns: 1fr; gap: 34px; }
+        .hero-r .blkA, .hero-r .blkB { display: none; }
+      }
+      @media (max-width: 560px) {
+        .grid6 { grid-template-columns: 1fr; }
+        .stats { grid-template-columns: repeat(2, 1fr); }
+        .stat:nth-child(3n) { border-right: 1px solid var(--line); }
+        .stat:nth-child(2n) { border-right: none; }
+        .hero-top { flex-direction: column; gap: 16px; }
+        .top-tag { display: none; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <a class="ribbon mono" href="/alt">← view /alt &nbsp;·&nbsp; <span style="color:var(--ink-soft)">option 2</span></a>
+
+    <!-- TOP -->
+    <header class="top">
+      <div class="wrap top-in">
+        <a class="brand" href="/alt1">APPCLAW<b>.</b></a>
+        <div class="top-r">
+          <span class="top-tag">PLAIN ENGLISH · REAL DEVICES</span>
+          <a class="top-cta" href={QUICKSTART}>GET STARTED</a>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <!-- HERO -->
+      <section class="hero">
+        <div class="hero-grid2">
+          <div class="hero-l">
+            <span class="eyebrow rv in"><u>WHAT APPCLAW DOES</u></span>
+            <div class="hero-top rv in d1">
+              <div class="six" aria-label="9">
+                {NINE.flatMap((row) => row.split("").map((c) => <i class={c === "1" ? "on" : ""}></i>))}
+              </div>
+              <h1>
+                ways AppClaw<br />automates
+                <span class="scrib"> mobile
+                  <svg viewBox="0 0 100 8" preserveAspectRatio="none"><path d="M1 6 Q 25 1 50 5 T 99 4" stroke="var(--blue)" stroke-width="3" fill="none" stroke-linecap="round" /></svg>
+                </span>.
+              </h1>
+            </div>
+            <p class="hero-sub mono rv in d2">
+              Say what you want in <span class="hl">plain English</span> — AppClaw figures out what to tap,
+              type, and swipe on real Android &amp; iOS devices.
+            </p>
+            <div class="hero-btns rv in d2">
+              <a class="btn" href={QUICKSTART}>Get Started <svg class="ico sm" viewBox="0 0 24 24" style="stroke:#fff"><path d="M5 12h14M13 6l6 6-6 6" /></svg></a>
+              <a class="btn alt" href={GH} target="_blank" rel="noopener">View on GitHub</a>
+            </div>
+          </div>
+
+          <div class="hero-r rv in d2">
+            <div class="blkA" aria-hidden="true"></div>
+            <div class="blkB" aria-hidden="true"></div>
+            <div class="device">
+              <div class="screen">
+                <div class="statusbar">
+                  <span>9:41</span>
+                  <span style="display:flex;align-items:center">
+                    <span class="sig"><i></i><i></i><i></i><i></i></span>
+                    <span class="batt"></span>
+                  </span>
+                </div>
+                <div class="appbar">
+                  <span class="app">MyApp</span>
+                  <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+                </div>
+                <div class="scr-body">
+                  <h5>Welcome back</h5>
+                  <div class="field">name@email.com</div>
+                  <div class="field">••••••••</div>
+                  <div class="loginbtn">
+                    Login
+                    <span class="reticle"></span>
+                    <span class="rlabel">located · below password</span>
+                  </div>
+                  <div class="signup">Already have an account? <b>Log in</b></div>
+                </div>
+              </div>
+            </div>
+            <div class="phone-cap">resolves the <b>Login</b> button — not the “Log in” text link</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GLOSSARY GRID -->
+      <section class="glossary">
+        <div class="grid6">
+          {CARDS.map((c) => (
+            <div class="gc rv">
+              <span class="num">{c.n}.</span>
+              <h3>{c.t}</h3>
+              <div class="icns">
+                {c.icon === "agent" && (
+                  <div class="inbox">
+                    <span class="ph">describe a goal…</span>
+                    <span class="ib sm bl"><svg class="ico sm" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" /></svg></span>
+                    <span class="ib sm sp"><svg class="ico sm" viewBox="0 0 24 24" style="stroke:#fff"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+                  </div>
+                )}
+                {c.icon === "yaml" && (
+                  <>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h3" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib ck"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12l4 4 10-10" /></svg></span>
+                  </>
+                )}
+                {c.icon === "locate" && (
+                  <>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="5" rx="1.5" /><rect x="4" y="14" width="10" height="5" rx="1.5" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib sp"><svg class="ico" viewBox="0 0 24 24" style="stroke:#fff"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.4" /><path d="M12 1v3M12 20v3M1 12h3M20 12h3" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib ck"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12l4 4 10-10" /></svg></span>
+                  </>
+                )}
+                {c.icon === "vision" && (
+                  <>
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                      <span class="ib sm"><svg class="ico sm" viewBox="0 0 24 24"><path d="M6 4h6M6 4v16M6 11h6M6 18h6" /></svg></span>
+                      <span class="ib sm"><svg class="ico sm" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 16l5-4 4 3 3-2 6 5" /></svg></span>
+                    </div>
+                    <span class="dash"></span>
+                    <span class="ib sp"><svg class="ico" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib ck"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12l4 4 10-10" /></svg></span>
+                  </>
+                )}
+                {c.icon === "memory" && (
+                  <>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /><path d="M12 8v4l3 2" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2" /><circle cx="18" cy="6" r="2" /><circle cx="18" cy="18" r="2" /><path d="M8 12l8-5M8 12l8 5" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib ck"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12l4 4 10-10" /></svg></span>
+                  </>
+                )}
+                {c.icon === "parallel" && (
+                  <div class="minirack">
+                    <i class="b"></i><i></i><i class="l"></i><i></i><i class="b"></i><i></i>
+                    <i></i><i class="b"></i><i></i><i class="b"></i><i></i><i class="l"></i>
+                  </div>
+                )}
+                {c.icon === "playground" && (
+                  <>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9l3 3-3 3M13 15h4" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><path d="M7 4l12 8-12 8z" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib ck"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12l4 4 10-10" /></svg></span>
+                  </>
+                )}
+                {c.icon === "appguide" && (
+                  <>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><path d="M4 5l5-1 6 2 5-1v15l-5 1-6-2-5 1z" /><path d="M9 4v16M15 6v16" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib sp"><svg class="ico" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib ck"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12l4 4 10-10" /></svg></span>
+                  </>
+                )}
+                {c.icon === "mcp" && (
+                  <>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib bl"><svg class="ico" viewBox="0 0 24 24"><path d="M9 12h6M8 8a4 4 0 000 8M16 8a4 4 0 010 8" /></svg></span>
+                    <span class="dash"></span>
+                    <span class="ib"><svg class="ico" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg></span>
+                  </>
+                )}
+              </div>
+              <p>{c.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+
+    <!-- STATS -->
+    <div class="wrap">
+      <section class="stats rv">
+        <div class="stat"><div class="v">32</div><div class="l">MCP Tools</div></div>
+        <div class="stat"><div class="v">10</div><div class="l">App Guides</div></div>
+        <div class="stat"><div class="v">5</div><div class="l">LLM Providers</div></div>
+        <div class="stat"><div class="v">3</div><div class="l">Modes</div></div>
+        <div class="stat"><div class="v">2</div><div class="l">Platforms</div></div>
+      </section>
+    </div>
+
+    <!-- STATEMENT -->
+    <div class="wrap">
+      <section class="statement">
+        <div class="st-l rv">
+          <span class="st-sp"><svg class="ico lg" viewBox="0 0 24 24" style="stroke:#fff;width:24px;height:24px"><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" /></svg></span>
+          <div class="st-text">
+            Automation is shifting from brittle scripts to
+            <span class="u"> agents that understand
+              <svg viewBox="0 0 100 8" preserveAspectRatio="none"><path d="M1 5 Q 25 2 50 5 T 99 4" stroke="var(--lime)" stroke-width="4" fill="none" stroke-linecap="round" /></svg>
+            </span>.
+          </div>
+        </div>
+        <div class="st-r rv d1">
+          <span class="grn"><svg class="ico" viewBox="0 0 24 24"><path d="M4 12h14M12 6l6 6-6 6" /></svg></span>
+          <p class="st-note">
+            From a prompt to a passing test, AppClaw drives the whole flow — plus a playground and
+            per-app AppGuides for the steps that need a hand.
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <!-- CTA -->
+    <div class="wrap">
+      <section class="cta">
+        <h2>Describe it. <span class="bl">AppClaw</span> grabs it.</h2>
+        <div class="install"><span class="pp">$</span> npx appclaw <button id="copyBtn">Copy</button></div>
+        <div class="cta-btns">
+          <a class="btn" href={QUICKSTART}>Get Started <svg class="ico sm" viewBox="0 0 24 24" style="stroke:#fff"><path d="M5 12h14M13 6l6 6-6 6" /></svg></a>
+          <a class="btn alt" href={MARKETPLACE} target="_blank" rel="noopener">Cursor &amp; VS Code</a>
+        </div>
+      </section>
+    </div>
+
+    <!-- BLACK BAR -->
+    <div class="blackbar">
+      <div class="wrap blackbar-in">
+        <span>DESCRIBE IT · IT TAPS · IT VERIFIES · IT REMEMBERS</span>
+        <span>© 2026 APPCLAW · APACHE 2.0 · <a href={GH} target="_blank" rel="noopener">GITHUB ↗</a></span>
+      </div>
+    </div>
+
+    <script is:inline>
+      const obs = new IntersectionObserver((entries) => {
+        entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); obs.unobserve(e.target); } });
+      }, { threshold: 0.12 });
+      document.querySelectorAll(".rv:not(.in)").forEach((el) => obs.observe(el));
+
+      const c = document.getElementById("copyBtn");
+      if (c) c.addEventListener("click", () => { navigator.clipboard.writeText("npx appclaw").then(() => { c.textContent = "Copied"; setTimeout(() => (c.textContent = "Copy"), 1800); }); });
+    </script>
+  </body>
+</html>
