@@ -101,30 +101,17 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
-            # android-emulator-runner executes this with /usr/bin/sh (dash),
-            # which has no `pipefail` — use the POSIX-supported flags only.
+            # android-emulator-runner executes this with /usr/bin/sh (dash) and
+            # does not honour backslash line-continuations — keep each command on
+            # a single line, and use POSIX flags only (no `pipefail`).
             set -eu
-
-            # ── Boot the second emulator (the first is already up as emulator-5554) ──
-            echo "no" | avdmanager create avd \
-              -n test2 \
-              -k "system-images;android-${API_LEVEL};${TARGET};${ARCH}" \
-              -d "${PROFILE}" --force
-            nohup "$ANDROID_HOME/emulator/emulator" -avd test2 -port 5556 \
-              -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim \
-              -camera-back none -camera-front none >"$RUNNER_TEMP/emulator-5556.log" 2>&1 &
-
-            # ── Wait for both emulators to finish booting ──
-            for serial in emulator-5554 emulator-5556; do
-              echo "Waiting for $serial to boot…"
-              adb -s "$serial" wait-for-device
-              timeout 300 adb -s "$serial" shell \
-                'while [[ -z $(getprop sys.boot_completed | tr -d "\r") ]]; do sleep 2; done'
-              adb -s "$serial" shell input keyevent 82 || true
-            done
+            # Boot the second emulator (the first is already up as emulator-5554).
+            echo "no" | avdmanager create avd -n test2 -k "system-images;android-${API_LEVEL};${TARGET};${ARCH}" -d "${PROFILE}" --force
+            nohup "$ANDROID_HOME/emulator/emulator" -avd test2 -port 5556 -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none > "$RUNNER_TEMP/emulator-5556.log" 2>&1 &
+            # Wait for both emulators to finish booting.
+            for serial in emulator-5554 emulator-5556; do echo "Waiting for $serial to boot..."; adb -s "$serial" wait-for-device; timeout 300 adb -s "$serial" shell 'while [ -z "$(getprop sys.boot_completed | tr -d "\r")" ]; do sleep 2; done'; adb -s "$serial" shell input keyevent 82 || true; done
             adb devices
-
-            # ── Run the example specs across both emulators ──
+            # Run the example specs across both emulators.
             cd examples/runner
             appclaw test --workers 2 --retries 1 --reporter plain
 
