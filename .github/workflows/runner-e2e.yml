@@ -101,7 +101,9 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
-            set -euo pipefail
+            # android-emulator-runner executes this with /usr/bin/sh (dash),
+            # which has no `pipefail` — use the POSIX-supported flags only.
+            set -eu
 
             # ── Boot the second emulator (the first is already up as emulator-5554) ──
             echo "no" | avdmanager create avd \
