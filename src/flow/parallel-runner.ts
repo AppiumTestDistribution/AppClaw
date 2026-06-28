@@ -19,8 +19,8 @@
 
 import { resolve, dirname } from 'path';
 import * as crypto from 'crypto';
-import * as net from 'net';
 import { acquireSharedMCPClient } from '../mcp/client.js';
+import { allocatePort, releasePorts } from '../mcp/port-allocator.js';
 import type { AppClawConfig } from '../config.js';
 import type { Platform, DeviceType } from '../index.js';
 import { extractText } from '../mcp/tools.js';
@@ -37,20 +37,6 @@ import { RunArtifactCollector, writeSuiteEntry } from '../report/writer.js';
 import { emitJson, isJsonMode } from '../json-emitter.js';
 import * as ui from '../ui/terminal.js';
 import chalk from 'chalk';
-
-// ── Free port discovery ─────────────────────────────────────────────
-
-/** Ask the OS for an available TCP port by binding to port 0. */
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.listen(0, '127.0.0.1', () => {
-      const addr = server.address() as net.AddressInfo;
-      server.close(() => resolve(addr.port));
-    });
-    server.on('error', reject);
-  });
-}
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -110,11 +96,15 @@ async function discoverDevices(
 interface WorkerCapsResult {
   caps: Record<string, unknown>;
   mjpegUrl?: string;
+  /** Reserved port numbers — release after the session is created. */
+  ports: number[];
 }
 
 async function buildWorkerCaps(platform: Platform): Promise<WorkerCapsResult> {
   if (platform === 'android') {
-    const [systemPort, mjpegPort] = await Promise.all([findFreePort(), findFreePort()]);
+    // Sequential allocation keeps the reservation check atomic per port.
+    const systemPort = await allocatePort();
+    const mjpegPort = await allocatePort();
     const mjpegUrl = `http://127.0.0.1:${mjpegPort}`;
     return {
       caps: {
@@ -123,15 +113,17 @@ async function buildWorkerCaps(platform: Platform): Promise<WorkerCapsResult> {
         'appium:mjpegScreenshotUrl': mjpegUrl,
       },
       mjpegUrl,
+      ports: [systemPort, mjpegPort],
     };
   }
   if (platform === 'ios') {
-    const wdaPort = await findFreePort();
+    const wdaPort = await allocatePort();
     return {
       caps: { 'appium:wdaLocalPort': wdaPort },
+      ports: [wdaPort],
     };
   }
-  return { caps: {} };
+  return { caps: {}, ports: [] };
 }
 
 // ── Worker execution ────────────────────────────────────────────────
@@ -163,16 +155,27 @@ async function runWorkerJob(
   // Without this, concurrent workers race on the shared activeDevice global
   // in appium-mcp and both end up targeting the same physical device.
   // Cloud mode: skip local port allocation — LambdaTest allocates sessions dynamically.
-  const { caps: workerCaps, mjpegUrl } = isCloud
-    ? { caps: {}, mjpegUrl: undefined }
+  const {
+    caps: workerCaps,
+    mjpegUrl,
+    ports,
+  } = isCloud
+    ? { caps: {}, mjpegUrl: undefined, ports: [] as number[] }
     : await buildWorkerCaps(platform);
   const appUrl = resolveFlowApp(job.parsed.meta.app, platform);
   const appCap = appUrl ? { 'appium:app': appUrl } : {};
-  const deviceResult = await setupDevice(sharedMcp, {
-    ...baseSetupArgs,
-    cliUdid: isCloud ? null : device.udid,
-    extraCaps: isCloud ? { ...appCap } : { 'appium:udid': device.udid, ...workerCaps, ...appCap },
-  });
+  let deviceResult;
+  try {
+    deviceResult = await setupDevice(sharedMcp, {
+      ...baseSetupArgs,
+      cliUdid: isCloud ? null : device.udid,
+      extraCaps: isCloud ? { ...appCap } : { 'appium:udid': device.udid, ...workerCaps, ...appCap },
+    });
+  } finally {
+    // Release the port reservations once creation settles (bound on success,
+    // free again on failure). See port-allocator.ts.
+    releasePorts(ports);
+  }
 
   emitJson({
     event: 'device_ready',

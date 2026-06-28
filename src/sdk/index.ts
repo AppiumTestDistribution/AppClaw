@@ -123,7 +123,10 @@ export class AppClaw {
         ? new RunArtifactCollector(
             'sdk-run',
             { name: options.reportName ?? 'AppClaw SDK Run' },
-            (options.platform ?? 'android') as 'android' | 'ios'
+            (options.platform ?? 'android') as 'android' | 'ios',
+            options.reportDevice,
+            options.reportSuiteId,
+            options.reportSuiteName
           )
         : null;
 
@@ -337,6 +340,15 @@ export class AppClaw {
     }
 
     return result;
+  }
+
+  /**
+   * The run id of this session's report (stable from construction), or
+   * undefined when reporting is disabled. Lets a caller (e.g. the runner) link a
+   * test result back to its on-disk manifest under `.appclaw/runs/<runId>/`.
+   */
+  get runId(): string | undefined {
+    return this.collector?.runId;
   }
 
   /**
