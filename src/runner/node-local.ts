@@ -61,7 +61,18 @@ export interface SSENode {
   host: string;
   port: number;
   stop(): Promise<void>;
+  /**
+   * The most recent appium-mcp server log lines (stdout+stderr), newest last.
+   * Empty for an external node (its process isn't ours to read). The node is
+   * shared by all workers, so for a parallel run this tail interleaves lines
+   * from concurrent sessions — it's a "what was the server doing around the
+   * failure" snapshot, not a per-test isolated stream.
+   */
+  recentLog(): string;
 }
+
+/** Cap the node log ring buffer so a long run can't grow it without bound. */
+const NODE_LOG_MAX_LINES = 500;
 
 // ── Signal guard ────────────────────────────────────────────────────
 // Every appium-mcp the runner spawns is tracked here so that a hard interrupt
@@ -130,10 +141,26 @@ export async function startLocalSSENode(opts: StartLocalNodeOptions = {}): Promi
   const port = opts.port ?? (await findFreePort());
   const { command, args } = resolveAppiumMcp();
 
+  // Pipe stdout/stderr so we can ring-buffer the server's log for failure
+  // reports. In debug mode we also tee it to our own stdio so the live view is
+  // unchanged. ('ignore' would discard it — then there'd be nothing to attach.)
   const child: ChildProcess = spawn(command, [...args, '--httpStream', `--port=${port}`], {
-    stdio: opts.debug ? 'inherit' : 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env },
   });
+
+  const logRing: string[] = [];
+  const onLog = (buf: Buffer, tee: NodeJS.WriteStream) => {
+    const text = buf.toString();
+    if (opts.debug) tee.write(text);
+    for (const line of text.split(/\r?\n/)) {
+      if (!line) continue;
+      logRing.push(line);
+      if (logRing.length > NODE_LOG_MAX_LINES) logRing.shift();
+    }
+  };
+  child.stdout?.on('data', (b: Buffer) => onLog(b, process.stdout));
+  child.stderr?.on('data', (b: Buffer) => onLog(b, process.stderr));
 
   // Track for the signal guard so an interrupt never orphans this process.
   installSignalGuards();
@@ -157,6 +184,7 @@ export async function startLocalSSENode(opts: StartLocalNodeOptions = {}): Promi
       return {
         host,
         port,
+        recentLog: () => logRing.join('\n'),
         async stop() {
           activeChildren.delete(child);
           // SIGKILL: fastmcp's httpStream server doesn't reliably honor SIGTERM.

@@ -208,6 +208,7 @@ export class Runner<State = unknown> {
       const node: SSENode = {
         host: u.hostname,
         port: Number(u.port),
+        recentLog: () => '', // external server's process isn't ours to read
         async stop() {
           /* externally owned */
         },
@@ -365,6 +366,11 @@ export class Runner<State = unknown> {
         }
       } catch (err) {
         error = err instanceof Error ? err : new Error(String(err));
+        // Snapshot the appium-mcp server log at the failure moment so the
+        // report's failure panel can show what the server was doing. Captured
+        // before teardown finalizes this attempt's manifest.
+        const mcpLog = node.recentLog();
+        if (mcpLog) app.attachAppiumMcpLog(mcpLog);
       }
 
       const info: TestInfo = {

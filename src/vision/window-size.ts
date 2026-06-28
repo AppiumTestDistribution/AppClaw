@@ -53,6 +53,36 @@ export function getDevicePlatform(mcp: MCPClient): 'android' | 'ios' {
   return platformCache.get(mcp) ?? 'android';
 }
 
+/** Human-readable OS version ("Android 14" / "iOS 17.2"), cached per client. */
+const osVersionCache = new WeakMap<MCPClient, string>();
+
+/**
+ * Resolve the device's OS version as a display string ("Android 14",
+ * "iOS 17.2"), fetched once via `appium_mobile_device_info` and cached per
+ * MCP client (parallel-safe). Returns undefined when it can't be determined
+ * (e.g. iOS where deviceInfo omits the version) — callers just show the device
+ * name alone in that case.
+ */
+export async function getOsVersion(mcp: MCPClient): Promise<string | undefined> {
+  const cached = osVersionCache.get(mcp);
+  if (cached) return cached;
+  try {
+    const result = await mcp.callTool('appium_mobile_device_info', { action: 'info' });
+    const text = mcpResultText(result);
+    // `mobile: deviceInfo` returns JSON. Android includes platformVersion ("14");
+    // iOS exposes it when available. Match the JSON field, then a looser form.
+    const ver =
+      text.match(/"platformVersion"\s*:\s*"?([\d.]+)"?/i)?.[1] ??
+      text.match(/platformVersion['":\s]+([\d.]+)/i)?.[1];
+    if (!ver) return undefined;
+    const label = getDevicePlatform(mcp) === 'ios' ? `iOS ${ver}` : `Android ${ver}`;
+    osVersionCache.set(mcp, label);
+    return label;
+  } catch {
+    return undefined;
+  }
+}
+
 function mcpResultText(result: MCPToolResult): string {
   for (const content of result.content) {
     if (content.type === 'text') return content.text;

@@ -31,6 +31,7 @@ import {
   type GenerateSdkTestConfig,
 } from './goal-export.js';
 import { RunArtifactCollector } from '../report/writer.js';
+import { getOsVersion } from '../vision/window-size.js';
 import { silenceTerminalUI } from '../ui/terminal.js';
 import type {
   RunYamlFlowOptions,
@@ -199,6 +200,13 @@ export class AppClaw {
       }
     }
 
+    // Resolve the device OS version once per run (best-effort) so the report can
+    // show "emulator-5556 · Android 14" instead of the device name alone.
+    if (this.collector && !this.collector.deviceVersion) {
+      this.collector.deviceVersion =
+        (await getOsVersion(client).catch(() => undefined)) ?? undefined;
+    }
+
     // Merge per-call overrides over the instance defaults. A per-call wait value
     // re-derives the poll budget for this step only; scroll overrides fall back
     // to the instance defaults, then to whatever the instruction parsed to.
@@ -349,6 +357,15 @@ export class AppClaw {
    */
   get runId(): string | undefined {
     return this.collector?.runId;
+  }
+
+  /**
+   * Attach the appium-mcp server log captured at failure time, so the report's
+   * failure panel can show it. Called by the runner from a test's catch block
+   * before teardown finalizes the manifest. No-op when reporting is disabled.
+   */
+  attachAppiumMcpLog(text: string): void {
+    this.collector?.attachAppiumMcpLog(text);
   }
 
   /**

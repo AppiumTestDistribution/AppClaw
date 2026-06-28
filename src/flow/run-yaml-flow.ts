@@ -49,6 +49,7 @@ import {
 import { Config } from '../config.js';
 import { MODEL_PRICING } from '../constants.js';
 import { screenshot } from '../mcp/tools.js';
+import { capturePreAction } from './pre-action-capture.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { ActionResult } from '../llm/schemas.js';
@@ -843,8 +844,10 @@ async function tryTapByLabelOnDom(
   const keyInfo = cacheCtx ? buildCacheKey(cacheCtx, pageSource, 'tap', cacheLabel) : null;
   if (cacheCtx && keyInfo) {
     const hit = await tryCachedLocator(cacheCtx, mcp, keyInfo, async (uuid) => {
+      // Capture the settled tap surface before the gesture navigates away.
+      const beforeScreenshot = await capturePreAction(mcp);
       await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: uuid });
-      return { success: true, message: `Tapped "${label}"` };
+      return { success: true, message: `Tapped "${label}"`, beforeScreenshot };
     });
     if (hit) return hit;
   }
@@ -867,6 +870,10 @@ async function tryTapByLabelOnDom(
   );
   if (!resolved) return null;
 
+  // Capture the settled tap surface (Samples List, etc.) right before the
+  // gesture so the report shows the screen the tap happened ON — with the dot
+  // on the target — not the page it navigates to.
+  const beforeScreenshot = await capturePreAction(mcp);
   await mcp.callTool('appium_gesture', { action: 'tap', elementUUID: resolved.uuid });
   const coords = pick.center;
   // Record the winning locator so the next run for the same label on the same
@@ -883,6 +890,7 @@ async function tryTapByLabelOnDom(
   return {
     success: true,
     message: `Tapped "${label}"${where} at [${coords[0]}, ${coords[1]}]`,
+    beforeScreenshot,
   };
 }
 

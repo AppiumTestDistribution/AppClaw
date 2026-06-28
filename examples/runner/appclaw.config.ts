@@ -1,6 +1,7 @@
 import { defineConfig, TestContext } from 'appclaw/runner';
 
 export default defineConfig({
+  video: true,
   testDir: 'tests',
   concurrency: 'auto',
   retries: 1,

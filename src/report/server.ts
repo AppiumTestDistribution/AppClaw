@@ -105,6 +105,34 @@ export function startReportServer(options: ReportServerOptions = {}): http.Serve
       const artifactMatch = pathname.match(/^\/artifacts\/([^/]+)\/(.+)$/);
       if (artifactMatch) {
         const [, runId, artifactPath] = artifactMatch;
+
+        // Screenshots are stored as base64 in the manifest (new runs write no
+        // PNG files). Resolve from there; fall through to disk for older runs
+        // that still have PNGs, and for video/other artifacts.
+        if (artifactPath.startsWith('steps/')) {
+          const manifest = await loadRunManifest(projectRoot, runId);
+          const step = manifest?.steps.find(
+            (s) => s.screenshotPath === artifactPath || s.beforeScreenshotPath === artifactPath
+          );
+          const dataUri =
+            step && step.beforeScreenshotPath === artifactPath
+              ? step.beforeScreenshot
+              : step?.screenshot;
+          const base64 = dataUri?.split(',')[1];
+          if (base64) {
+            const buf = Buffer.from(base64, 'base64');
+            res.writeHead(200, {
+              'Content-Type': 'image/png',
+              'Content-Length': buf.length,
+              'Cache-Control': 'public, max-age=3600',
+              'Access-Control-Allow-Origin': '*',
+            });
+            res.end(buf);
+            return;
+          }
+          // else fall through to disk (legacy PNG files)
+        }
+
         const fullPath = getArtifactPath(projectRoot, runId, ...artifactPath.split('/'));
 
         // Security: prevent path traversal

@@ -5,8 +5,8 @@
  * this report is scoped to the CURRENT run only. It aggregates the suite's
  * tests, links each back to its on-disk manifest (steps + screenshots + video)
  * via `runId`, and renders a mobile-focused report: per-device breakdown,
- * per-file grouping, a step gallery with device-framed screenshots, failure
- * reasons, and the run environment.
+ * per-file grouping, a step timeline with device-framed screenshots (click any
+ * to zoom into a full-size lightbox), failure reasons, and the run environment.
  *
  * Written to `.appclaw/runs/<suiteId>/index.html`; screenshots are referenced
  * relatively (`../<runId>/steps/…`) so the folder is portable.
@@ -34,18 +34,36 @@ interface ReportTest {
   title: string;
   file: string;
   device: string;
+  /** Device OS version ("Android 14" / "iOS 17.2"), from the run manifest. */
+  osVersion?: string;
   status: 'passed' | 'failed' | 'skipped';
   durationMs: number;
   retries: number;
   error?: string;
   runId?: string;
-  steps: StepArtifact[];
-  videoPath?: string;
-  /** Relative href prefix to this test's run folder, e.g. `../<runId>` */
-  hrefBase?: string;
+  steps: ReportStep[];
+  /** appium-mcp server log tail captured at failure time (failed tests only). */
+  appiumMcpLog?: string;
+  /** Screen recording inlined as a base64 data URI (so the report is portable). */
+  videoData?: string;
+  /** Stable index assigned at render time; links a list row to its detail data. */
+  id?: number;
 }
 
+/** A step plus its screenshot as a data URI (read straight from the manifest). */
+type ReportStep = StepArtifact & { img?: string };
+
 /* ───────────────────────── data assembly ───────────────────────── */
+
+/** Read a file and return a base64 data URI, or undefined if absent. */
+async function fileToDataUri(absPath: string, mime: string): Promise<string | undefined> {
+  try {
+    const buf = await fsp.readFile(absPath);
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Load each test's manifest (steps/screenshots/video) and shape the model. */
 async function assembleTests(projectRoot: string, results: TestResult[]): Promise<ReportTest[]> {
@@ -65,9 +83,24 @@ async function assembleTests(projectRoot: string, results: TestResult[]): Promis
       if (!r.runId) return base;
       const manifest = await loadRunManifest(projectRoot, r.runId).catch(() => null);
       if (manifest) {
-        base.steps = manifest.steps ?? [];
-        base.videoPath = manifest.videoPath;
-        base.hrefBase = `../${r.runId}`;
+        base.osVersion = manifest.deviceVersion;
+        base.appiumMcpLog = manifest.failureLogs?.appiumMcp;
+        // Screenshots are base64 in the manifest, so the report stays a single
+        // portable file with no external requests. Prefer the before/tap-surface
+        // screenshot when present (tap steps) so the dot lands on the screen the
+        // tap happened on; fall back to the after-execution screenshot otherwise.
+        base.steps = (manifest.steps ?? []).map((s) => ({
+          ...s,
+          img: s.beforeScreenshot ?? s.screenshot,
+        }));
+        // Inline the recording too (base64) so the report stays one portable
+        // file — plays in place, like the screenshots.
+        if (manifest.videoPath) {
+          base.videoData = await fileToDataUri(
+            path.join(projectRoot, '.appclaw', 'runs', r.runId, manifest.videoPath),
+            'video/mp4'
+          );
+        }
         // Manifest duration is more precise for passed tests with sub-steps.
         if (!base.durationMs && manifest.durationMs) base.durationMs = manifest.durationMs;
       }
@@ -143,12 +176,21 @@ function fmtDate(iso: string): string {
 /* ───────────────────────── rendering ───────────────────────────── */
 
 function renderReport(suite: SuiteResult, meta: SuiteReportMeta, tests: ReportTest[]): string {
-  const total = suite.passed + suite.failed + suite.skipped;
-  const ran = suite.passed + suite.failed;
-  const passRate = ran > 0 ? Math.round((suite.passed / ran) * 100) : 100;
+  // Derive counts from `tests` so a partially-populated suite object can never
+  // surface as NaN/undefined in the header cards. Prefer suite's own tallies
+  // when present, else fall back to what the test list tells us.
+  const passed = suite.passed ?? tests.filter((t) => t.status === 'passed').length;
+  const failed = suite.failed ?? tests.filter((t) => t.status === 'failed').length;
+  const skipped = suite.skipped ?? tests.filter((t) => t.status === 'skipped').length;
+  const total = passed + failed + skipped;
+  const ran = passed + failed;
+  const passRate = ran > 0 ? Math.round((passed / ran) * 100) : 100;
   const flaky = tests.filter((t) => t.status === 'passed' && t.retries > 0).length;
   const totalSteps = tests.reduce((n, t) => n + t.steps.length, 0);
-  const verdict = suite.failed > 0 ? 'FAILED' : 'PASSED';
+  const suiteDurationMs = suite.durationMs || tests.reduce((n, t) => n + (t.durationMs || 0), 0);
+  const verdict = failed > 0 ? 'FAILED' : 'PASSED';
+  // Stable id per test — shared by the list rows and the embedded detail data.
+  tests.forEach((t, i) => (t.id = i));
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -158,30 +200,36 @@ function renderReport(suite: SuiteResult, meta: SuiteReportMeta, tests: ReportTe
 <title>${esc(meta.suiteName)} · AppClaw Report</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>${styles()}</style>
 </head>
 <body class="${verdict === 'FAILED' ? 'is-failed' : 'is-passed'}">
 <div class="grain"></div>
-<main>
-  ${renderHero(suite, meta, verdict, passRate, ran)}
-  ${renderStats(suite, { total, passRate, flaky, totalSteps, ran })}
+<button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()" aria-label="toggle light / dark theme" title="Toggle theme">☾</button>
+<main id="list-view">
+  ${renderHero(meta, { verdict, passRate, ran, passed, durationMs: suiteDurationMs })}
+  ${renderStats({ total, passed, failed, skipped, flaky, totalSteps, durationMs: suiteDurationMs })}
   ${renderDevices(meta, tests)}
   ${renderResults(tests)}
   ${renderFooter(meta)}
 </main>
+<section id="detail-view" class="detail" hidden></section>
+<script>window.__REPORT__=${embedJson(buildData(tests))};</script>
 <script>${script()}</script>
 </body>
 </html>`;
 }
 
+/** JSON for an inline <script>, with `<` escaped so it can't close the tag. */
+function embedJson(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, '\\u003c');
+}
+
 function renderHero(
-  suite: SuiteResult,
   meta: SuiteReportMeta,
-  verdict: string,
-  passRate: number,
-  ran: number
+  d: { verdict: string; passRate: number; ran: number; passed: number; durationMs: number }
 ): string {
+  const { verdict, passRate, ran, passed, durationMs } = d;
   const R = 52;
   const C = 2 * Math.PI * R;
   const dash = (passRate / 100) * C;
@@ -193,7 +241,7 @@ function renderHero(
       <div class="hero-meta">
         <span class="chip plat plat-${esc(meta.platform)}">${platIcon} ${esc(meta.platform)}</span>
         <span class="chip">${esc(fmtDate(meta.startedAt))}</span>
-        <span class="chip">${esc(fmtClock(suite.durationMs))} wall</span>
+        <span class="chip">${esc(fmtClock(durationMs))} wall</span>
         <span class="chip">${meta.devices.length} device${meta.devices.length === 1 ? '' : 's'} · ${meta.workers} worker${meta.workers === 1 ? '' : 's'}</span>
       </div>
     </div>
@@ -210,24 +258,29 @@ function renderHero(
       </div>
       <div class="verdict verdict-${verdict.toLowerCase()}">
         <span class="dot"></span>${verdict}
-        <span class="verdict-sub">${suite.passed}/${ran || suite.passed} passed</span>
+        <span class="verdict-sub">${passed}/${ran || passed} passed</span>
       </div>
     </div>
   </header>`;
 }
 
-function renderStats(
-  suite: SuiteResult,
-  d: { total: number; passRate: number; flaky: number; totalSteps: number; ran: number }
-): string {
+function renderStats(d: {
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  flaky: number;
+  totalSteps: number;
+  durationMs: number;
+}): string {
   const tiles: Array<[string, string, string]> = [
     ['tests', String(d.total), 'neutral'],
-    ['passed', String(suite.passed), 'pass'],
-    ['failed', String(suite.failed), suite.failed ? 'fail' : 'muted'],
+    ['passed', String(d.passed), 'pass'],
+    ['failed', String(d.failed), d.failed ? 'fail' : 'muted'],
     ['flaky', String(d.flaky), d.flaky ? 'flaky' : 'muted'],
-    ['skipped', String(suite.skipped), suite.skipped ? 'skip' : 'muted'],
+    ['skipped', String(d.skipped), d.skipped ? 'skip' : 'muted'],
     ['steps', String(d.totalSteps), 'neutral'],
-    ['duration', fmtDur(suite.durationMs), 'neutral'],
+    ['duration', fmtDur(d.durationMs), 'neutral'],
   ];
   return `<section class="stats reveal">
     ${tiles
@@ -252,10 +305,11 @@ function renderDevices(meta: SuiteReportMeta, tests: ReportTest[]): string {
       const pass = group.filter((t) => t.status === 'passed').length;
       const fail = group.filter((t) => t.status === 'failed').length;
       const ms = group.reduce((n, t) => n + t.durationMs, 0);
+      const os = group.find((t) => t.osVersion)?.osVersion;
       return `<div class="device-card">
         <div class="device-frame-mini"></div>
         <div class="device-info">
-          <div class="device-name">${esc(name)}</div>
+          <div class="device-name">${esc(name)}${os ? ` <span class="device-os">${esc(os)}</span>` : ''}</div>
           <div class="device-stats">
             <span class="pass">${pass}✓</span>
             ${fail ? `<span class="fail">${fail}✗</span>` : ''}
@@ -279,11 +333,10 @@ function renderResults(tests: ReportTest[]): string {
     byFile.get(t.file)!.push(t);
   }
 
-  let testIndex = 0;
   const groups = [...byFile]
     .map(([file, group]) => {
       const fail = group.filter((t) => t.status === 'failed').length;
-      const rows = group.map((t) => renderTest(t, testIndex++)).join('');
+      const rows = group.map((t) => renderTest(t)).join('');
       return `<div class="file-group">
         <div class="file-head">
           <span class="file-icon">›</span>
@@ -316,83 +369,104 @@ function renderResults(tests: ReportTest[]): string {
   </section>`;
 }
 
-function renderTest(t: ReportTest, idx: number): string {
+/** A clickable list row — opens the per-test detail view (Step Inspector). */
+function renderTest(t: ReportTest): string {
   const flaky = t.status === 'passed' && t.retries > 0;
-  const tag = flaky ? 'flaky' : t.status;
-  const hasDetail = t.steps.length > 0 || !!t.error || !!t.videoPath;
   const stepN = t.steps.length;
-  return `<article class="test status-${t.status}${flaky ? ' is-flaky' : ''}" data-status="${t.status}" data-flaky="${flaky}" data-title="${esc(t.title.toLowerCase())}">
-    <button class="test-head"${hasDetail ? ' aria-expanded="false"' : ' disabled'} ${hasDetail ? 'onclick="toggleTest(this)"' : ''}>
-      <span class="status-glyph s-${t.status}">${
-        t.status === 'passed' ? '✓' : t.status === 'failed' ? '✗' : '⊘'
-      }</span>
-      <span class="test-title">${esc(t.title)}</span>
-      <span class="test-tags">
-        ${flaky ? `<span class="tag tag-flaky">↻ ${t.retries}</span>` : ''}
-        ${t.retries > 0 && !flaky ? `<span class="tag tag-retry">↻ ${t.retries}</span>` : ''}
-        <span class="tag tag-device">${esc(t.device)}</span>
-        ${stepN ? `<span class="tag tag-steps">${stepN} step${stepN === 1 ? '' : 's'}</span>` : ''}
-        <span class="tag tag-time">${esc(fmtDur(t.durationMs))}</span>
-      </span>
-      ${hasDetail ? '<span class="chevron">⌄</span>' : '<span class="chevron-empty"></span>'}
-    </button>
-    ${hasDetail ? `<div class="test-body"><div class="test-body-inner">${renderTestBody(t, tag)}</div></div>` : ''}
-  </article>`;
+  const glyph = t.status === 'passed' ? '✓' : t.status === 'failed' ? '✗' : '⊘';
+  return `<button class="test status-${t.status}" data-idx="${t.id}" data-status="${t.status}" data-flaky="${flaky}" data-title="${esc(t.title.toLowerCase())}" onclick="openTest(${t.id})">
+    <span class="status-glyph s-${t.status}">${glyph}</span>
+    <span class="test-title">${esc(t.title)}</span>
+    <span class="test-tags">
+      ${t.retries > 0 ? `<span class="tag tag-flaky">↻ ${t.retries}</span>` : ''}
+      <span class="tag tag-device">${esc(t.device)}</span>
+      ${stepN ? `<span class="tag tag-steps">${stepN} step${stepN === 1 ? '' : 's'}</span>` : ''}
+      <span class="tag tag-time">${esc(fmtDur(t.durationMs))}</span>
+    </span>
+    <span class="chevron">›</span>
+  </button>`;
 }
 
-function renderTestBody(t: ReportTest, _tag: string): string {
-  const parts: string[] = [];
-
-  if (t.error) {
-    parts.push(`<div class="error-box">
-      <div class="error-label">Failure</div>
-      <pre class="error-msg">${esc(t.error)}</pre>
-    </div>`);
-  }
-
-  if (t.videoPath && t.hrefBase) {
-    parts.push(`<div class="video-row">
-      <a class="video-link" href="${esc(t.hrefBase)}/${esc(t.videoPath)}" target="_blank">▶ screen recording</a>
-    </div>`);
-  }
-
-  if (t.steps.length) {
-    parts.push(
-      `<div class="gallery">${t.steps.map((s) => renderStep(s, t.hrefBase)).join('')}</div>`
-    );
-  } else if (!t.error) {
-    parts.push('<div class="no-steps">No captured steps for this test.</div>');
-  }
-
-  return parts.join('');
+/**
+ * The instruction as the user wrote it in their test — that's what belongs in
+ * the step label + the inspector's "Instruction" field. The engine's result
+ * `message` ("Tapped …") is shown separately in the inspector's Message row.
+ */
+function stepDescription(s: StepArtifact): string {
+  return s.verbatim || s.target || s.message || s.kind;
 }
 
-function renderStep(s: StepArtifact, hrefBase?: string): string {
-  const label = s.target || s.message || s.verbatim || s.kind;
-  const shot = s.screenshotPath && hrefBase ? `${hrefBase}/${s.screenshotPath}` : '';
-  const overlay = renderTapOverlay(s);
-  return `<figure class="step s-${s.status}">
-    <div class="phone">
-      <div class="phone-screen">
-        ${shot ? `<img loading="lazy" src="${esc(shot)}" alt="${esc(label)}">` : '<div class="no-shot">no screenshot</div>'}
-        ${overlay}
-      </div>
-    </div>
-    <figcaption>
-      <span class="step-kind k-${esc(s.kind)}">${esc(s.kind)}</span>
-      <span class="step-label">${esc(label)}</span>
-      <span class="step-time">${esc(fmtDur(s.durationMs))}</span>
-    </figcaption>
-  </figure>`;
+/* ── client data model (embedded as JSON, rendered by the detail SPA) ── */
+
+interface ClientStep {
+  n: number;
+  kind: string;
+  desc: string;
+  status: string;
+  durationMs: number;
+  message?: string;
+  phase?: string;
+  img?: string;
+  /** Ms from run start to this step — used to sync the step with the recording. */
+  offsetMs?: number;
+  /**
+   * Raw tap point in device pixels, plus the reference frame to scale against.
+   * `w`/`h` come from deviceScreenSize/screenshotSize when known; otherwise the
+   * client falls back to the screenshot's natural pixel size (Android tap coords
+   * already live in the screenshot's pixel space).
+   */
+  tap?: { x: number; y: number; w?: number; h?: number };
+}
+interface ClientTest {
+  id: number;
+  title: string;
+  file: string;
+  device: string;
+  os?: string;
+  status: string;
+  durationMs: number;
+  retries: number;
+  error?: string;
+  video?: string;
+  /** appium-mcp server log tail (failed tests only). */
+  mcpLog?: string;
+  steps: ClientStep[];
 }
 
-/** A pulse dot at the tap point, scaled into the screenshot's coordinate box. */
-function renderTapOverlay(s: StepArtifact): string {
-  if (!s.tapCoordinates || !s.deviceScreenSize) return '';
-  const xp = (s.tapCoordinates.x / s.deviceScreenSize.width) * 100;
-  const yp = (s.tapCoordinates.y / s.deviceScreenSize.height) * 100;
-  if (!Number.isFinite(xp) || !Number.isFinite(yp)) return '';
-  return `<span class="tap" style="left:${xp.toFixed(2)}%;top:${yp.toFixed(2)}%"></span>`;
+/** Everything the detail view needs, keyed by test id. */
+function buildData(tests: ReportTest[]): ClientTest[] {
+  return tests.map((t) => ({
+    id: t.id ?? 0,
+    title: t.title,
+    file: t.file,
+    device: t.device,
+    os: t.osVersion,
+    status: t.status,
+    durationMs: t.durationMs,
+    retries: t.retries,
+    error: t.error,
+    video: t.videoData,
+    mcpLog: t.appiumMcpLog,
+    steps: t.steps.map((s, i) => ({
+      n: i + 1,
+      kind: s.kind,
+      desc: stepDescription(s),
+      status: s.status,
+      durationMs: s.durationMs,
+      message: s.message,
+      phase: s.phase,
+      img: s.img,
+      offsetMs: s.videoOffsetMs,
+      tap: s.tapCoordinates
+        ? {
+            x: s.tapCoordinates.x,
+            y: s.tapCoordinates.y,
+            w: s.deviceScreenSize?.width ?? s.screenshotSize?.width,
+            h: s.deviceScreenSize?.height ?? s.screenshotSize?.height,
+          }
+        : undefined,
+    })),
+  }));
 }
 
 function renderFooter(meta: SuiteReportMeta): string {
@@ -410,34 +484,57 @@ function renderFooter(meta: SuiteReportMeta): string {
 function styles(): string {
   return `
 :root{
-  --bg:#0a0c11; --panel:#14171f; --panel-2:#181c26; --line:#242a39;
-  --ink:#e8eaf0; --muted:#9298ab; --faint:#5c6377;
-  --brand:#FC8EAC; --brand-soft:rgba(252,142,172,.14);
-  --pass:#3ddc97; --fail:#ff6b81; --skip:#6b7280; --flaky:#f0b429;
+  /* matches the AppClaw site (landing/) — deep-ink dark, bright cyan accent */
+  --bg:#0b0e13; --panel:#161a22; --panel-2:#1b2029; --line:#272d37;
+  --ink:#e6eaf1; --muted:#919aab; --faint:#5b6473;
+  --brand:#19d4ec; --brand-soft:rgba(25,212,236,.14); --brand-rgb:25,212,236;
+  --pass:#3ddc97; --fail:#f0596a; --skip:#6b7280; --flaky:#f0b429;
   --r:16px;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{
   margin:0;background:
-    radial-gradient(1100px 520px at 82% -8%, rgba(252,142,172,.10), transparent 60%),
-    radial-gradient(900px 600px at -5% 0%, rgba(61,220,151,.06), transparent 55%),
+    radial-gradient(1100px 520px at 82% -8%, rgba(25,212,236,.10), transparent 60%),
+    radial-gradient(900px 600px at -5% 0%, rgba(99,102,241,.07), transparent 55%),
     var(--bg);
   color:var(--ink);
-  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  font-family:"Inter",ui-sans-serif,system-ui,-apple-system,sans-serif;
   font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
   min-height:100vh;
 }
-body.is-failed{--brand:#FC8EAC}
+body.is-failed{--brand:var(--fail);--brand-soft:rgba(240,89,106,.14);--brand-rgb:240,89,106}
 .grain{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
 main{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:40px 28px 80px}
-code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.85em}
+code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.85em}
 
 /* reveal */
 .reveal{opacity:0;transform:translateY(14px);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
 .stats{animation-delay:.06s}.devices{animation-delay:.12s}.results{animation-delay:.18s}.footer{animation-delay:.24s}
 @keyframes rise{to{opacity:1;transform:none}}
+
+/* light theme — flips the variable palette + a few dark-only spots */
+body.light{
+  --bg:#f3f6f8; --panel:#ffffff; --panel-2:#eef2f6; --line:#dce2ea;
+  --ink:#15202c; --muted:#5c6675; --faint:#97a1ae;
+  --brand:#0a97ad; --brand-soft:rgba(10,151,173,.12); --brand-rgb:10,151,173;
+  --pass:#13a06a; --fail:#e0485f; --skip:#8a909c; --flaky:#c08400;
+  background:radial-gradient(1100px 520px at 82% -8%, rgba(10,151,173,.07), transparent 60%),#f3f6f8;
+  color:var(--ink);
+}
+body.light.is-failed{--brand:#e0485f;--brand-soft:rgba(224,72,95,.1);--brand-rgb:224,72,95}
+body.light .grain{opacity:.015}
+body.light .suite{background:linear-gradient(180deg,#13161d,#454c5a);-webkit-background-clip:text;background-clip:text}
+body.light .donut-track{stroke:rgba(0,0,0,.08)}
+body.light .hero{box-shadow:0 24px 60px -42px rgba(20,30,60,.3)}
+body.light .chip{background:rgba(0,0,0,.02)}
+
+/* theme toggle */
+.theme-toggle{position:fixed;top:18px;right:18px;z-index:40;width:40px;height:40px;border-radius:11px;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:17px;cursor:pointer;
+  display:grid;place-items:center;transition:.15s;box-shadow:0 6px 18px -10px rgba(0,0,0,.5)}
+.theme-toggle:hover{border-color:var(--brand);color:var(--brand)}
 
 /* hero */
 .hero{display:flex;justify-content:space-between;gap:32px;align-items:flex-start;
@@ -446,15 +543,15 @@ code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.85em}
   box-shadow:0 30px 80px -40px rgba(0,0,0,.8);position:relative;overflow:hidden}
 .hero::before{content:"";position:absolute;inset:0;background:
   linear-gradient(90deg,var(--brand),transparent 40%);opacity:.08}
-.brand{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;
+.brand{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
 .brand-mark{color:var(--brand);font-size:15px}
 .brand-sub{color:var(--faint)}
-.suite{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;
+.suite{font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;
   font-size:clamp(30px,5vw,52px);line-height:1.02;letter-spacing:-.02em;margin:14px 0 16px;
   background:linear-gradient(180deg,#fff,#c8cbd6);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero-meta{display:flex;flex-wrap:wrap;gap:8px}
-.chip{font-family:"IBM Plex Mono",monospace;font-size:12px;padding:5px 11px;border-radius:999px;
+.chip{font-family:"JetBrains Mono",monospace;font-size:12px;padding:5px 11px;border-radius:999px;
   border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--muted)}
 .chip.plat{text-transform:uppercase;letter-spacing:.06em;color:var(--ink);border-color:var(--brand);
   background:var(--brand-soft)}
@@ -468,13 +565,13 @@ code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.85em}
 body.is-failed .donut-value{stroke:var(--flaky)}
 @keyframes draw{to{stroke-dashoffset:calc(var(--circ) - var(--dash))}}
 .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.rate{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:30px;line-height:1}
+.rate{font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;font-size:30px;line-height:1}
 .rate span{font-size:14px;color:var(--muted)}
 .rate-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:2px}
-.verdict{display:flex;align-items:center;gap:9px;font-family:"Bricolage Grotesque",sans-serif;
+.verdict{display:flex;align-items:center;gap:9px;font-family:"Plus Jakarta Sans",sans-serif;
   font-weight:800;font-size:18px;letter-spacing:.04em;padding:8px 16px;border-radius:12px;border:1px solid var(--line)}
 .verdict .dot{width:9px;height:9px;border-radius:50%}
-.verdict-sub{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0}
+.verdict-sub{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0}
 .verdict-passed{color:var(--pass)}.verdict-passed .dot{background:var(--pass);box-shadow:0 0 14px var(--pass)}
 .verdict-failed{color:var(--fail)}.verdict-failed .dot{background:var(--fail);box-shadow:0 0 14px var(--fail)}
 
@@ -483,7 +580,7 @@ body.is-failed .donut-value{stroke:var(--flaky)}
 .tile{border:1px solid var(--line);border-radius:var(--r);padding:18px 16px;background:var(--panel);
   position:relative;overflow:hidden}
 .tile::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--faint);opacity:.6}
-.tile-value{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:30px;line-height:1;letter-spacing:-.01em}
+.tile-value{font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;font-size:30px;line-height:1;letter-spacing:-.01em}
 .tile-label{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:8px}
 .tone-pass .tile-value{color:var(--pass)}.tone-pass::after{background:var(--pass)}
 .tone-fail .tile-value{color:var(--fail)}.tone-fail::after{background:var(--fail)}
@@ -493,9 +590,9 @@ body.is-failed .donut-value{stroke:var(--flaky)}
 .tone-muted{opacity:.55}
 
 /* section */
-.section-title{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:20px;
+.section-title{font-family:"Plus Jakarta Sans",sans-serif;font-weight:700;font-size:20px;
   margin:0 0 16px;display:flex;align-items:center;gap:10px}
-.section-title .count,.file-count{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted);
+.section-title .count,.file-count{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--muted);
   border:1px solid var(--line);border-radius:999px;padding:2px 9px}
 .devices{margin-top:36px}
 .device-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
@@ -504,7 +601,8 @@ body.is-failed .donut-value{stroke:var(--flaky)}
 .device-frame-mini{width:26px;height:44px;border-radius:6px;border:2px solid var(--faint);flex-shrink:0;position:relative;
   background:linear-gradient(160deg,#222838,#11141c)}
 .device-frame-mini::after{content:"";position:absolute;left:50%;top:4px;transform:translateX(-50%);width:8px;height:2px;border-radius:2px;background:var(--faint)}
-.device-name{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600}
+.device-name{font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:600}
+.device-os{color:var(--muted);font-weight:500;font-size:11px;margin-left:4px}
 .device-stats{display:flex;gap:10px;font-size:12px;margin-top:3px}
 .device-stats .pass{color:var(--pass)}.device-stats .fail{color:var(--fail)}.faint{color:var(--faint)}
 
@@ -513,78 +611,134 @@ body.is-failed .donut-value{stroke:var(--flaky)}
 .results-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .results-head .section-title{margin:0}
 .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.search{font-family:"IBM Plex Mono",monospace;font-size:13px;background:var(--panel);border:1px solid var(--line);
+.search{font-family:"JetBrains Mono",monospace;font-size:13px;background:var(--panel);border:1px solid var(--line);
   color:var(--ink);padding:8px 13px;border-radius:10px;width:190px;outline:none}
 .search:focus{border-color:var(--brand)}
 .filters{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
-.filter{font-family:"IBM Plex Sans",sans-serif;font-size:13px;font-weight:500;color:var(--muted);background:none;
+.filter{font-family:"Inter",sans-serif;font-size:13px;font-weight:500;color:var(--muted);background:none;
   border:none;padding:6px 13px;border-radius:7px;cursor:pointer;transition:.15s}
 .filter:hover{color:var(--ink)}
-.filter.active{background:var(--brand);color:#1a0f14;font-weight:600}
+.filter.active{background:var(--brand);color:#04222a;font-weight:600}
 
 .file-group{margin-bottom:20px}
 .file-head{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);margin-bottom:8px}
 .file-icon{color:var(--brand)}
-.file-path{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink);font-weight:500}
+.file-path{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--ink);font-weight:500}
 .file-badge{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:600}
 .file-badge.all-pass{color:var(--pass);background:rgba(61,220,151,.1)}
 .file-badge.has-fail{color:var(--fail);background:rgba(255,107,129,.1)}
 .file-count{margin-left:auto}
 
-.test{border:1px solid var(--line);border-radius:13px;background:var(--panel);margin-bottom:8px;overflow:hidden;transition:border-color .2s}
+.test{width:100%;display:flex;align-items:center;gap:13px;padding:14px 16px;text-align:left;
+  border:1px solid var(--line);border-radius:13px;background:var(--panel);margin-bottom:8px;cursor:pointer;
+  color:var(--ink);font-family:inherit;font-size:14.5px;transition:border-color .2s,transform .12s,background .2s}
 .test.status-failed{border-color:rgba(255,107,129,.35)}
-.test:hover{border-color:rgba(255,255,255,.16)}
-.test-head{width:100%;display:flex;align-items:center;gap:13px;padding:14px 16px;background:none;border:none;
-  color:var(--ink);cursor:pointer;text-align:left;font-family:inherit;font-size:14.5px}
-.test-head[disabled]{cursor:default}
+.test:hover{border-color:var(--brand);background:var(--panel-2);transform:translateX(2px)}
 .status-glyph{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700}
 .s-passed{background:rgba(61,220,151,.16);color:var(--pass)}
 .s-failed{background:rgba(255,107,129,.16);color:var(--fail)}
 .s-skipped{background:rgba(107,114,128,.16);color:var(--skip)}
 .test-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
 .test-tags{display:flex;gap:6px;align-items:center;flex-shrink:0}
-.tag{font-family:"IBM Plex Mono",monospace;font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tag{font-family:"JetBrains Mono",monospace;font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .tag-device{color:var(--ink)}
 .tag-flaky{color:var(--flaky);border-color:rgba(240,180,41,.4)}
-.tag-retry{color:var(--flaky)}
-.tag-time{color:var(--brand);border-color:rgba(252,142,172,.3)}
-.chevron{color:var(--faint);transition:transform .25s;font-size:16px}
-.chevron-empty{width:16px;display:inline-block}
-.test.open .chevron{transform:rotate(180deg)}
-
-.test-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease}
-.test.open .test-body{grid-template-rows:1fr}
-.test-body-inner{overflow:hidden;min-height:0}
-.test.open .test-body-inner{padding:4px 16px 18px}
+.tag-time{color:var(--brand);border-color:rgba(var(--brand-rgb),.3)}
+.chevron{color:var(--faint);font-size:20px;transition:transform .15s,color .15s}
+.test:hover .chevron{color:var(--brand);transform:translateX(3px)}
 
 .error-box{border:1px solid rgba(255,107,129,.3);border-radius:10px;background:rgba(255,107,129,.06);padding:12px 14px;margin:8px 0 14px}
 .error-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--fail);font-weight:600;margin-bottom:6px}
-.error-msg{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:#ffd2d9;margin:0;white-space:pre-wrap;word-break:break-word}
+.error-msg{font-family:"JetBrains Mono",monospace;font-size:12.5px;color:#ffd2d9;margin:0;white-space:pre-wrap;word-break:break-word}
 .video-row{margin:6px 0 14px}
-.video-link{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--brand);text-decoration:none;border:1px solid rgba(252,142,172,.3);padding:6px 12px;border-radius:8px}
+.video-link{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--brand);text-decoration:none;border:1px solid rgba(var(--brand-rgb),.3);padding:6px 12px;border-radius:8px}
 .video-link:hover{background:var(--brand-soft)}
 .no-steps,.no-shot{color:var(--faint);font-size:13px;font-style:italic}
 
-/* step gallery — device-framed screenshots */
-.gallery{display:flex;gap:16px;overflow-x:auto;padding:8px 2px 14px;scroll-snap-type:x proximity}
-.gallery::-webkit-scrollbar{height:8px}.gallery::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
-.step{margin:0;flex-shrink:0;width:172px;scroll-snap-align:start}
-.phone{padding:7px;border-radius:22px;background:linear-gradient(160deg,#262d3e,#0f121a);
+/* shared phone frame */
+.phone{display:block;padding:6px;border-radius:18px;background:linear-gradient(160deg,#262d3e,#0f121a);
   border:1px solid #313a4f;box-shadow:0 14px 30px -16px rgba(0,0,0,.9)}
-.phone-screen{position:relative;border-radius:15px;overflow:hidden;background:#000;aspect-ratio:9/19.5}
+.phone-screen{position:relative;display:block;border-radius:13px;overflow:hidden;background:#000;aspect-ratio:9/19.5}
 .phone-screen img{width:100%;height:100%;object-fit:cover;display:block}
 .no-shot{display:grid;place-items:center;height:100%;color:var(--faint)}
 .tap{position:absolute;width:26px;height:26px;border-radius:50%;transform:translate(-50%,-50%);
-  border:2px solid var(--brand);background:rgba(252,142,172,.25);box-shadow:0 0 0 0 rgba(252,142,172,.5);
-  animation:tap 1.8s ease-out infinite}
-@keyframes tap{0%{box-shadow:0 0 0 0 rgba(252,142,172,.5)}70%{box-shadow:0 0 0 16px rgba(252,142,172,0)}100%{box-shadow:0 0 0 0 rgba(252,142,172,0)}}
-figcaption{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11.5px}
-.step-kind{font-family:"IBM Plex Mono",monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
-  padding:2px 6px;border-radius:5px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted)}
-.step.s-failed .step-kind{color:var(--fail);border-color:rgba(255,107,129,.4)}
-.step.s-passed .step-kind{color:var(--pass)}
-.step-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
-.step-time{color:var(--faint);font-family:"IBM Plex Mono",monospace}
+  border:2px solid var(--brand);background:rgba(var(--brand-rgb),.25);box-shadow:0 0 0 0 rgba(var(--brand-rgb),.5);
+  animation:tap 1.8s ease-out infinite;pointer-events:none}
+@keyframes tap{0%{box-shadow:0 0 0 0 rgba(var(--brand-rgb),.5)}70%{box-shadow:0 0 0 16px rgba(var(--brand-rgb),0)}100%{box-shadow:0 0 0 0 rgba(var(--brand-rgb),0)}}
+.step-kind{font-family:"JetBrains Mono",monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+  padding:2px 7px;border-radius:5px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted)}
+
+.st-passed{color:var(--pass)}.st-failed{color:var(--fail)}.st-skipped{color:var(--skip)}
+
+/* ── detail view (per-test Step Inspector) ── */
+.detail{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:28px 28px 80px;
+  animation:slidein .3s cubic-bezier(.2,.7,.2,1)}
+.detail[hidden]{display:none}
+@keyframes slidein{from{opacity:0;transform:translateX(18px)}}
+.dt-top{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-bottom:8px}
+.dt-back{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--muted);background:var(--panel);
+  border:1px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;transition:.15s}
+.dt-back:hover{color:var(--ink);border-color:var(--brand)}
+.dt-title{font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;font-size:clamp(22px,3vw,32px);
+  letter-spacing:-.01em;margin:0;flex:1;min-width:200px}
+.dt-verdict{font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;letter-spacing:.04em;font-size:15px;
+  padding:6px 14px;border-radius:10px;border:1px solid var(--line)}
+.dt-verdict.v-passed{color:var(--pass);border-color:rgba(61,220,151,.4)}
+.dt-verdict.v-failed{color:var(--fail);border-color:rgba(255,107,129,.4)}
+.dt-verdict.v-skipped{color:var(--skip)}
+.dt-meta{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px}
+.dt-rec{color:var(--brand);cursor:pointer;font-family:inherit;border-color:rgba(var(--brand-rgb),.35)!important}
+.dt-rec:hover{background:var(--brand-soft)}
+.dt-rec.on{background:var(--brand);color:#04222a;border-color:var(--brand)!important}
+.dt-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.dt-logs{margin-top:20px}
+.dt-logs-head{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+.logblk{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:10px;overflow:hidden}
+.logblk>summary{cursor:pointer;padding:11px 14px;font-size:13px;font-weight:600;list-style:none;user-select:none}
+.logblk>summary::-webkit-details-marker{display:none}
+.logblk>summary::before{content:'▸';display:inline-block;margin-right:8px;color:var(--faint);transition:transform .15s}
+.logblk[open]>summary::before{transform:rotate(90deg)}
+.logsub{font-weight:400;color:var(--faint);font-size:11px}
+.logpre{margin:0;padding:14px;border-top:1px solid var(--line);background:var(--bg);font-family:"JetBrains Mono",monospace;font-size:12px;line-height:1.55;color:var(--muted);white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto}
+/* The author display:block above beats the UA [hidden]{display:none}, so the
+   video would cover the screenshot by default. Restore hidden-means-hidden. */
+.dt-video[hidden]{display:none}
+
+.dt-grid{display:grid;grid-template-columns:300px 1fr 320px;gap:20px;align-items:start}
+.dt-panel{border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden}
+.dt-steps-head,.dt-insp-head{font-family:"JetBrains Mono",monospace;font-size:11px;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--muted);padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.dt-steps{padding:6px;max-height:74vh;overflow:auto}
+.dt-step{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:11px 12px;border:1px solid transparent;
+  border-radius:10px;background:none;color:var(--ink);cursor:pointer;font-family:inherit;font-size:13.5px;transition:.12s}
+.dt-step:hover{background:var(--panel-2)}
+.dt-step.active{background:rgba(var(--brand-rgb),.1);border-color:rgba(var(--brand-rgb),.4)}
+.dt-step-n{width:24px;height:24px;border-radius:7px;flex-shrink:0;display:grid;place-items:center;font-size:11px;font-weight:700;
+  font-family:"JetBrains Mono",monospace;background:var(--panel-2);border:1px solid var(--line);color:var(--muted)}
+.dt-step.s-passed .dt-step-n{color:var(--pass);border-color:rgba(61,220,151,.4)}
+.dt-step.s-failed .dt-step-n{color:var(--fail);border-color:rgba(255,107,129,.5)}
+.dt-step-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dt-step-desc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.dt-step-kind{font-family:"JetBrains Mono",monospace;font-size:10px;text-transform:uppercase;color:var(--faint);margin-top:2px}
+.dt-step-time{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--faint);flex-shrink:0}
+
+.dt-stage{display:flex;justify-content:center;padding:8px}
+.phone.big{padding:9px;border-radius:30px}
+.phone.big .phone-screen{border-radius:22px;height:min(72vh,660px);aspect-ratio:9/19.5}
+.phone.big .phone-screen img{object-fit:contain}
+
+.dt-insp{padding:6px 4px}
+.insp-row{padding:13px 16px;border-bottom:1px solid var(--line)}
+.insp-row:last-child{border-bottom:none}
+.insp-label{font-family:"JetBrains Mono",monospace;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);margin-bottom:6px}
+.insp-val{font-size:14px;color:var(--ink);word-break:break-word;line-height:1.45}
+.insp-val.mono{font-family:"JetBrains Mono",monospace;font-size:13px}
+.insp-pill{display:inline-block;font-family:"JetBrains Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+  padding:3px 10px;border-radius:6px;border:1px solid var(--line)}
+.insp-pill.s-passed{color:var(--pass);border-color:rgba(61,220,151,.4)}
+.insp-pill.s-failed{color:var(--fail);border-color:rgba(255,107,129,.4)}
+.dt-noshot{display:grid;place-items:center;height:100%;color:var(--faint);font-style:italic}
+@media(max-width:960px){.dt-grid{grid-template-columns:1fr}.phone.big .phone-screen{height:auto;max-height:70vh}}
 
 .empty{text-align:center;color:var(--faint);padding:50px;font-style:italic}
 
@@ -605,41 +759,211 @@ figcaption{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11.5
 
 function script(): string {
   return `
-function toggleTest(btn){
-  var t=btn.closest('.test');
-  var open=t.classList.toggle('open');
-  btn.setAttribute('aria-expanded',open?'true':'false');
+var DATA=window.__REPORT__||[];
+var cur=null, curStep=0, videoMode=false;
+
+// ── theme (persisted) ──
+function applyTheme(t){
+  document.body.classList.toggle('light',t==='light');
+  var b=document.getElementById('theme-toggle'); if(b)b.textContent=t==='light'?'☀':'☾';
+  try{localStorage.setItem('appclaw-report-theme',t);}catch(e){}
 }
+function toggleTheme(){applyTheme(document.body.classList.contains('light')?'dark':'light');}
+(function(){var s;try{s=localStorage.getItem('appclaw-report-theme');}catch(e){} if(s)applyTheme(s);})();
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmt(ms){if(!ms)return'0s';if(ms<1000)return ms+'ms';var s=ms/1000;return s<60?s.toFixed(1)+'s':Math.floor(s/60)+'m '+Math.round(s%60)+'s';}
+function glyph(s){return s==='passed'?'✓':s==='failed'?'✗':'⊘';}
+
+// ── list: filter + search ──
 (function(){
   var filter='all', q='';
-  var groups=document.getElementById('groups');
   var empty=document.getElementById('empty');
   function apply(){
     var any=false;
     document.querySelectorAll('.test').forEach(function(t){
       var s=t.dataset.status, fl=t.dataset.flaky==='true', title=t.dataset.title||'';
-      var mf = filter==='all' || (filter==='flaky'?fl:s===filter);
-      var mq = !q || title.indexOf(q)>-1;
-      var show = mf && mq;
-      t.style.display = show?'':'none';
-      if(show) any=true;
+      var mf=filter==='all'||(filter==='flaky'?fl:s===filter), mq=!q||title.indexOf(q)>-1, show=mf&&mq;
+      t.style.display=show?'':'none'; if(show)any=true;
     });
     document.querySelectorAll('.file-group').forEach(function(g){
-      var vis=[].some.call(g.querySelectorAll('.test'),function(t){return t.style.display!=='none'});
+      var vis=[].some.call(g.querySelectorAll('.test'),function(t){return t.style.display!=='none';});
       g.style.display=vis?'':'none';
     });
     empty.hidden=any;
   }
   document.querySelectorAll('.filter').forEach(function(b){
     b.addEventListener('click',function(){
-      document.querySelectorAll('.filter').forEach(function(x){x.classList.remove('active')});
+      document.querySelectorAll('.filter').forEach(function(x){x.classList.remove('active');});
       b.classList.add('active'); filter=b.dataset.filter; apply();
     });
   });
   var s=document.getElementById('search');
   s.addEventListener('input',function(){q=s.value.trim().toLowerCase();apply();});
-  // Auto-open the first failed test so failures are immediately visible.
-  var firstFail=document.querySelector('.test.status-failed .test-head:not([disabled])');
-  if(firstFail) toggleTest(firstFail);
-})();`;
+})();
+
+// ── detail view (Step Inspector) ──
+function showDetail(id,push){
+  var t=DATA[id]; if(!t)return;
+  cur=id; curStep=0; renderDetail(t);
+  document.getElementById('list-view').hidden=true;
+  document.getElementById('detail-view').hidden=false;
+  window.scrollTo(0,0);
+  if(push&&location.hash!=='#test-'+id) history.pushState(null,'','#test-'+id);
+}
+function openTest(id){ showDetail(id,true); }
+function back(){
+  cur=null;
+  document.getElementById('detail-view').hidden=true;
+  document.getElementById('list-view').hidden=false;
+  if(location.hash) history.pushState(null,'','#');
+}
+function renderDetail(t){
+  videoMode=false;
+  var meta='<span class="chip">'+esc(t.device)+(t.os?' · '+esc(t.os):'')+'</span>'+
+    '<span class="chip">'+fmt(t.durationMs)+'</span>'+
+    '<span class="chip">'+esc(t.file)+'</span>'+
+    (t.retries>0?'<span class="chip" style="color:var(--flaky)">↻ '+t.retries+'</span>':'')+
+    (t.video?'<button class="chip dt-rec" id="dt-rec-btn" onclick="toggleVideo()">▶ recording</button>':'');
+  var err=t.error?'<div class="error-box"><div class="error-label">Failure</div><pre class="error-msg">'+esc(t.error)+'</pre></div>':'';
+  var steps=t.steps.length
+    ? t.steps.map(function(s,i){return '<button class="dt-step s-'+s.status+'" data-i="'+i+'" onclick="selectStep('+i+')">'+
+        '<span class="dt-step-n">'+s.n+'</span>'+
+        '<span class="dt-step-main"><span class="dt-step-desc">'+esc(s.desc)+'</span><span class="dt-step-kind">'+esc(s.kind)+'</span></span>'+
+        '<span class="dt-step-time">'+fmt(s.durationMs)+'</span></button>';}).join('')
+    : '<div class="dt-noshot" style="padding:28px">No captured steps</div>';
+  document.getElementById('detail-view').innerHTML=
+    '<div class="dt-top">'+
+      '<button class="dt-back" onclick="back()">← all tests</button>'+
+      '<span class="status-glyph s-'+t.status+'">'+glyph(t.status)+'</span>'+
+      '<h2 class="dt-title">'+esc(t.title)+'</h2>'+
+      '<span class="dt-verdict v-'+t.status+'">'+t.status+'</span>'+
+    '</div>'+
+    '<div class="dt-meta">'+meta+'</div>'+err+
+    '<div class="dt-grid">'+
+      '<div class="dt-panel"><div class="dt-steps-head"><span>Steps</span><span>'+t.steps.length+'</span></div><div class="dt-steps">'+steps+'</div></div>'+
+      '<div class="dt-stage"><div class="phone big"><div class="phone-screen">'+
+        '<img id="dt-img" alt=""><span id="dt-tap" class="tap" hidden></span>'+
+        (t.video?'<video id="dt-video" class="dt-video" playsinline controls preload="metadata" hidden></video>':'')+
+      '</div></div></div>'+
+      '<div class="dt-panel"><div class="dt-insp-head"><span>Inspector</span></div><div class="dt-insp" id="dt-insp"></div></div>'+
+    '</div>'+
+    renderLogs(t);
+  if(t.steps.length) selectStep(0);
+}
+// AppClaw trace, reconstructed from the recorded steps — what AppClaw did, in
+// order, with the failing step marked. Paired with the appium-mcp server log so
+// a failure shows both sides at once.
+function appclawTrace(t){
+  var lines=t.steps.map(function(s){
+    var mark=s.status==='failed'?'✗':(s.status==='passed'?'✓':'•');
+    var msg=s.message?(' — '+s.message):'';
+    return mark+' #'+s.n+' '+s.kind+': '+s.desc+msg;
+  });
+  if(t.error) lines.push('','✗ '+t.error);
+  return lines.join('\\n');
+}
+// Logs are most useful on failure; show the panel for failed tests, or whenever
+// a server log was captured. Collapsed by default so passing runs stay clean.
+function renderLogs(t){
+  var show = t.status==='failed' || !!t.mcpLog;
+  if(!show) return '';
+  var trace=appclawTrace(t);
+  var blocks='<details class="logblk" open><summary>AppClaw log</summary><pre class="logpre">'+esc(trace)+'</pre></details>';
+  if(t.mcpLog) blocks+='<details class="logblk"><summary>appium-mcp server log <span class="logsub">(shared across workers)</span></summary><pre class="logpre">'+esc(t.mcpLog)+'</pre></details>';
+  return '<section class="dt-logs"><div class="dt-logs-head">Logs</div>'+blocks+'</section>';
+}
+function placeTap(t){
+  var img=document.getElementById('dt-img'), tap=document.getElementById('dt-tap'), scr=img.parentElement;
+  var w=t.w||img.naturalWidth, h=t.h||img.naturalHeight;
+  if(!w||!h){tap.hidden=true;return;}
+  // Match the screen box to the screenshot's aspect so the % maps 1:1 (no
+  // letterbox offset from object-fit:contain), then place the pulse dot.
+  scr.style.aspectRatio=(img.naturalWidth||w)+'/'+(img.naturalHeight||h);
+  tap.style.left=(t.x/w*100)+'%'; tap.style.top=(t.y/h*100)+'%'; tap.hidden=false;
+}
+function renderInspector(s){
+  var rows=[['Instruction',esc(s.desc),'']];
+  rows.push(['Status','<span class="insp-pill s-'+s.status+'">'+s.status+'</span>','raw']);
+  rows.push(['Action',esc(s.kind),'mono']);
+  if(s.phase)rows.push(['Phase',esc(s.phase),'mono']);
+  rows.push(['Duration',fmt(s.durationMs),'mono']);
+  if(s.message)rows.push(['Message',esc(s.message),'']);
+  if(s.tap)rows.push(['Tap point','['+s.tap.x+', '+s.tap.y+']','mono']);
+  document.getElementById('dt-insp').innerHTML=rows.map(function(r){
+    var body=r[2]==='raw'?r[1]:'<div class="insp-val'+(r[2]==='mono'?' mono':'')+'">'+r[1]+'</div>';
+    return '<div class="insp-row"><div class="insp-label">'+r[0]+'</div>'+body+'</div>';
+  }).join('');
+}
+function highlightStep(i){
+  document.querySelectorAll('.dt-step').forEach(function(b){b.classList.toggle('active',+b.dataset.i===i);});
+  var act=document.querySelector('.dt-step[data-i="'+i+'"]'); if(act)act.scrollIntoView({block:'nearest'});
+}
+// The recording is usually much SHORTER than the wall-clock run (e.g. a 7.6s
+// test captured as a ~2s clip), so step offsetMs (wall-clock from run start)
+// can't index the video directly. Map proportionally: video fraction ↔ run
+// fraction, using the test's total durationMs as the wall-clock span.
+function videoTimeToStep(t,cur,dur){
+  if(!dur||!isFinite(dur)||!t.durationMs)return curStep;
+  var wall=(cur/dur)*t.durationMs, idx=0;
+  for(var k=0;k<t.steps.length;k++){ if((t.steps[k].offsetMs||0)<=wall) idx=k; }
+  return idx;
+}
+function stepToVideoTime(t,s,dur){
+  if(!dur||!isFinite(dur)||!t.durationMs)return 0;
+  return Math.max(0,Math.min(dur,((s.offsetMs||0)/t.durationMs)*dur));
+}
+function selectStep(i){
+  var t=DATA[cur]; if(!t||!t.steps[i])return;
+  curStep=i; var s=t.steps[i];
+  highlightStep(i); renderInspector(s);
+  if(videoMode){
+    // In video mode, clicking a step seeks the recording to that moment.
+    var vid=document.getElementById('dt-video');
+    if(vid) vid.currentTime=stepToVideoTime(t,s,vid.duration);
+    return;
+  }
+  var img=document.getElementById('dt-img'), tap=document.getElementById('dt-tap');
+  tap.hidden=true;
+  img.onload=function(){ if(curStep===i&&!videoMode&&s.tap) placeTap(s.tap); };
+  if(s.img){img.style.display='';img.src=s.img;}else{img.removeAttribute('src');img.style.display='none';}
+  if(s.img&&img.complete&&img.naturalWidth&&s.tap) placeTap(s.tap);
+}
+// Recording: plays inline in the phone, highlighting each step as it reaches it.
+function toggleVideo(){
+  var t=DATA[cur]; if(!t||!t.video)return;
+  var vid=document.getElementById('dt-video'), img=document.getElementById('dt-img'),
+      tap=document.getElementById('dt-tap'), btn=document.getElementById('dt-rec-btn');
+  videoMode=!videoMode;
+  if(videoMode){
+    if(!vid.getAttribute('src')) vid.src=t.video;
+    img.style.display='none'; tap.hidden=true; vid.hidden=false;
+    if(btn)btn.classList.add('on');
+    vid.parentElement.style.aspectRatio='9/19.5';
+    vid.ontimeupdate=function(){
+      var idx=videoTimeToStep(t,vid.currentTime,vid.duration);
+      if(idx!==curStep){ curStep=idx; highlightStep(idx); renderInspector(t.steps[idx]); }
+    };
+    vid.play().catch(function(){});
+  }else{
+    vid.pause(); vid.hidden=true; img.style.display='';
+    if(btn)btn.classList.remove('on');
+    selectStep(curStep);
+  }
+}
+
+// ── routing (deep links + back button) + keyboard ──
+function route(){
+  var m=(location.hash||'').match(/^#test-(\\d+)$/);
+  if(m&&DATA[+m[1]]) showDetail(+m[1],false); else back();
+}
+window.addEventListener('popstate',route);
+document.addEventListener('keydown',function(e){
+  if(cur===null)return;
+  var t=DATA[cur]; if(!t)return;
+  if(e.key==='Escape')back();
+  else if(e.key==='ArrowDown'||e.key==='ArrowRight'){e.preventDefault();if(curStep<t.steps.length-1)selectStep(curStep+1);}
+  else if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();if(curStep>0)selectStep(curStep-1);}
+});
+if(/^#test-\\d+$/.test(location.hash||'')) route();
+`;
 }
