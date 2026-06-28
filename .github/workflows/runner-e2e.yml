@@ -111,9 +111,9 @@ jobs:
             # Wait for both emulators to finish booting.
             for serial in emulator-5554 emulator-5556; do echo "Waiting for $serial to boot..."; adb -s "$serial" wait-for-device; timeout 300 adb -s "$serial" shell 'while [ -z "$(getprop sys.boot_completed | tr -d "\r")" ]; do sleep 2; done'; adb -s "$serial" shell input keyevent 82 || true; done
             adb devices
-            # Run the example specs across both emulators.
-            cd examples/runner
-            appclaw test --workers 2 --retries 1 --reporter plain
+            # Run the example specs across both emulators. Each line runs in its
+            # own `sh -c`, so `cd` must be chained with the command that needs it.
+            cd examples/runner && appclaw test --workers 2 --retries 1 --reporter plain
 
       - name: Upload runner report
         if: always()
