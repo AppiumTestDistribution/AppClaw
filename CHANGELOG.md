@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.8.0...v1.9.0) (2026-06-29)
+
+### Features
+
+* add support for appclaw runner ([#42](https://github.com/AppiumTestDistribution/AppClaw/issues/42)) ([edbe9c7](https://github.com/AppiumTestDistribution/AppClaw/commit/edbe9c74a769ec39ed603c315ffac47bc4f59f5a))
+
 ## [1.8.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.7.0...v1.8.0) (2026-06-24)
 
 ### Features
