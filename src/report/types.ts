@@ -29,10 +29,18 @@ export interface StepArtifact {
   error?: string;
   /** Informational message (e.g. assert text, done message) */
   message?: string;
-  /** Relative path to screenshot taken after step (e.g. "steps/step-001.png") */
+  /**
+   * Logical id for the after-step screenshot (e.g. "steps/step-001.png"). No
+   * file is written — the image lives in `screenshot` as base64. Kept as a
+   * stable key the report server maps back to the base64 for the live viewer.
+   */
   screenshotPath?: string;
-  /** Relative path to screenshot taken BEFORE the action (for tap pointer overlay) */
+  /** Logical id for the BEFORE-action screenshot (tap pointer overlay). */
   beforeScreenshotPath?: string;
+  /** After-step screenshot as a base64 data URI (`data:image/png;base64,…`). */
+  screenshot?: string;
+  /** Before-action screenshot as a base64 data URI. */
+  beforeScreenshot?: string;
   /** Coordinates of the element interacted with (for tap/type pointer overlay) */
   tapCoordinates?: { x: number; y: number };
   /** Device screen dimensions in the coordinate system used by tap actions (physical pixels on Android, logical points on iOS) */
@@ -68,6 +76,8 @@ export interface RunManifest {
   platform: 'android' | 'ios';
   /** Device name or UDID (if known) */
   device?: string;
+  /** Device OS version, display-ready ("Android 14" / "iOS 17.2"), if detected */
+  deviceVersion?: string;
   /** Overall result */
   success: boolean;
   /** Steps executed count */
@@ -86,6 +96,16 @@ export interface RunManifest {
   steps: StepArtifact[];
   /** Relative path to the screen recording (e.g. "recording.mp4") */
   videoPath?: string;
+  /**
+   * Diagnostic logs captured when the run failed, for the report's failure
+   * panel. `appiumMcp` is the appium-mcp server log tail at failure time (the
+   * server is shared across parallel workers, so it can interleave sessions).
+   * The appclaw-side trace is derived from `steps` by the report, not stored
+   * here.
+   */
+  failureLogs?: {
+    appiumMcp?: string;
+  };
 }
 
 export interface PhaseResultRecord {

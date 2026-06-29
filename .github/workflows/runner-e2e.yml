@@ -1,0 +1,124 @@
+name: Runner E2E (2 Android emulators)
+
+# End-to-end test of the parallel runner (examples/runner): boots TWO Android
+# emulators and runs the example specs across both with `appclaw test --workers 2`.
+#
+# This is heavy (2 emulators + LLM calls), so it does NOT run on every PR. It
+# runs on demand (Actions tab) and when the runner itself changes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: 'LLM provider'
+        required: false
+        default: 'gemini'
+      model:
+        description: 'LLM model ID (blank = provider default)'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'src/runner/**'
+      - 'examples/runner/**'
+      - '.github/workflows/runner-e2e.yml'
+
+concurrency:
+  group: runner-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runner-android:
+    name: Runner — 2 Android emulators
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      API_LEVEL: '33'
+      TARGET: default
+      ARCH: x86_64
+      PROFILE: pixel_6
+      LLM_PROVIDER: ${{ github.event.inputs.provider || 'gemini' }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_MODEL: ${{ github.event.inputs.model }}
+      # Point the example config at a CI caps file that installs VodQA from a URL
+      # (the committed caps.json uses a machine-local APK path).
+      APPCLAW_CAPS: ./tests/caps.ci.json
+      # Force the plain reporter (no TUI dashboard) for readable CI logs.
+      APPCLAW_TUI: 'off'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # ── Build the local AppClaw and expose it as a global `appclaw` ──────────
+      - name: Build & link AppClaw
+        run: |
+          npm ci
+          npm run build
+          npm link
+
+      - name: Install example deps & link AppClaw
+        working-directory: examples/runner
+        run: |
+          npm install
+          npm link appclaw
+
+      # ── Android emulator acceleration ───────────────────────────────────────
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ env.API_LEVEL }}-${{ env.TARGET }}-${{ env.ARCH }}
+
+      # ── Run the runner across two emulators ─────────────────────────────────
+      # reactivecircus/android-emulator-runner boots one AVD ("test", emulator-5554)
+      # and runs `script`. Inside the script we boot a SECOND emulator on port 5556,
+      # wait for both to finish booting, then run `appclaw test --workers 2` so the
+      # specs fan out across both devices.
+      - name: Boot 2 emulators & run specs
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.API_LEVEL }}
+          target: ${{ env.TARGET }}
+          arch: ${{ env.ARCH }}
+          profile: ${{ env.PROFILE }}
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
+          script: |
+            # android-emulator-runner executes this with /usr/bin/sh (dash) and
+            # does not honour backslash line-continuations — keep each command on
+            # a single line, and use POSIX flags only (no `pipefail`).
+            set -eu
+            # Boot the second emulator (the first is already up as emulator-5554).
+            echo "no" | avdmanager create avd -n test2 -k "system-images;android-${API_LEVEL};${TARGET};${ARCH}" -d "${PROFILE}" --force
+            nohup "$ANDROID_HOME/emulator/emulator" -avd test2 -port 5556 -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none > "$RUNNER_TEMP/emulator-5556.log" 2>&1 &
+            # Wait for both emulators to finish booting.
+            for serial in emulator-5554 emulator-5556; do echo "Waiting for $serial to boot..."; adb -s "$serial" wait-for-device; timeout 300 adb -s "$serial" shell 'while [ -z "$(getprop sys.boot_completed | tr -d "\r")" ]; do sleep 2; done'; adb -s "$serial" shell input keyevent 82 || true; done
+            adb devices
+            # Run the example specs across both emulators. Each line runs in its
+            # own `sh -c`, so `cd` must be chained with the command that needs it.
+            cd examples/runner && appclaw test --workers 2 --retries 1 --reporter plain
+
+      - name: Upload runner report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runner-report
+          path: examples/runner/.appclaw/runs/
+          if-no-files-found: ignore

@@ -250,6 +250,19 @@ export function printProgressBar(current: number, total: number, width = 20): vo
 // ─── Spinner ─────────────────────────────────────────────
 
 const SPINNER = cliSpinners.dots;
+/**
+ * Animated spinners only make sense on an interactive TTY where the cursor can
+ * be moved to redraw a line in place. In CI / piped output (`isTTY` falsy), the
+ * in-place redraw codes don't collapse — every frame is appended, flooding the
+ * log with hundreds of `⠋ Creating Appium session…` lines. There we fall back
+ * to a single static line and no timer.
+ */
+function spinnerCanAnimate(): boolean {
+  // Match the ora/chalk convention: a real interactive TTY and not CI. Some CI
+  // providers allocate a pseudo-TTY yet still don't honour in-place redraws, so
+  // `CI` is treated as non-animating regardless of isTTY.
+  return process.stdout.isTTY === true && !process.env.CI;
+}
 let spinnerTimer: ReturnType<typeof setInterval> | null = null;
 let spinnerFrame = 0;
 let spinnerLineActive = false;
@@ -366,9 +379,21 @@ export function startSpinner(message: string, detail?: string, rotateWords = fal
   if (r?.startSpinner) return r.startSpinner(message, detail, rotateWords);
   stopSpinner();
   spinnerFrame = 0;
-  spinnerLineActive = true;
   spinnerPrimary = rotateWords ? pickThinkingVerb() : message;
   spinnerDetail = detail;
+
+  // Non-TTY (CI, piped logs): emit one static line, no animation, no cursor
+  // codes. updateSpinner/stopSpinner become no-ops on the line below since
+  // spinnerLineActive stays false.
+  if (!spinnerCanAnimate()) {
+    const line = spinnerDetail
+      ? `  ${theme.step.bold(spinnerPrimary)} ${theme.dim(`(${spinnerDetail})`)}`
+      : `  ${theme.dim(spinnerPrimary)}`;
+    process.stdout.write(line + '\n');
+    return;
+  }
+
+  spinnerLineActive = true;
   process.stdout.write('\x1B[?25l');
   paintSpinnerLine(spinnerFrame, false);
   spinnerTimer = setInterval(() => {
@@ -402,6 +427,9 @@ export function stopSpinner(finalMessage?: string): void {
     if (finalMessage) {
       process.stdout.write(finalMessage + '\n');
     }
+  } else if (finalMessage && !spinnerCanAnimate()) {
+    // Non-TTY: no live line to clear, but still surface the final message.
+    process.stdout.write(finalMessage + '\n');
   }
 }
 

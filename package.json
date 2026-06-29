@@ -13,6 +13,14 @@
     "./cli": {
       "import": "./dist/index.js"
     },
+    "./runner": {
+      "import": "./dist/runner/index.js",
+      "types": "./dist/runner/index.d.ts"
+    },
+    "./runner/cli": {
+      "import": "./dist/runner/cli.js",
+      "types": "./dist/runner/cli.d.ts"
+    },
     "./agent-runtime": {
       "import": "./dist/agent-runtime/index.js",
       "types": "./dist/agent-runtime/index.d.ts"
@@ -85,5 +93,8 @@
     "tsx": "^4.21.0",
     "typescript": "^5.6.0",
     "vitest": "^4.1.2"
+  },
+  "overrides": {
+    "jose": "^6.1.3"
   }
 }

@@ -17,4 +17,13 @@ export interface ActionResult {
    * for all non-SDK paths and for actions the cache doesn't apply to.
    */
   cacheHit?: boolean;
+  /**
+   * The settled screen captured right before this action's gesture fired, as a
+   * base64 PNG. For a tap this is the surface the tap happened ON (with the
+   * target still visible) — the report shows it with the tap dot, instead of the
+   * post-navigation destination. Threaded through the return value (not a module
+   * global) so concurrent workers in a parallel run never cross screenshots.
+   * Undefined unless the report collector enabled capture.
+   */
+  beforeScreenshot?: string;
 }

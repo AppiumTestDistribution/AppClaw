@@ -114,6 +114,12 @@ export interface AppClawOptions {
   report?: boolean;
   /** Name shown in the report viewer. Default: 'AppClaw SDK Run'. */
   reportName?: string;
+  /** Friendly device name recorded in the run manifest (e.g. "emulator-5554"). */
+  reportDevice?: string;
+  /** Suite this run belongs to — tags the manifest so a suite report can group it. */
+  reportSuiteId?: string;
+  /** Human-readable suite name (shown in the suite report). */
+  reportSuiteName?: string;
   /**
    * Record the screen during the run and embed the video in the report.
    * Requires Appium to support `appium_screen_recording`. Default: false.

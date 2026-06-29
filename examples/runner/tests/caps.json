@@ -1,0 +1,7 @@
+{
+  "android": {
+    "appium:app": "/Users/saikrishna/Documents/git/appium-demo/VodQA.apk",
+    "appium:automationName": "UiAutomator2",
+    "appium:autoGrantPermissions": true
+  }
+}

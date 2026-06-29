@@ -1535,6 +1535,32 @@
             <li><a href="#agent-cli-vision">Vision</a></li>
           </ul>
         </div>
+
+        <div class="sidebar-group">
+          <button class="sidebar-heading" aria-expanded="false">
+            Test Runner
+            <svg
+              class="sidebar-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <ul>
+            <li><a href="#runner-overview">Overview</a></li>
+            <li><a href="#runner-quickstart">Installation &amp; First Run</a></li>
+            <li><a href="#runner-tests">Writing Tests</a></li>
+            <li><a href="#runner-config">Configuration</a></li>
+            <li><a href="#runner-hooks">Lifecycle Hooks</a></li>
+            <li><a href="#runner-fixtures">Fixtures</a></li>
+            <li><a href="#runner-parallelism">Parallelism</a></li>
+            <li><a href="#runner-cli">CLI Reference</a></li>
+            <li><a href="#runner-reports">Reports &amp; Cleanup</a></li>
+          </ul>
+        </div>
       </aside>
 
       <!-- CONTENT -->
@@ -5250,6 +5276,1273 @@ APP_GUIDE (WhatsApp):
               </tr>
             </tbody>
           </table>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- TEST RUNNER                                  -->
+        <!-- ============================================ -->
+        <section id="runner-overview" class="reveal">
+          <h2>Test Runner</h2>
+          <p>
+            The AppClaw <strong>Runner</strong> owns your entire mobile test run. It discovers
+            connected devices, starts the appium-mcp server, assigns one device per worker, runs
+            your tests <strong>in parallel</strong>, and writes a consolidated report. You only
+            write the test bodies — device pools, ports, sessions, and cleanup are handled for you.
+          </p>
+          <p>
+            It builds on the <a href="#sdk-overview">Node.js SDK</a>: every test receives a ready
+            <code>app</code> (an <code>AppClaw</code> instance) bound to a leased device, so the
+            full <code>app.run()</code> / <code>app.verify()</code> surface is available inside a
+            test.
+          </p>
+          <p>What the Runner handles for you:</p>
+          <ul>
+            <li>
+              <strong>Device pool</strong> — discovers and de-dupes connected devices/emulators.
+            </li>
+            <li>
+              <strong>appium-mcp node</strong> — spins up a local SSE server and connects to it.
+            </li>
+            <li>
+              <strong>Parallel sessions</strong> — one device per worker, isolated ports + pinned
+              UDID.
+            </li>
+            <li>
+              <strong>Lifecycle hooks</strong> — run / device / scope / test setup and teardown.
+            </li>
+            <li>
+              <strong>Fixtures</strong> — Playwright-style reusable, composable, injected setup.
+            </li>
+            <li>
+              <strong>Reporting</strong> — per-test reports + a suite summary, with a pass/fail exit
+              code.
+            </li>
+            <li>
+              <strong>Cleanup</strong> — deletes sessions (frees adb ports) and never orphans the
+              server.
+            </li>
+          </ul>
+        </section>
+
+        <section id="runner-quickstart" class="reveal">
+          <h2>Installation &amp; First Run</h2>
+          <p>Install AppClaw, add a config file, drop spec files in a folder, and run.</p>
+
+          <h3>Scaffold a project with <code>appclaw init</code></h3>
+          <p>
+            The fastest way to start. It asks a few questions (platform, LLM provider, agent mode —
+            use the <strong>↑/↓ arrow keys</strong> to choose), then writes a ready-to-run project.
+            It only creates files and prints next steps: it never installs packages, never touches
+            the network, and never prompts for your API key.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="c"># Scaffold into the current folder (or pass a directory name)</span>
+<span class="k">npx</span> appclaw init
+<span class="k">npx</span> appclaw init my-app
+
+<span class="c"># Skip the prompts with flags / defaults</span>
+<span class="k">npx</span> appclaw init my-app --platform ios --provider anthropic --yes</pre>
+          </div>
+
+          <p>It generates a complete Test Runner project:</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Generated</span>
+            </div>
+            <pre>my-app/
+  appclaw.config.ts      <span class="c"># all 5 lifecycle hooks, wired to your answers</span>
+  tests/
+    example.spec.ts      <span class="c"># a starter spec to run immediately</span>
+  .env.example           <span class="c"># full, commented reference of every setting</span>
+  .env                   <span class="c"># empty — paste your LLM_API_KEY here (gitignored)</span>
+  package.json           <span class="c"># "test" + "test:parallel" scripts, devDeps</span>
+  tsconfig.json
+  .gitignore             <span class="c"># node_modules/, .appclaw/, .env</span></pre>
+          </div>
+
+          <div class="callout callout-info">
+            <div class="callout-title">Non-destructive</div>
+            <p>
+              Re-running <code>init</code> in an existing project skips files that already exist and
+              <em>merges</em> <code>package.json</code> / <code>.gitignore</code> rather than
+              overwriting them. Pass <code>--force</code> to overwrite.
+            </p>
+          </div>
+
+          <p>Then finish setup and run:</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">cd</span> my-app
+<span class="k">npm</span> install
+<span class="c"># paste your key into .env → LLM_API_KEY=...</span>
+<span class="k">npm</span> test</pre>
+          </div>
+
+          <h3>Or set it up manually</h3>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="c"># 1. Install (project-local) — tsx loads the TypeScript specs/config</span>
+<span class="k">npm</span> install -D appclaw tsx
+
+<span class="c"># 2. Connect an emulator / device, then run all tests</span>
+<span class="k">npx</span> appclaw test
+
+<span class="c"># Run a single file, or filter by path substring</span>
+<span class="k">npx</span> appclaw test tests/login.spec.ts
+<span class="k">npx</span> appclaw test login</pre>
+          </div>
+
+          <h3>Trigger it from package.json</h3>
+          <p>
+            The normal entry point is an npm script. <code>appclaw test</code> auto-discovers
+            <code>appclaw.config.ts</code> in the working directory and runs the specs in its
+            <code>testDir</code> — so the script is just the command plus any flags.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">package.json</span>
+            </div>
+            <pre>{
+  <span class="s">"scripts"</span>: {
+    <span class="s">"test"</span>: <span class="s">"appclaw test"</span>,                  <span class="c">// runs everything in testDir</span>
+    <span class="s">"test:parallel"</span>: <span class="s">"appclaw test --workers 2"</span>,
+    <span class="s">"test:login"</span>: <span class="s">"appclaw test tests/login.spec.ts"</span>,
+    <span class="s">"test:grep"</span>: <span class="s">"appclaw test --grep login"</span>
+  },
+  <span class="s">"devDependencies"</span>: { <span class="s">"appclaw"</span>: <span class="s">"^1.8.0"</span>, <span class="s">"tsx"</span>: <span class="s">"^4.21.0"</span> }
+}</pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">npm</span> test                  <span class="c"># → appclaw test (reads appclaw.config.ts)</span>
+<span class="k">npm</span> run test:parallel     <span class="c"># 2 devices at once</span>
+<span class="k">npm</span> run test:login        <span class="c"># a single file</span></pre>
+          </div>
+
+          <p>A minimal project layout:</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Project</span>
+            </div>
+            <pre>my-app/
+  package.json          <span class="c"># "test": "appclaw test"</span>
+  appclaw.config.ts     <span class="c"># infra: nodes, concurrency, retries, llm, hooks (write once)</span>
+  tests/
+    login.spec.ts       <span class="c"># your tests — no UDIDs, no ports</span>
+    checkout.spec.ts</pre>
+          </div>
+
+          <div class="callout callout-info">
+            <div class="callout-title">TypeScript specs just work</div>
+            <p>
+              Spec and config files are TypeScript. <code>appclaw test</code> registers a TS loader
+              (<code>tsx</code>) automatically before importing them, so a plain
+              <code>"test": "appclaw test"</code> script works — just keep <code>tsx</code> in your
+              <code>devDependencies</code>. Pre-compiled <code>.js</code> specs run without it.
+            </p>
+          </div>
+        </section>
+
+        <section id="runner-tests" class="reveal">
+          <h2>Writing Tests</h2>
+          <p>
+            Import <code>test</code>, <code>describe</code>, and hooks from
+            <code>appclaw/runner</code>. Each test gets an injected <code>app</code> and a context
+            object.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">tests/login.spec.ts</span>
+            </div>
+            <pre><span class="k">import</span> { test, describe } <span class="k">from</span> <span class="s">'appclaw/runner'</span>;
+
+describe(<span class="s">'Login'</span>, () =&gt; {
+  test(<span class="s">'user can sign in'</span>, <span class="k">async</span> (app, ctx) =&gt; {
+    <span class="c">// app = an AppClaw on a leased device</span>
+    <span class="k">await</span> app.run(<span class="s">'tap the Username field'</span>);
+    <span class="k">await</span> app.run(<span class="s">'type admin'</span>);
+    <span class="k">await</span> app.run(<span class="s">'tap Login'</span>);
+    <span class="k">await</span> app.verify(<span class="s">'the home screen is visible'</span>);
+    <span class="c">// ctx.state · ctx.device · ctx.title · ctx.retry</span>
+  });
+
+  <span class="c">// Per-test options: retries, skip, only, platform</span>
+  test(<span class="s">'flaky path'</span>, { retries: <span class="fl">2</span> }, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+  test.skip(<span class="s">'not ready'</span>, <span class="k">async</span> () =&gt; {});
+  test.only(<span class="s">'focus this'</span>, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+
+  <span class="c">// Platform-only tests — skipped (not failed) on a run of the other OS</span>
+  test.android(<span class="s">'NFC tap-to-pay'</span>, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+  test.ios(<span class="s">'Face ID enrollment'</span>, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+  test(<span class="s">'shared but explicit'</span>, { platform: [<span class="s">'android'</span>, <span class="s">'ios'</span>] }, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+});</pre>
+          </div>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>API</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>test(title, fn)</td>
+                <td>Register a test. <code>fn(app, ctx)</code> runs on a leased device.</td>
+              </tr>
+              <tr>
+                <td>test(title, opts, fn)</td>
+                <td>
+                  With per-test options: <code>retries</code>, <code>skip</code>, <code>only</code>,
+                  <code>platform</code>.
+                </td>
+              </tr>
+              <tr>
+                <td>test.only / test.skip</td>
+                <td>Focus or skip a test. Any <code>.only</code> filters the run to only those.</td>
+              </tr>
+              <tr>
+                <td>test.android / test.ios</td>
+                <td>
+                  Restrict a test to one platform. On a run of the other OS it is reported as
+                  <strong>skipped</strong> (not failed) — so a shared spec file can hold both
+                  Android-only and iOS-only tests. Equivalent to
+                  <code>{ platform: 'android' }</code> / <code>{ platform: 'ios' }</code>; pass an
+                  array (<code>{ platform: ['android', 'ios'] }</code>) for multiple.
+                </td>
+              </tr>
+              <tr>
+                <td>describe(label, fn)</td>
+                <td>
+                  Group tests (nestable). Scopes <code>beforeAll</code>/<code>afterAll</code> and
+                  titles.
+                </td>
+              </tr>
+              <tr>
+                <td>ctx.state</td>
+                <td>Value returned by <code>globalSetup</code>, shared across the run.</td>
+              </tr>
+              <tr>
+                <td>ctx.device</td>
+                <td>The device this test is running on (<code>name</code>, <code>udid</code>).</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="runner-config" class="reveal">
+          <h2>Configuration</h2>
+          <p>
+            All run configuration lives in <code>appclaw.config.ts</code> via
+            <code>defineConfig</code>. It is written once by whoever operates the lab/CI — test
+            authors never touch it.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">appclaw.config.ts</span>
+            </div>
+            <pre><span class="k">import</span> { defineConfig } <span class="k">from</span> <span class="s">'appclaw/runner'</span>;
+
+<span class="k">export default</span> defineConfig({
+  <span class="c">// ── discovery / specs ──</span>
+  testDir: <span class="s">'tests'</span>,
+  testMatch: [<span class="s">'**/*.spec.ts'</span>, <span class="s">'**/*.test.ts'</span>],
+
+  <span class="c">// ── execution ──</span>
+  concurrency: <span class="s">'auto'</span>,        <span class="c">// 'auto' = one worker per device, or a number</span>
+  retries: <span class="fl">1</span>,
+  timeout: <span class="fl">120000</span>,           <span class="c">// per-test timeout (ms)</span>
+
+  <span class="c">// ── infra ──</span>
+  node: { local: <span class="k">true</span> },     <span class="c">// spawn a local appium-mcp SSE server</span>
+
+  <span class="c">// ── AppClaw options (forwarded to every test's session) ──</span>
+  platform: <span class="s">'android'</span>,
+  provider: process.env.LLM_PROVIDER,
+  apiKey: process.env.LLM_API_KEY,
+  model: process.env.LLM_MODEL,
+  capabilitiesFile: <span class="s">'./tests/caps.json'</span>,   <span class="c">// resolved next to this config</span>
+  <span class="c">// agentMode: 'vision', maxSteps: 40, waitTimeout: 15000, video: true, …</span>
+});</pre>
+          </div>
+
+          <h3>Environment variables (.env)</h3>
+          <p>
+            The config reads secrets from <code>process.env</code> (e.g.
+            <code>apiKey: process.env.LLM_API_KEY</code>). AppClaw
+            <strong>auto-loads a <code>.env</code> file from the directory you run in</strong> — put
+            it next to <code>package.json</code> and the values are available before the config is
+            read. No wiring needed.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">.env</span>
+            </div>
+            <pre>
+LLM_PROVIDER=anthropic
+LLM_API_KEY=sk-ant-…
+LLM_MODEL=claude-sonnet-4-6</pre
+            >
+          </div>
+
+          <p>
+            If your <code>.env</code> lives elsewhere (a shared file, a CI secret path), point at it
+            with <code>--env-file</code> — it's loaded before the config, overriding the auto-loaded
+            one:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">appclaw</span> test --env-file ../../.env
+<span class="k">appclaw</span> test --env-file .env.ci --workers 2</pre>
+          </div>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Secrets stay out of the config</div>
+            <p>
+              Keep <code>appclaw.config.ts</code> committed and free of secrets — reference
+              <code>process.env.*</code> for keys and let <code>.env</code> (git-ignored) or
+              <code>--env-file</code> supply the values. dotenv won't overwrite variables already
+              set in the real environment, so CI-injected secrets take precedence.
+            </p>
+          </div>
+
+          <h3>Resolution precedence</h3>
+          <p>For any setting: <strong>CLI flag &gt; config file &gt; built-in default</strong>.</p>
+
+          <h3>Runner-level options</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Default</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>testDir</td>
+                <td><code>tests</code></td>
+                <td>Folder scanned for spec files.</td>
+              </tr>
+              <tr>
+                <td>testMatch</td>
+                <td><code>**/*.spec.ts</code>, <code>**/*.test.ts</code></td>
+                <td>Filename patterns that count as specs.</td>
+              </tr>
+              <tr>
+                <td>testIgnore</td>
+                <td>—</td>
+                <td>Patterns to exclude.</td>
+              </tr>
+              <tr>
+                <td>concurrency</td>
+                <td><code>auto</code></td>
+                <td><code>auto</code> = one worker per device, or a fixed number.</td>
+              </tr>
+              <tr>
+                <td>retries</td>
+                <td><code>0</code></td>
+                <td>Re-run a failed test up to N times (fresh device each retry).</td>
+              </tr>
+              <tr>
+                <td>timeout</td>
+                <td><code>120000</code></td>
+                <td>Per-test timeout in ms.</td>
+              </tr>
+              <tr>
+                <td>node</td>
+                <td><code>{ local: true }</code></td>
+                <td>Spawn a local SSE node, or connect to <code>{ url }</code>.</td>
+              </tr>
+              <tr>
+                <td>reporter / reportDir</td>
+                <td><code>list</code> / <code>.appclaw/runs</code></td>
+                <td>Reporter and output directory.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>AppClaw options (pass-through)</h3>
+          <p>
+            The config <strong>extends the full <code>AppClawOptions</code> surface</strong>, so any
+            per-session option can be set directly on the config and is forwarded to every test:
+            <code>platform</code>, <code>provider</code>, <code>apiKey</code>, <code>model</code>,
+            <code>agentMode</code>, <code>maxSteps</code>, <code>waitTimeout</code>,
+            <code>scrollMode</code>, <code>video</code>, <code>locatorCache</code>,
+            <code>capabilitiesFile</code>, and more. See the
+            <a href="#sdk-options">SDK Options Reference</a>. The Runner manages
+            <code>mcpTransport</code>/<code>mcpHost</code>/<code>mcpPort</code>/<code
+              >deviceUdid</code
+            >
+            itself (overridden per session) so you can't accidentally break device pinning.
+          </p>
+
+          <h3>Running on Android &amp; iOS</h3>
+          <p>
+            A run targets <strong>one platform</strong> — set by <code>platform</code> in the
+            config, or overridden with <code>--platform android|ios</code>. The whole run (device
+            pool, sessions, report) pins to that platform.
+          </p>
+          <p>
+            Your <strong>specs don't change</strong>: AppClaw drives by natural language +
+            DOM/vision, not platform-specific selectors, so the same
+            <code>tests/login.spec.ts</code> runs on both OSes. Only the <em>config</em> differs
+            (platform + capabilities). The clean setup is
+            <strong>two config files sharing one <code>tests/</code> folder</strong>, since
+            <code>capabilitiesFile</code> is per-platform:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">project layout</span>
+            </div>
+            <pre>appclaw.android.ts   <span class="c">// platform: 'android', capabilitiesFile: './caps/android.json'</span>
+appclaw.ios.ts       <span class="c">// platform: 'ios',     capabilitiesFile: './caps/ios.json'</span>
+tests/               <span class="c">// shared specs — unchanged across platforms</span></pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">package.json</span>
+            </div>
+            <pre>{
+  <span class="s">"scripts"</span>: {
+    <span class="s">"test:android"</span>: <span class="s">"appclaw test -c appclaw.android.ts"</span>,
+    <span class="s">"test:ios"</span>:     <span class="s">"appclaw test -c appclaw.ios.ts"</span>,
+    <span class="s">"test:all"</span>:     <span class="s">"npm run test:android &amp;&amp; npm run test:ios"</span>
+  }
+}</pre>
+          </div>
+
+          <p>
+            If both platforms can share a single caps file, skip the second config and just flip the
+            flag: <code>appclaw test --platform android</code> / <code>--platform ios</code>.
+          </p>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">One platform per run — by design</div>
+            <p>
+              Each invocation discovers its own device pool and writes its own report under
+              <code>.appclaw/runs/</code>. In CI this maps cleanly onto separate jobs — an Android
+              build/runner on one machine and an iOS build on a Mac runner — each running
+              <code>npm run test:android</code> or <code>test:ios</code> against its own devices.
+              There is no single-command Android+iOS matrix; run the two scripts (sequentially via
+              <code>test:all</code>, or as parallel CI jobs).
+            </p>
+          </div>
+        </section>
+
+        <section id="runner-hooks" class="reveal">
+          <h2>Lifecycle Hooks</h2>
+          <p>Hooks run at four scopes. All are optional — unset hooks are simply skipped.</p>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Hook</th>
+                <th>Scope</th>
+                <th>Runs</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>globalSetup / globalTeardown</td>
+                <td>run</td>
+                <td>
+                  Once per run. <code>globalSetup</code>'s return value is injected into every test
+                  as <code>ctx.state</code>.
+                </td>
+              </tr>
+              <tr>
+                <td>deviceSetup</td>
+                <td>device</td>
+                <td>Once per device, before its first test.</td>
+              </tr>
+              <tr>
+                <td>beforeAll / afterAll</td>
+                <td>scope (file / describe)</td>
+                <td>Once per <strong>(scope, device)</strong> — see note below.</td>
+              </tr>
+              <tr>
+                <td>beforeEach / afterEach</td>
+                <td>test</td>
+                <td>Around <strong>every</strong> test.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">appclaw.config.ts — hooks</span>
+            </div>
+            <pre>defineConfig({
+  globalSetup: <span class="k">async</span> ({ pool }) =&gt; {
+    <span class="k">const</span> token = <span class="k">await</span> loginViaApi();
+    <span class="k">return</span> { token };           <span class="c">// → ctx.state in every test</span>
+  },
+  globalTeardown: <span class="k">async</span> ({ state }) =&gt; { <span class="k">await</span> cleanup(state.token); },
+
+  deviceSetup: <span class="k">async</span> (app, ctx) =&gt; { <span class="k">await</span> app.run(<span class="s">'grant all permissions'</span>); },
+  beforeEach:  <span class="k">async</span> (app, ctx) =&gt; { <span class="k">await</span> app.run(<span class="s">'reset app'</span>); },
+  afterEach:   <span class="k">async</span> (app, info) =&gt; { <span class="c">/* info.status, info.durationMs */</span> },
+});</pre>
+          </div>
+
+          <p>
+            <code>beforeAll</code> / <code>afterAll</code> are registered
+            <em>inside spec files</em> (file-scoped at the top, or inside a <code>describe</code>):
+          </p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">tests/checkout.spec.ts</span>
+            </div>
+            <pre><span class="k">import</span> { test, describe, beforeAll, afterAll } <span class="k">from</span> <span class="s">'appclaw/runner'</span>;
+
+beforeAll(<span class="k">async</span> (app) =&gt; { <span class="c">/* once per device, before this file's tests */</span> });
+
+describe(<span class="s">'Cart'</span>, () =&gt; {
+  beforeAll(<span class="k">async</span> (app) =&gt; { <span class="c">/* once per device, for this group */</span> });
+  test(<span class="s">'add item'</span>, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+});</pre>
+          </div>
+
+          <h3>Execution order (on a device)</h3>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">order</span>
+            </div>
+            <pre>
+deviceSetup → beforeAll (file → describe) → beforeEach → test → afterEach
+           → … → afterAll (describe → file, reverse) at device drain</pre
+            >
+          </div>
+
+          <div class="callout callout-warn">
+            <div class="callout-title">Once per (scope, device)</div>
+            <p>
+              <code>beforeAll</code>/<code>afterAll</code> run once per (scope, device), not once
+              globally. Every device that runs tests from a file/<code>describe</code> gets that
+              scope's <code>beforeAll</code> before its first such test, and <code>afterAll</code>
+              when it finishes its queue. This preserves per-test parallelism (a file's tests can
+              spread across devices). Use them for device/run-level setup (seed/clean data,
+              start/stop a service), not for "immediately after this block" timing.
+            </p>
+          </div>
+        </section>
+
+        <section id="runner-fixtures" class="reveal">
+          <h2>Fixtures</h2>
+          <p>
+            Fixtures are reusable setup a test opts into by <strong>destructuring</strong> it from
+            the first argument — the Playwright model. They are <strong>lazy</strong> (built only
+            when a test asks), support <strong>dependency injection</strong>, and use the
+            <code>use()</code> pattern for setup/teardown.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">tests/fixtures.ts — define once</span>
+            </div>
+            <pre><span class="k">import</span> { test as base } <span class="k">from</span> <span class="s">'appclaw/runner'</span>;
+<span class="k">import type</span> { AppClaw } <span class="k">from</span> <span class="s">'appclaw'</span>;
+
+<span class="c">// loggedInApp: taps login, hands the app to the test, then tears down.</span>
+<span class="k">export const</span> test = base.extend&lt;{ loggedInApp: AppClaw }&gt;({
+  loggedInApp: <span class="k">async</span> ({ app }, use) =&gt; {
+    <span class="k">await</span> app.run(<span class="s">'Click on login button'</span>);   <span class="c">// setup</span>
+    <span class="k">await</span> use(app);                            <span class="c">// hand to the test</span>
+    <span class="c">// teardown here, after the test</span>
+  },
+});</pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">tests/home.spec.ts — consume by destructuring</span>
+            </div>
+            <pre><span class="k">import</span> { test } <span class="k">from</span> <span class="s">'./fixtures.js'</span>;
+
+test(<span class="s">'list is visible'</span>, <span class="k">async</span> ({ loggedInApp }) =&gt; {
+  <span class="k">await</span> loggedInApp.verify(<span class="s">'the list is visible'</span>);
+});</pre>
+          </div>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Concept</th>
+                <th>Behavior</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Lazy</td>
+                <td>A fixture is built only if a test (or a requested fixture) destructures it.</td>
+              </tr>
+              <tr>
+                <td>Dependency injection</td>
+                <td>
+                  A fixture declares deps by destructuring them (<code>{ app }</code>); they're
+                  built first.
+                </td>
+              </tr>
+              <tr>
+                <td>use(value)</td>
+                <td>
+                  Code before <code>use</code> is setup; code after is teardown (run in reverse
+                  dependency order).
+                </td>
+              </tr>
+              <tr>
+                <td>test.extend(defs)</td>
+                <td>Compose new fixtures onto a test; returns a new, typed <code>test</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Built-in fixtures</h3>
+          <p>
+            Destructure these without defining anything: <code>app</code> (the AppClaw on the leased
+            device), <code>device</code>, <code>state</code> (from <code>globalSetup</code>),
+            <code>title</code>, and <code>retry</code>. Your own fixtures can depend on them.
+          </p>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Built-in</th>
+                <th>Type</th>
+                <th>What it is</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>app</code></td>
+                <td>AppClaw</td>
+                <td>The session on the leased device — fresh per test.</td>
+              </tr>
+              <tr>
+                <td><code>device</code></td>
+                <td>Device</td>
+                <td>
+                  <code>name</code>, <code>udid</code>, <code>platform</code>, <code>state</code> of
+                  the leased device.
+                </td>
+              </tr>
+              <tr>
+                <td><code>state</code></td>
+                <td>State</td>
+                <td>Whatever <code>globalSetup</code> returned — shared across the run.</td>
+              </tr>
+              <tr>
+                <td><code>title</code></td>
+                <td>string</td>
+                <td>The current test's title.</td>
+              </tr>
+              <tr>
+                <td><code>retry</code></td>
+                <td>number</td>
+                <td>0-based retry attempt (0 = first try).</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Returning data from a fixture (device info + an API user)</h3>
+          <p>
+            A fixture isn't limited to the <code>app</code> — it can do any setup and
+            <strong>return data</strong> the test needs, by passing it to <code>use(value)</code>.
+            The test reads it back by destructuring the fixture's name, fully typed. A common case:
+            provision a user through your backend before the test and tear it down after. The
+            built-in <code>device</code> is available to both the fixture and the test.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label"
+                >tests/fixtures.ts — a fixture that provisions and returns a user</span
+              >
+            </div>
+            <pre><span class="k">import</span> { test as base } <span class="k">from</span> <span class="s">'appclaw/runner'</span>;
+<span class="k">import</span> { createUser, deleteUser, <span class="k">type</span> ApiUser } <span class="k">from</span> <span class="s">'./api.js'</span>;
+
+<span class="k">export const</span> test = base.extend&lt;{ apiUser: ApiUser }&gt;({
+  apiUser: <span class="k">async</span> ({ device }, use) =&gt; {
+    <span class="k">const</span> user = <span class="k">await</span> createUser(device.name);   <span class="c">// setup — POST /users</span>
+    <span class="k">await</span> use(user);                            <span class="c">// hand the data to the test</span>
+    <span class="k">await</span> deleteUser(user);                      <span class="c">// teardown — DELETE /users/:id</span>
+  },
+});</pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label"
+                >tests/api-user.spec.ts — read device info + the returned data</span
+              >
+            </div>
+            <pre><span class="k">import</span> { test } <span class="k">from</span> <span class="s">'./fixtures.js'</span>;
+
+test(<span class="s">'sign up a fresh user'</span>, <span class="k">async</span> ({ app, device, apiUser }) =&gt; {
+  <span class="c">// device info — name, udid, platform, state</span>
+  console.log(<span class="s">`on ${device.name} (${device.udid})`</span>);
+
+  <span class="c">// fixture data — typed as ApiUser, so apiUser.email autocompletes</span>
+  <span class="k">await</span> app.run(<span class="s">`Type ${apiUser.email} into the email field`</span>);
+  <span class="k">await</span> app.run(<span class="s">`Type ${apiUser.password} into the password field`</span>);
+  <span class="k">await</span> app.run(<span class="s">'Click on login button'</span>);
+  <span class="k">await</span> app.verify(<span class="s">'the home screen is visible'</span>);
+});</pre>
+          </div>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Type the return value</div>
+            <p>
+              Declare the fixture's type in <code>extend&lt;{ apiUser: ApiUser }&gt;</code>. The
+              value you pass to <code>use(...)</code> is checked against it, and the test sees
+              <code>apiUser</code> as <code>ApiUser</code> — not <code>any</code>. The fixture's own
+              <code>{ device }</code> is typed too, so <code>device.name</code> autocompletes.
+            </p>
+          </div>
+
+          <h3>Scope: test vs worker</h3>
+          <p>
+            By default a fixture is <strong>test-scoped</strong> — built fresh for every test, torn
+            down right after. Pass <code>{ scope: 'worker' }</code> (the
+            <code>[fn, options]</code> tuple form) to build it
+            <strong>once per worker (= once per device)</strong>, reuse it across that worker's
+            tests, and tear it down once when the worker finishes. Use it to avoid repeating
+            expensive setup (accounts, tokens, seeded data, a mock server) on every test.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">tests/fixtures.ts — worker-scoped</span>
+            </div>
+            <pre><span class="k">export const</span> test = base.extend&lt;{ account: Account }&gt;({
+  <span class="c">// built once per device, shared by all its tests</span>
+  account: [<span class="k">async</span> ({ device }, use) =&gt; {
+    <span class="k">const</span> acct = <span class="k">await</span> createAccount();   <span class="c">// setup once</span>
+    <span class="k">await</span> use(acct);
+    <span class="k">await</span> deleteAccount(acct);            <span class="c">// teardown once, at worker drain</span>
+  }, { scope: <span class="s">'worker'</span> }],
+});
+
+test(<span class="s">'uses the shared account'</span>, <span class="k">async</span> ({ app, account }) =&gt; {
+  <span class="k">await</span> app.run(<span class="s">`sign in as ${account.email}`</span>);
+});</pre>
+          </div>
+
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Scope</th>
+                <th>Built</th>
+                <th>Good for</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>test (default)</td>
+                <td>Per test</td>
+                <td>Per-session state — login, per-test data.</td>
+              </tr>
+              <tr>
+                <td>worker</td>
+                <td>Once per device</td>
+                <td>Shared resources — account, token, seeded data, mock server.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout callout-warn">
+            <div class="callout-title">Worker fixtures can't depend on the session</div>
+            <p>
+              Each test gets a <strong>fresh Appium session</strong>, so the built-in
+              <code>app</code> is test-scoped. A worker-scoped fixture may only depend on other
+              worker fixtures or the worker-stable built-ins <code>device</code> and
+              <code>state</code> — depending on <code>app</code> (or any test-scoped fixture)
+              throws. Worker scope sets up the <em>world</em> once; test scope (and
+              <code>beforeEach</code>) gets each <em>session</em>
+              into the right state.
+            </p>
+          </div>
+
+          <div class="callout callout-info">
+            <div class="callout-title">Positional form still works</div>
+            <p>
+              The legacy signature <code>async (app, ctx) =&gt; { … }</code> is unchanged — the
+              runner detects whether the first parameter is destructured (<code>{ … }</code> →
+              fixtures) or positional (<code>app</code> → legacy). For a <em>single</em> argument,
+              prefer the object form <code>async ({ app }) =&gt; { … }</code>: a lone
+              <code>(app)</code> is indistinguishable from a destructured arg to TypeScript, so the
+              object form keeps the types precise (use the positional form when you also need
+              <code>ctx</code>).
+            </p>
+          </div>
+        </section>
+
+        <section id="runner-parallelism" class="reveal">
+          <h2>Parallelism</h2>
+          <p>
+            The Runner runs tests across all your devices at once. The unit of parallelism is the
+            <strong>test</strong>: every test goes into one shared queue, and each device-worker
+            pulls the next test when free (work-stealing). A device is held by its worker for the
+            whole run (sticky lease), and each test gets its own isolated Appium session — unique
+            <code>systemPort</code> / <code>mjpegServerPort</code> / <code>wdaLocalPort</code> and a
+            pinned UDID — so concurrent sessions never collide.
+          </p>
+
+          <h3>What runs in parallel — tests, not files</h3>
+          <p>
+            A common assumption is that each <code>*.spec.ts</code> <em>file</em> runs on its own
+            device. It doesn't. The runner flattens every file into a single queue of
+            <strong>tests</strong>, and each device-worker pulls the next test when free — so two
+            tests from the <em>same</em> file routinely run on different devices at the same time.
+          </p>
+
+          <style>
+            .par-diagram {
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+              margin: 18px 0 6px;
+              padding: 20px;
+              background: var(--bg-soft);
+              border: 1px solid var(--accent-rim, rgba(128, 128, 128, 0.18));
+              border-radius: 14px;
+            }
+            .par-row {
+              display: flex;
+              align-items: stretch;
+              gap: 14px;
+              flex-wrap: wrap;
+            }
+            .par-col {
+              flex: 1 1 240px;
+              min-width: 190px;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+            }
+            .par-devices {
+              display: flex;
+              gap: 10px;
+              flex-wrap: wrap;
+            }
+            .par-devices .par-device {
+              flex: 1 1 240px;
+            }
+            .par-down {
+              align-self: center;
+            }
+            .par-col-label {
+              font-family: var(--font-mono);
+              font-size: 0.7rem;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              color: var(--ink-mute);
+            }
+            .par-sub {
+              text-transform: none;
+              letter-spacing: 0;
+              color: var(--ink-faint);
+            }
+            .par-arrow {
+              align-self: center;
+              font-size: 1.35rem;
+              line-height: 1;
+              color: var(--ink-faint);
+              flex: 0 0 auto;
+            }
+            .par-file,
+            .par-device,
+            .par-queue {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              padding: 12px;
+              background: var(--bg-elev);
+              border: 1px solid var(--accent-rim, rgba(128, 128, 128, 0.18));
+              border-radius: 10px;
+            }
+            .par-file-name,
+            .par-device-name {
+              font-family: var(--font-mono);
+              font-size: 0.78rem;
+              font-weight: 600;
+              color: var(--ink);
+              margin-bottom: 2px;
+            }
+            .par-chip {
+              font-family: var(--font-mono);
+              font-size: 0.72rem;
+              padding: 5px 9px;
+              border-radius: 7px;
+              border-left: 3px solid transparent;
+              background: var(--bg-soft);
+              color: var(--ink-mid);
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .par-chip.fA {
+              border-left-color: #2ec7d8;
+              background: rgba(46, 199, 216, 0.1);
+            }
+            .par-chip.fB {
+              border-left-color: #8b97ff;
+              background: rgba(139, 151, 255, 0.12);
+            }
+            .par-caption {
+              font-size: 0.83rem;
+              color: var(--ink-mute);
+              margin: 0 0 22px;
+            }
+            .par-caption .fa {
+              color: #2ec7d8;
+              font-weight: 600;
+            }
+            @media (max-width: 560px) {
+              /* When files/queue stack, point the connector down too — but never
+                 the already-vertical ↓ between the queue and the devices. */
+              .par-row .par-arrow:not(.par-down) {
+                transform: rotate(90deg);
+              }
+            }
+          </style>
+
+          <div
+            class="par-diagram"
+            role="img"
+            aria-label="Tests from spec files are flattened into one shared queue, then pulled by device-workers; tests from the same file run on different devices."
+          >
+            <div class="par-row">
+              <div class="par-col">
+                <div class="par-col-label">Spec files</div>
+                <div class="par-file">
+                  <span class="par-file-name">login.spec.ts</span>
+                  <span class="par-chip fA">login › sign in</span>
+                  <span class="par-chip fA">login › bad password</span>
+                  <span class="par-chip fA">login › logout</span>
+                </div>
+                <div class="par-file">
+                  <span class="par-file-name">cart.spec.ts</span>
+                  <span class="par-chip fB">cart › add item</span>
+                  <span class="par-chip fB">cart › checkout</span>
+                </div>
+              </div>
+
+              <div class="par-arrow" aria-hidden="true">→</div>
+
+              <div class="par-col">
+                <div class="par-col-label">
+                  One shared queue <span class="par-sub">· tests, not files</span>
+                </div>
+                <div class="par-queue">
+                  <span class="par-chip fA">login › sign in</span>
+                  <span class="par-chip fB">cart › add item</span>
+                  <span class="par-chip fA">login › bad password</span>
+                  <span class="par-chip fB">cart › checkout</span>
+                  <span class="par-chip fA">login › logout</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="par-arrow par-down" aria-hidden="true">↓</div>
+
+            <div class="par-col">
+              <div class="par-col-label">
+                Device-workers <span class="par-sub">· pull the next test when free</span>
+              </div>
+              <div class="par-devices">
+                <div class="par-device">
+                  <span class="par-device-name">▢ emulator-5554</span>
+                  <span class="par-chip fA">login › sign in</span>
+                  <span class="par-chip fB">cart › add item</span>
+                  <span class="par-chip fA">login › logout</span>
+                </div>
+                <div class="par-device">
+                  <span class="par-device-name">▢ emulator-5556</span>
+                  <span class="par-chip fB">cart › checkout</span>
+                  <span class="par-chip fA">login › bad password</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="par-caption">
+            Notice the <span class="fa">login.spec.ts</span> tests (teal) landed on
+            <em>both</em> devices — the file was never the unit of work; each test was.
+          </p>
+
+          <h3>How many run at once</h3>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">workers</span>
+            </div>
+            <pre>
+workers = min( request , devices , tests )
+                  │         │         └ can't have more workers than tests
+                  │         └ hard ceiling: number of discovered devices
+                  └ concurrency / --workers</pre
+            >
+          </div>
+
+          <h3>Ways to control it</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Lever</th>
+                <th>Effect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>concurrency: 'auto' (default)</td>
+                <td>One worker per discovered device.</td>
+              </tr>
+              <tr>
+                <td>concurrency: N (config)</td>
+                <td>Cap workers at N.</td>
+              </tr>
+              <tr>
+                <td>--workers N (CLI)</td>
+                <td>Override config for this run (CLI wins).</td>
+              </tr>
+              <tr>
+                <td>device count</td>
+                <td>Hard ceiling — can't exceed connected devices.</td>
+              </tr>
+              <tr>
+                <td>test count</td>
+                <td>Ceiling — 1 test never uses 2 workers.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Examples</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Tests × Devices</th>
+                <th>What happens</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2 tests, 2 devices</td>
+                <td>Both run at once, one per device. Wall-clock ≈ the slower test.</td>
+              </tr>
+              <tr>
+                <td>3 tests, 2 devices</td>
+                <td>
+                  Two run immediately; the 3rd goes to whichever device frees first. One device runs
+                  2 tests, the other 1 (≈ 2× a single test).
+                </td>
+              </tr>
+              <tr>
+                <td>1 test, 2 devices</td>
+                <td>One worker; the second device sits idle (can't split one test).</td>
+              </tr>
+              <tr>
+                <td>4 tests, 1 device</td>
+                <td>All run sequentially on the single device.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal — run 2 devices in parallel</span>
+            </div>
+            <pre><span class="k">appclaw</span> test <span class="fl">--workers</span> 2
+
+<span class="c"># Summary shows which device each test ran on:</span>
+<span class="c">#   ✓ Login › user can sign in   [emulator-5554]</span>
+<span class="c">#   ✓ Cart  › add item          [emulator-5556]</span></pre>
+          </div>
+
+          <div class="callout callout-info">
+            <div class="callout-title">Scope &amp; sharding</div>
+            <p>
+              The current Runner uses one local appium-mcp node, so max real parallelism = the
+              number of locally-connected devices. <code>deviceSetup</code> and
+              <code>beforeAll</code> run once on <em>each</em> participating device. Sharding (<code
+                >--shard x/n</code
+              >) is a separate, cross-machine mechanism — it splits the test set across runs and
+              pairs with <code>--workers</code> for parallelism within each.
+            </p>
+          </div>
+        </section>
+
+        <section id="runner-cli" class="reveal">
+          <h2>CLI Reference</h2>
+          <p>
+            <code>appclaw test [filter…] [options]</code>. The positional filter narrows by file
+            path or substring within <code>testDir</code>. Run it via an npm script (<code
+              >"test": "appclaw test"</code
+            >) or directly with <code>npx appclaw test …</code>.
+          </p>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Flag</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>[filter…]</td>
+                <td>File path, folder, or substring to run a subset.</td>
+              </tr>
+              <tr>
+                <td>-c, --config &lt;file&gt;</td>
+                <td>Config file (default: <code>appclaw.config.{ts,js}</code>).</td>
+              </tr>
+              <tr>
+                <td>--env-file &lt;path&gt;</td>
+                <td>
+                  Load a dotenv file before config (alias: <code>--env-path</code>). A
+                  <code>.env</code> in the cwd auto-loads.
+                </td>
+              </tr>
+              <tr>
+                <td>--workers &lt;n&gt;</td>
+                <td>Parallel workers (default: device count).</td>
+              </tr>
+              <tr>
+                <td>--retries &lt;n&gt;</td>
+                <td>Retry failed tests up to n times.</td>
+              </tr>
+              <tr>
+                <td>--timeout &lt;ms&gt;</td>
+                <td>Per-test timeout.</td>
+              </tr>
+              <tr>
+                <td>--grep &lt;regex&gt;</td>
+                <td>Run only tests whose title matches.</td>
+              </tr>
+              <tr>
+                <td>--grep-invert &lt;regex&gt;</td>
+                <td>Skip tests whose title matches.</td>
+              </tr>
+              <tr>
+                <td>--shard &lt;x/n&gt;</td>
+                <td>Run shard x of n (split across machines).</td>
+              </tr>
+              <tr>
+                <td>--reporter &lt;name&gt;</td>
+                <td>Reporter: <code>list</code>, <code>html</code>.</td>
+              </tr>
+              <tr>
+                <td>--platform &lt;p&gt;</td>
+                <td><code>android</code> or <code>ios</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="runner-reports" class="reveal">
+          <h2>Reports &amp; Cleanup</h2>
+          <p>
+            Every test writes its own run data to <code>.appclaw/runs/</code> (screenshots per step,
+            status, timing), the console prints a file-grouped summary table, and the Runner
+            generates a <strong>self-contained HTML report for that run</strong>. The process exit
+            code is <code>0</code> when all tests pass, <code>1</code> otherwise — so it drops
+            straight into CI.
+          </p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Run Summary</span>
+            </div>
+            <pre>
+Results
+
+tests/login.spec.ts (2)
+  ✓ Login › user can sign in        emulator-5554  6.1s
+  ✓ Login › toggle remember-me      emulator-5556  7.0s
+tests/cart.spec.ts (1)
+  ✗ Cart  › add item                emulator-5554  3.2s  ↻1
+      expected badge "1", found "0"
+
+──────────────────────────────────────────────────────────
+✓ 2 passed  ✗ 1 failed  in 16.3s  · emulator-5554: 2  emulator-5556: 1
+→ report  .appclaw/runs/suite-…/index.html</pre
+            >
+          </div>
+
+          <h3>The HTML report</h3>
+          <p>
+            Open the printed path in a browser. The report is
+            <strong>scoped to the current run only</strong> — it never folds in past runs — and is
+            built for mobile: a pass-rate summary, a per-device breakdown, results grouped by spec
+            file, and, on expanding a test, a
+            <strong>device-framed screenshot of every step</strong>, the failure reason, and a
+            screen recording when one was captured.
+          </p>
+          <div class="callout callout-tip">
+            <div class="callout-title">Current run vs. history</div>
+            <p>
+              The report at the end of <code>appclaw test</code> shows just that run. The older
+              <code>appclaw --report</code> viewer is a separate, global index of <em>every</em>
+              historical run — use it to browse past results, not to read the run you just executed.
+            </p>
+          </div>
+
+          <p>Cleanup is automatic and layered:</p>
+          <ul>
+            <li>
+              <strong>Per test</strong> — the session is deleted on teardown, which frees its adb
+              port forwards and the on-device server.
+            </li>
+            <li><strong>End of run</strong> — the local appium-mcp node is stopped.</li>
+            <li>
+              <strong>On interrupt</strong> — a signal guard (<code>Ctrl-C</code> /
+              <code>SIGTERM</code> / crash) kills the node so it is never orphaned.
+            </li>
+          </ul>
+          <p>View the HTML reports any time with <code>appclaw --report</code>.</p>
         </section>
       </main>
     </div>

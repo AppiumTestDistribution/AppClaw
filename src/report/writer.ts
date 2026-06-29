@@ -101,6 +101,9 @@ export interface StepCollectorEntry {
 export class RunArtifactCollector {
   readonly runId: string;
   readonly startedAt: string;
+  /** Device OS version ("Android 14" / "iOS 17.2"), set once per run when known. */
+  deviceVersion?: string;
+  private appiumMcpLog?: string;
   private steps: StepCollectorEntry[] = [];
   private stepTimers = new Map<number, number>();
   private videoBase64: string | undefined;
@@ -150,6 +153,17 @@ export class RunArtifactCollector {
     this.videoBase64 = base64;
   }
 
+  /**
+   * Attach the appium-mcp server log tail captured at failure time. Stored on
+   * the manifest so the report can show it next to the appclaw step trace when
+   * a test fails. Tail-trimmed to keep manifests bounded.
+   */
+  attachAppiumMcpLog(text: string): void {
+    if (!text) return;
+    const lines = text.split('\n');
+    this.appiumMcpLog = lines.slice(-200).join('\n');
+  }
+
   /** Attach a screen recording from a file path on disk (will be copied into the run dir). */
   attachVideoFromPath(filePath: string): void {
     this.videoFilePath = filePath;
@@ -173,27 +187,26 @@ export class RunArtifactCollector {
     const finishedAt = new Date().toISOString();
     const durationMs = new Date(finishedAt).getTime() - new Date(this.startedAt).getTime();
 
-    // Create run directory
+    // Create run directory (manifest + optional video; screenshots are embedded
+    // as base64 in the manifest, so no `steps/` PNG files are written).
     const runDir = path.join(runsDir(projectRoot), this.runId);
-    const stepsDir = path.join(runDir, 'steps');
-    await fsp.mkdir(stepsDir, { recursive: true });
+    await fsp.mkdir(runDir, { recursive: true });
 
-    // Save screenshots and build step artifacts
+    // Build step artifacts with screenshots inlined as base64 data URIs.
     const stepArtifacts: StepArtifact[] = [];
     for (const step of this.steps) {
+      const num = String(step.index).padStart(3, '0');
       let screenshotPath: string | undefined;
       let beforeScreenshotPath: string | undefined;
+      let screenshot: string | undefined;
+      let beforeScreenshot: string | undefined;
       if (step.screenshotBase64) {
-        const filename = `step-${String(step.index).padStart(3, '0')}.png`;
-        screenshotPath = `steps/${filename}`;
-        const fullPath = path.join(runDir, screenshotPath);
-        await fsp.writeFile(fullPath, Buffer.from(step.screenshotBase64, 'base64'));
+        screenshotPath = `steps/step-${num}.png`; // logical id (no file written)
+        screenshot = `data:image/png;base64,${step.screenshotBase64}`;
       }
       if (step.beforeScreenshotBase64) {
-        const filename = `step-${String(step.index).padStart(3, '0')}-before.png`;
-        beforeScreenshotPath = `steps/${filename}`;
-        const fullPath = path.join(runDir, beforeScreenshotPath);
-        await fsp.writeFile(fullPath, Buffer.from(step.beforeScreenshotBase64, 'base64'));
+        beforeScreenshotPath = `steps/step-${num}-before.png`;
+        beforeScreenshot = `data:image/png;base64,${step.beforeScreenshotBase64}`;
       }
       stepArtifacts.push({
         index: step.index,
@@ -207,6 +220,8 @@ export class RunArtifactCollector {
         message: step.message,
         screenshotPath,
         beforeScreenshotPath,
+        screenshot,
+        beforeScreenshot,
         tapCoordinates: step.tapCoordinates,
         deviceScreenSize: step.deviceScreenSize,
         screenshotSize: step.screenshotSize,
@@ -235,6 +250,7 @@ export class RunArtifactCollector {
       durationMs,
       platform: this.platform,
       device: this.device,
+      deviceVersion: this.deviceVersion,
       success: result.success,
       stepsExecuted: result.stepsExecuted,
       stepsTotal: result.stepsTotal,
@@ -244,6 +260,7 @@ export class RunArtifactCollector {
       phaseResults: result.phaseResults,
       steps: stepArtifacts,
       videoPath,
+      failureLogs: this.appiumMcpLog ? { appiumMcp: this.appiumMcpLog } : undefined,
     };
 
     // Write manifest

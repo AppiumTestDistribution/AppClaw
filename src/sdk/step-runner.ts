@@ -15,10 +15,11 @@ import type { MCPClient } from '../mcp/types.js';
 import type { RunArtifactCollector } from '../report/writer.js';
 import { screenshot } from '../mcp/tools.js';
 import { lastVisionScreenshot } from '../flow/vision-execute.js';
+import { setPreActionCapture } from '../flow/pre-action-capture.js';
 import { runOneInstruction } from '../flow/run-instruction.js';
 import type { FlowTapPollOptions, ScrollControl } from '../flow/run-yaml-flow.js';
 import type { LocatorCacheCtx } from './locator-cache.js';
-import { getCachedScreenSize } from '../vision/window-size.js';
+import { getCachedScreenSize, getScreenSizeForStark } from '../vision/window-size.js';
 import { pngDimensionsFromBase64 } from '../vision/png-dimensions.js';
 import { printStepResult } from '../ui/step-printer.js';
 import type { AppResolver } from '../agent/app-resolver.js';
@@ -64,6 +65,8 @@ export class StepRunner {
     if (this.collector && this.stepIndex !== undefined) {
       this.collector.startStep(this.stepIndex);
     }
+    // Only pay for a pre-tap screenshot when we're actually recording a report.
+    setPreActionCapture(!!this.collector);
 
     // All "instruction → step → executed" logic lives in runOneInstruction so
     // the SDK and playground stay in lockstep. See src/flow/run-instruction.ts.
@@ -76,6 +79,31 @@ export class StepRunner {
 
     if (this.collector && this.stepIndex !== undefined) {
       const tapCoords = extractCoordinates(result.message);
+
+      // The "tap surface" — the settled screen the action happened ON, captured
+      // right before the gesture fired. DOM taps thread it back through the
+      // result (race-free across parallel workers); vision mode exposes its
+      // analysed screen via the module global. For a tap this is what the report
+      // should show, with the dot on the target — NOT the page it navigates to.
+      const beforeShot = result.beforeScreenshot ?? lastVisionScreenshot ?? undefined;
+
+      // For a tap, show the before/tap-surface screen so the dot lands on the
+      // element. For everything else (assert/type/swipe/wait — no navigation
+      // dot), the after-execution screen is the meaningful one.
+      const useBefore = !!(tapCoords && beforeShot);
+      const shot = useBefore
+        ? (beforeShot as string)
+        : await screenshot(this.mcp).catch(() => null);
+      const dims = shot ? (pngDimensionsFromBase64(shot) ?? undefined) : undefined;
+
+      // Device screen size = the coordinate space tap coords live in. The cache
+      // is empty for DOM-mode SDK runs, so fetch it when a tap must be plotted,
+      // so the dot scales correctly against the (often downscaled) screenshot.
+      let deviceSize = getCachedScreenSize(this.mcp) ?? undefined;
+      if (!deviceSize && tapCoords && shot) {
+        deviceSize = (await getScreenSizeForStark(this.mcp, shot).catch(() => null)) ?? undefined;
+      }
+
       this.collector.addStep({
         index: this.stepIndex,
         kind: step.kind,
@@ -85,25 +113,17 @@ export class StepRunner {
         message: result.message,
         error: result.success ? undefined : result.message,
         tapCoordinates: tapCoords,
-        deviceScreenSize: getCachedScreenSize(this.mcp) ?? undefined,
+        deviceScreenSize: deviceSize,
         cacheHit: result.cacheHit,
       });
 
-      // In vision mode, visionExecute captured the pre-action screenshot — use it
-      // for the tap dot overlay (same as the YAML flow path).
-      const visionShot = lastVisionScreenshot;
-      if (visionShot) {
-        const dims = pngDimensionsFromBase64(visionShot) ?? undefined;
-        if (tapCoords) {
-          this.collector.attachBeforeScreenshot(this.stepIndex, visionShot, dims);
+      if (shot) {
+        // Tap → the before/tap-surface screen (report displays this with the
+        // dot); non-tap → the after-execution result screen.
+        if (useBefore) {
+          this.collector.attachBeforeScreenshot(this.stepIndex, shot, dims);
         } else {
-          this.collector.attachScreenshot(this.stepIndex, visionShot, dims);
-        }
-      } else {
-        // DOM mode or non-visual step — take an after screenshot
-        const screenshotB64 = await screenshot(this.mcp).catch(() => null);
-        if (screenshotB64) {
-          this.collector.attachScreenshot(this.stepIndex, screenshotB64);
+          this.collector.attachScreenshot(this.stepIndex, shot, dims);
         }
       }
     }
