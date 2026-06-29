@@ -74,6 +74,13 @@ export interface TestOptions {
   skip?: boolean;
   /** Run only this test (and other `.only`s) when any `.only` is present. */
   only?: boolean;
+  /**
+   * Restrict this test to one or more platforms. When the run's platform isn't
+   * in the list, the test is reported as skipped (not failed) — so a shared spec
+   * file can carry both Android-only and iOS-only tests and each platform's run
+   * only executes the ones it supports. Omit to run on every platform.
+   */
+  platform?: Platform | Platform[];
 }
 
 /** Arguments handed to `globalSetup` / `globalTeardown`. */

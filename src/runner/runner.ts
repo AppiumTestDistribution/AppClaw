@@ -234,6 +234,17 @@ export class Runner<State = unknown> {
       const { current, total } = this.config.shard;
       tests = tests.filter((_, i) => i % total === current - 1);
     }
+    // Platform gate: a test tagged for specific platform(s) is skipped (not run,
+    // not failed) when this run's platform isn't among them. Keeps a shared spec
+    // file valid across an Android run and an iOS run.
+    const runPlatform = this.config.platform;
+    tests = tests.map((t) => {
+      const want = t.options.platform;
+      if (!want) return t;
+      const allowed = Array.isArray(want) ? want : [want];
+      if (allowed.includes(runPlatform)) return t;
+      return { ...t, options: { ...t.options, skip: true } };
+    });
     return tests;
   }
 

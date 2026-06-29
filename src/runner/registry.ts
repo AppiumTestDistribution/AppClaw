@@ -101,7 +101,10 @@ type PositionalCallback<State> = (app: AppClaw, ctx: TestContext<State>) => void
  *   test('name', async ({ app, loggedInApp }) => { ... })   // fixtures
  *   test('name', async (app, ctx) => { ... })               // positional + ctx
  *   test('name', { retries: 2 }, fn)
- * Plus `test.only`, `test.skip`, and `test.extend({ … })`.
+ *   test('name', { platform: 'android' }, fn)              // platform-gated
+ * Plus `test.only`, `test.skip`, `test.android`, `test.ios`, and
+ * `test.extend({ … })`. Platform-gated tests are reported as *skipped* (not
+ * failed) on a run whose platform doesn't match.
  */
 export interface TestApi<Fx = Record<never, never>> {
   <State = unknown>(title: string, fn: FixturesCallback<Fx, State>): void;
@@ -112,6 +115,12 @@ export interface TestApi<Fx = Record<never, never>> {
   only<State = unknown>(title: string, fn: PositionalCallback<State>): void;
   skip<State = unknown>(title: string, fn: FixturesCallback<Fx, State>): void;
   skip<State = unknown>(title: string, fn: PositionalCallback<State>): void;
+  /** Run only on Android; skipped (not failed) on an iOS run. */
+  android<State = unknown>(title: string, fn: FixturesCallback<Fx, State>): void;
+  android<State = unknown>(title: string, fn: PositionalCallback<State>): void;
+  /** Run only on iOS; skipped (not failed) on an Android run. */
+  ios<State = unknown>(title: string, fn: FixturesCallback<Fx, State>): void;
+  ios<State = unknown>(title: string, fn: PositionalCallback<State>): void;
   /**
    * Compose new fixtures onto this test. Returns a new, typed `test`.
    *
@@ -145,6 +154,10 @@ function createTest<Fx>(fixtures: FixtureDefs): TestApi<Fx> {
     register(title, fn, { only: true }, fixtures)) as TestApi<Fx>['only'];
   t.skip = ((title: string, fn: AnyFn) =>
     register(title, fn, { skip: true }, fixtures)) as TestApi<Fx>['skip'];
+  t.android = ((title: string, fn: AnyFn) =>
+    register(title, fn, { platform: 'android' }, fixtures)) as TestApi<Fx>['android'];
+  t.ios = ((title: string, fn: AnyFn) =>
+    register(title, fn, { platform: 'ios' }, fixtures)) as TestApi<Fx>['ios'];
   t.extend = ((defs: FixtureDefs) => createTest({ ...fixtures, ...defs })) as TestApi<Fx>['extend'];
   return t;
 }
