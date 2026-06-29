@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
-// `appclaw test ...` routes to the runner CLI; everything else falls through to
-// the main interactive/flow/report entry point.
-if (process.argv[2] === 'test') {
+// `appclaw init` scaffolds a project; `appclaw test ...` routes to the runner
+// CLI; everything else falls through to the main interactive/flow/report entry.
+if (process.argv[2] === 'init') {
+  const { runInit } = await import('../dist/cli/init.js');
+  const code = await runInit(process.argv.slice(3));
+  process.exit(code);
+} else if (process.argv[2] === 'test') {
   // Spec/config files (appclaw.config.ts, *.spec.ts) are TypeScript, loaded via
   // dynamic import() inside the runner. Node can't import .ts directly, so we
   // register a TS loader here (tsx) before the runner runs. This lets a plain

@@ -5328,6 +5328,66 @@ APP_GUIDE (WhatsApp):
           <h2>Installation &amp; First Run</h2>
           <p>Install AppClaw, add a config file, drop spec files in a folder, and run.</p>
 
+          <h3>Scaffold a project with <code>appclaw init</code></h3>
+          <p>
+            The fastest way to start. It asks a few questions (platform, LLM provider, agent mode —
+            use the <strong>↑/↓ arrow keys</strong> to choose), then writes a ready-to-run project.
+            It only creates files and prints next steps: it never installs packages, never touches
+            the network, and never prompts for your API key.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="c"># Scaffold into the current folder (or pass a directory name)</span>
+<span class="k">npx</span> appclaw init
+<span class="k">npx</span> appclaw init my-app
+
+<span class="c"># Skip the prompts with flags / defaults</span>
+<span class="k">npx</span> appclaw init my-app --platform ios --provider anthropic --yes</pre>
+          </div>
+
+          <p>It generates a complete Test Runner project:</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Generated</span>
+            </div>
+            <pre>my-app/
+  appclaw.config.ts      <span class="c"># all 5 lifecycle hooks, wired to your answers</span>
+  tests/
+    example.spec.ts      <span class="c"># a starter spec to run immediately</span>
+  .env.example           <span class="c"># full, commented reference of every setting</span>
+  .env                   <span class="c"># empty — paste your LLM_API_KEY here (gitignored)</span>
+  package.json           <span class="c"># "test" + "test:parallel" scripts, devDeps</span>
+  tsconfig.json
+  .gitignore             <span class="c"># node_modules/, .appclaw/, .env</span></pre>
+          </div>
+
+          <div class="callout callout-info">
+            <div class="callout-title">Non-destructive</div>
+            <p>
+              Re-running <code>init</code> in an existing project skips files that already exist and
+              <em>merges</em> <code>package.json</code> / <code>.gitignore</code> rather than
+              overwriting them. Pass <code>--force</code> to overwrite.
+            </p>
+          </div>
+
+          <p>Then finish setup and run:</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">Terminal</span>
+            </div>
+            <pre><span class="k">cd</span> my-app
+<span class="k">npm</span> install
+<span class="c"># paste your key into .env → LLM_API_KEY=...</span>
+<span class="k">npm</span> test</pre>
+          </div>
+
+          <h3>Or set it up manually</h3>
           <div class="code-block">
             <div class="code-block-header">
               <div class="code-block-dots"><span></span><span></span><span></span></div>
@@ -5427,10 +5487,15 @@ describe(<span class="s">'Login'</span>, () =&gt; {
     <span class="c">// ctx.state · ctx.device · ctx.title · ctx.retry</span>
   });
 
-  <span class="c">// Per-test options: retries, skip, only</span>
+  <span class="c">// Per-test options: retries, skip, only, platform</span>
   test(<span class="s">'flaky path'</span>, { retries: <span class="fl">2</span> }, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
   test.skip(<span class="s">'not ready'</span>, <span class="k">async</span> () =&gt; {});
   test.only(<span class="s">'focus this'</span>, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+
+  <span class="c">// Platform-only tests — skipped (not failed) on a run of the other OS</span>
+  test.android(<span class="s">'NFC tap-to-pay'</span>, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+  test.ios(<span class="s">'Face ID enrollment'</span>, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
+  test(<span class="s">'shared but explicit'</span>, { platform: [<span class="s">'android'</span>, <span class="s">'ios'</span>] }, <span class="k">async</span> (app) =&gt; { <span class="c">/* … */</span> });
 });</pre>
           </div>
 
@@ -5449,12 +5514,23 @@ describe(<span class="s">'Login'</span>, () =&gt; {
               <tr>
                 <td>test(title, opts, fn)</td>
                 <td>
-                  With per-test options: <code>retries</code>, <code>skip</code>, <code>only</code>.
+                  With per-test options: <code>retries</code>, <code>skip</code>, <code>only</code>,
+                  <code>platform</code>.
                 </td>
               </tr>
               <tr>
                 <td>test.only / test.skip</td>
                 <td>Focus or skip a test. Any <code>.only</code> filters the run to only those.</td>
+              </tr>
+              <tr>
+                <td>test.android / test.ios</td>
+                <td>
+                  Restrict a test to one platform. On a run of the other OS it is reported as
+                  <strong>skipped</strong> (not failed) — so a shared spec file can hold both
+                  Android-only and iOS-only tests. Equivalent to
+                  <code>{ platform: 'android' }</code> / <code>{ platform: 'ios' }</code>; pass an
+                  array (<code>{ platform: ['android', 'ios'] }</code>) for multiple.
+                </td>
               </tr>
               <tr>
                 <td>describe(label, fn)</td>
@@ -6053,6 +6129,188 @@ test(<span class="s">'uses the shared account'</span>, <span class="k">async</sp
             whole run (sticky lease), and each test gets its own isolated Appium session — unique
             <code>systemPort</code> / <code>mjpegServerPort</code> / <code>wdaLocalPort</code> and a
             pinned UDID — so concurrent sessions never collide.
+          </p>
+
+          <h3>What runs in parallel — tests, not files</h3>
+          <p>
+            A common assumption is that each <code>*.spec.ts</code> <em>file</em> runs on its own
+            device. It doesn't. The runner flattens every file into a single queue of
+            <strong>tests</strong>, and each device-worker pulls the next test when free — so two
+            tests from the <em>same</em> file routinely run on different devices at the same time.
+          </p>
+
+          <style>
+            .par-diagram {
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+              margin: 18px 0 6px;
+              padding: 20px;
+              background: var(--bg-soft);
+              border: 1px solid var(--accent-rim, rgba(128, 128, 128, 0.18));
+              border-radius: 14px;
+            }
+            .par-row {
+              display: flex;
+              align-items: stretch;
+              gap: 14px;
+              flex-wrap: wrap;
+            }
+            .par-col {
+              flex: 1 1 240px;
+              min-width: 190px;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+            }
+            .par-devices {
+              display: flex;
+              gap: 10px;
+              flex-wrap: wrap;
+            }
+            .par-devices .par-device {
+              flex: 1 1 240px;
+            }
+            .par-down {
+              align-self: center;
+            }
+            .par-col-label {
+              font-family: var(--font-mono);
+              font-size: 0.7rem;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              color: var(--ink-mute);
+            }
+            .par-sub {
+              text-transform: none;
+              letter-spacing: 0;
+              color: var(--ink-faint);
+            }
+            .par-arrow {
+              align-self: center;
+              font-size: 1.35rem;
+              line-height: 1;
+              color: var(--ink-faint);
+              flex: 0 0 auto;
+            }
+            .par-file,
+            .par-device,
+            .par-queue {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              padding: 12px;
+              background: var(--bg-elev);
+              border: 1px solid var(--accent-rim, rgba(128, 128, 128, 0.18));
+              border-radius: 10px;
+            }
+            .par-file-name,
+            .par-device-name {
+              font-family: var(--font-mono);
+              font-size: 0.78rem;
+              font-weight: 600;
+              color: var(--ink);
+              margin-bottom: 2px;
+            }
+            .par-chip {
+              font-family: var(--font-mono);
+              font-size: 0.72rem;
+              padding: 5px 9px;
+              border-radius: 7px;
+              border-left: 3px solid transparent;
+              background: var(--bg-soft);
+              color: var(--ink-mid);
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .par-chip.fA {
+              border-left-color: #2ec7d8;
+              background: rgba(46, 199, 216, 0.1);
+            }
+            .par-chip.fB {
+              border-left-color: #8b97ff;
+              background: rgba(139, 151, 255, 0.12);
+            }
+            .par-caption {
+              font-size: 0.83rem;
+              color: var(--ink-mute);
+              margin: 0 0 22px;
+            }
+            .par-caption .fa {
+              color: #2ec7d8;
+              font-weight: 600;
+            }
+            @media (max-width: 560px) {
+              /* When files/queue stack, point the connector down too — but never
+                 the already-vertical ↓ between the queue and the devices. */
+              .par-row .par-arrow:not(.par-down) {
+                transform: rotate(90deg);
+              }
+            }
+          </style>
+
+          <div
+            class="par-diagram"
+            role="img"
+            aria-label="Tests from spec files are flattened into one shared queue, then pulled by device-workers; tests from the same file run on different devices."
+          >
+            <div class="par-row">
+              <div class="par-col">
+                <div class="par-col-label">Spec files</div>
+                <div class="par-file">
+                  <span class="par-file-name">login.spec.ts</span>
+                  <span class="par-chip fA">login › sign in</span>
+                  <span class="par-chip fA">login › bad password</span>
+                  <span class="par-chip fA">login › logout</span>
+                </div>
+                <div class="par-file">
+                  <span class="par-file-name">cart.spec.ts</span>
+                  <span class="par-chip fB">cart › add item</span>
+                  <span class="par-chip fB">cart › checkout</span>
+                </div>
+              </div>
+
+              <div class="par-arrow" aria-hidden="true">→</div>
+
+              <div class="par-col">
+                <div class="par-col-label">
+                  One shared queue <span class="par-sub">· tests, not files</span>
+                </div>
+                <div class="par-queue">
+                  <span class="par-chip fA">login › sign in</span>
+                  <span class="par-chip fB">cart › add item</span>
+                  <span class="par-chip fA">login › bad password</span>
+                  <span class="par-chip fB">cart › checkout</span>
+                  <span class="par-chip fA">login › logout</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="par-arrow par-down" aria-hidden="true">↓</div>
+
+            <div class="par-col">
+              <div class="par-col-label">
+                Device-workers <span class="par-sub">· pull the next test when free</span>
+              </div>
+              <div class="par-devices">
+                <div class="par-device">
+                  <span class="par-device-name">▢ emulator-5554</span>
+                  <span class="par-chip fA">login › sign in</span>
+                  <span class="par-chip fB">cart › add item</span>
+                  <span class="par-chip fA">login › logout</span>
+                </div>
+                <div class="par-device">
+                  <span class="par-device-name">▢ emulator-5556</span>
+                  <span class="par-chip fB">cart › checkout</span>
+                  <span class="par-chip fA">login › bad password</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="par-caption">
+            Notice the <span class="fa">login.spec.ts</span> tests (teal) landed on
+            <em>both</em> devices — the file was never the unit of work; each test was.
           </p>
 
           <h3>How many run at once</h3>
