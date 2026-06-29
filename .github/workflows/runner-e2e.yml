@@ -45,7 +45,7 @@ jobs:
       # (the committed caps.json uses a machine-local APK path).
       APPCLAW_CAPS: ./tests/caps.ci.json
       # Force the plain reporter (no TUI dashboard) for readable CI logs.
-      APPCLAW_TUI: 'on'
+      APPCLAW_TUI: 'off'
 
     steps:
       - uses: actions/checkout@v4

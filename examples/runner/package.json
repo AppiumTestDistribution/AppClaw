@@ -5,7 +5,7 @@
   "comment": "This example's .env lives at the repo root, so scripts pass --env-file. In your own project, put .env next to package.json and it's auto-loaded — drop the flag.",
   "scripts": {
     "test": "appclaw test --env-file ../../.env",
-    "test:parallel": "appclaw test --env-file ../../.env --workers 2",
+    "test:parallel": "appclaw test --env-file ../../.env --workers 3",
     "test:login": "appclaw test --env-file ../../.env tests/login.spec.ts",
     "test:grep": "appclaw test --env-file ../../.env --grep login",
     "test:ci": "appclaw test --env-file ../../.env --workers 2 --retries 1 --shard 1/1"

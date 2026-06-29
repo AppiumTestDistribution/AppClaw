@@ -17,7 +17,7 @@ describe('Login', () => {
 
   test('toggle slider and verify two green dots are visible', async ({ app }) => {
     await tapLogin(app);
-    await app.run('Click on slider');
+    await app.run('Click on logout button');
     await app.verify('two green dot is visisble');
   });
 });
