@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: 'tests',
   concurrency: 'auto',
   retries: 1,
-  node: { local: true }, // spawn a local appium-mcp SSE server
+  node: { local: true }, // spawn a local appium-mcp SSE server url: 'http://localhost:8080'
 
   // ── AppClaw options (forwarded to every test's session) ──
   platform: 'android',
