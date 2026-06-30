@@ -1419,6 +1419,7 @@
           </button>
           <ul>
             <li><a href="#vision-modes">Vision Modes</a></li>
+            <li><a href="#local-llm">Local LLM (Vision)</a></li>
             <li><a href="#custom-capabilities">Custom Capabilities</a></li>
             <li><a href="#env-vars">Environment Variables</a></li>
           </ul>
@@ -2579,6 +2580,239 @@
           </table>
         </section>
 
+        <!-- ============================================ -->
+        <!-- LOCAL LLM (VISION)                           -->
+        <!-- ============================================ -->
+        <section id="local-llm" class="reveal">
+          <h2>Local LLM (Vision)</h2>
+          <p>
+            In vision mode, AppClaw grounds UI elements from a screenshot. You can run that
+            grounding <strong>fully locally</strong> on your own machine with
+            <strong>Qwen2.5-VL</strong> (via
+            <a href="https://lmstudio.ai" target="_blank" rel="noopener">LM Studio</a>) instead of
+            sending screenshots to <strong>Gemini in the cloud</strong>. No screenshots leave your
+            machine, no per-call API cost, no Gemini key.
+          </p>
+
+          <div class="callout callout-warn">
+            <div class="callout-title">
+              Important — deterministic steps only, not agent goal mode
+            </div>
+            <p>
+              The local Qwen path powers <strong>deterministic steps</strong> only — SDK
+              <code>app.run("tap Login")</code>, the <strong>playground</strong>, and
+              <strong>YAML flows</strong> (one instruction &rarr; one vision call). It is
+              <strong>not</strong> for autonomous <strong>agent goal mode</strong> (<code
+                >appclaw "log in and place an order"</code
+              >). Qwen2.5-VL is a <em>vision-grounding</em> model with
+              <strong>no reasoning / thinking</strong>, so it can locate an element but cannot plan
+              a multi-step goal. Agent goal mode still needs a thinking-capable cloud LLM
+              (<code>LLM_PROVIDER</code>) for the planning loop — only the
+              <em>element location</em> sub-step is local. Reasoning models such as
+              <code>qwen3.5-9b</code> are <strong>not</strong> a substitute: they burn their token
+              budget thinking and return wrong or empty coordinates.
+            </p>
+          </div>
+
+          <h3>Cloud Gemini vs Local Qwen</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>&nbsp;</th>
+                <th>Gemini (cloud)</th>
+                <th>Qwen2.5-VL (local)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Setup</td>
+                <td>Gemini API key only</td>
+                <td>LM Studio + a downloaded model (one-time)</td>
+              </tr>
+              <tr>
+                <td>Cost per locate</td>
+                <td>Paid API tokens (per screenshot)</td>
+                <td><strong>Free</strong> — runs on your hardware</td>
+              </tr>
+              <tr>
+                <td>Latency per locate</td>
+                <td>~0.6&ndash;1.5s (network + cloud)</td>
+                <td>~1.5&ndash;2.6s on Apple&nbsp;Silicon (no network)</td>
+              </tr>
+              <tr>
+                <td>Privacy</td>
+                <td>Screenshots sent to Google</td>
+                <td><strong>Fully offline</strong> — nothing leaves the machine</td>
+              </tr>
+              <tr>
+                <td>Accuracy</td>
+                <td>Excellent, resolution-independent (normalized coords)</td>
+                <td>Excellent at the right resolution (see note below)</td>
+              </tr>
+              <tr>
+                <td>Offline / air-gapped</td>
+                <td>No</td>
+                <td><strong>Yes</strong></td>
+              </tr>
+              <tr>
+                <td>Coordinate contract</td>
+                <td>
+                  Normalized <code>[y,x]</code> 0&ndash;1000 (<code>VISION_PROVIDER=stark</code>)
+                </td>
+                <td>Native pixel <code>bbox_2d</code> (<code>VISION_PROVIDER=qwen</code>)</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            <strong>Rule of thumb:</strong> choose <strong>Gemini</strong> for the lowest per-call
+            latency and zero local setup (you pay per call); choose <strong>local Qwen</strong> when
+            privacy, offline use, or eliminating API cost matters more than ~1s of extra latency per
+            step.
+          </p>
+
+          <h3>Which model</h3>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th><code>VISION_PROVIDER</code></th>
+                <th>Verdict</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>qwen2.5-vl-7b-instruct</code></td>
+                <td><code>qwen</code></td>
+                <td>
+                  <strong>Recommended.</strong> Returns native pixel <code>bbox_2d</code>; grounds
+                  accurately. On Apple&nbsp;Silicon prefer an <strong>MLX</strong> build; a
+                  <strong>4-bit</strong> quant (~4.5&nbsp;GB) fits comfortably on
+                  16&ndash;24&nbsp;GB and is faster than 8-bit (~8.5&nbsp;GB, which can hit memory
+                  guardrails on 24&nbsp;GB).
+                </td>
+              </tr>
+              <tr>
+                <td><code>gemma-4-e4b-it</code> (and other Gemini-family)</td>
+                <td><code>stark</code></td>
+                <td>
+                  Works. Speaks the normalized <code>[y,x]</code> 0&ndash;1000 contract, so it runs
+                  through the <code>stark</code> provider (with
+                  <code>STARK_VISION_COORDINATE_ORDER=yx</code>) — <em>not</em> the
+                  <code>qwen</code>
+                  provider. Smaller / lighter on RAM.
+                </td>
+              </tr>
+              <tr>
+                <td><code>qwen3.5-9b</code> (reasoning)</td>
+                <td>&mdash;</td>
+                <td>
+                  <strong>Not recommended.</strong> Reasoning model — hallucinates coordinates with
+                  high confidence and/or burns its token budget thinking. Avoid for grounding.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Setup</h3>
+          <ol>
+            <li>
+              In LM Studio: <strong>Discover</strong> &rarr; search
+              <code>Qwen2.5-VL-7B-Instruct</code> &rarr; pick a build with the vision (&#128065;)
+              badge (MLX 4-bit recommended on Mac) &rarr; load it.
+            </li>
+            <li>
+              <strong>Local Server</strong> tab &rarr; Start Server. Keep only one vision model
+              loaded — LM Studio serves a single model at a time and won't auto-switch.
+            </li>
+            <li>Copy the exact model id LM Studio shows into <code>STARK_VISION_MODEL</code>.</li>
+          </ol>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">.env — local Qwen vision</span>
+            </div>
+            <pre><span class="c"># Cloud LLM is still used for any reasoning (agent goal mode);</span>
+<span class="c"># vision *grounding* runs locally on Qwen.</span>
+<span class="k">LLM_PROVIDER</span>=gemini
+<span class="k">LLM_API_KEY</span>=<span class="s">your-key</span>
+
+<span class="k">AGENT_MODE</span>=vision
+<span class="k">VISION_PROVIDER</span>=qwen                        <span class="c"># native Qwen2.5-VL grounding</span>
+<span class="k">STARK_VISION_BASE_URL</span>=<span class="s">http://localhost:1234</span>  <span class="c"># /v1 appended automatically</span>
+<span class="k">STARK_VISION_MODEL</span>=<span class="s">qwen2.5-vl-7b-instruct</span>   <span class="c"># exact id from LM Studio</span>
+<span class="k">QWEN_VISION_MAX_EDGE_PX</span>=<span class="s">1024</span>             <span class="c"># see resolution note</span></pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-block-dots"><span></span><span></span><span></span></div>
+              <span class="code-block-label">.env — local Gemma vision (Gemini-family)</span>
+            </div>
+            <pre><span class="k">AGENT_MODE</span>=vision
+<span class="k">VISION_PROVIDER</span>=stark                       <span class="c"># Gemma speaks the normalized contract</span>
+<span class="k">STARK_VISION_BASE_URL</span>=<span class="s">http://localhost:1234</span>
+<span class="k">STARK_VISION_MODEL</span>=<span class="s">gemma-4-e4b-it</span>
+<span class="k">STARK_VISION_COORDINATE_ORDER</span>=<span class="s">yx</span>
+<span class="k">QWEN_VISION_MAX_EDGE_PX</span>=<span class="s">1024</span></pre>
+          </div>
+
+          <h3>Resolution matters &mdash; <code>QWEN_VISION_MAX_EDGE_PX</code></h3>
+          <p>
+            Local models ground in <strong>image-pixel space</strong>, so accuracy scales with the
+            screenshot resolution AppClaw sends. Cloud Gemini uses normalized coordinates and is
+            fine at 512px, but a local model at 512px misses small or closely-packed targets (e.g.
+            two adjacent top-bar icons). Latency is dominated by model inference, <em>not</em> image
+            size, so raising resolution is nearly free — and a too-small image is actually slower in
+            practice because mis-taps trigger auto-wait retries.
+          </p>
+          <table class="cmd-table">
+            <thead>
+              <tr>
+                <th>Max edge</th>
+                <th>Accuracy (dense screen)</th>
+                <th>Latency</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>512</td>
+                <td>Misses small / adjacent icons</td>
+                <td>~2.6s</td>
+                <td>Too low — avoid for local models</td>
+              </tr>
+              <tr>
+                <td><strong>1024 (default)</strong></td>
+                <td>Reliable</td>
+                <td>~2.6s</td>
+                <td>Recommended for most apps</td>
+              </tr>
+              <tr>
+                <td>1280</td>
+                <td>Best (pixel-accurate)</td>
+                <td>~2.85s</td>
+                <td>Very dense UIs with tiny targets</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Findings &amp; tips</div>
+            <p>
+              <strong>Use a descriptive target.</strong> &ldquo;notification bell icon&rdquo;
+              grounds more reliably than a terse &ldquo;bell&rdquo;, especially next to similar
+              icons.<br />
+              <strong>One model loaded at a time.</strong> LM Studio serves only the loaded model;
+              switching <code>STARK_VISION_MODEL</code> requires loading that model in the UI.<br />
+              <strong>Watch RAM.</strong> An 8-bit 7B (~8.5&nbsp;GB) can trip LM Studio's resource
+              guardrail on a 24&nbsp;GB Mac — use a 4-bit build or eject other loaded models.<br />
+              <strong>Base URL.</strong> <code>/v1</code> is appended automatically, so both
+              <code>http://localhost:1234</code> and <code>http://localhost:1234/v1</code> work.
+            </p>
+          </div>
+        </section>
+
         <section id="env-vars" class="reveal">
           <h2>Environment Variables</h2>
           <p>
@@ -2691,6 +2925,47 @@
                   Gemini API key for Stark vision — only needed when <code>LLM_PROVIDER</code> is
                   not <code>gemini</code> and <code>AGENT_MODE=vision</code>. If provider is already
                   Gemini, <code>LLM_API_KEY</code> is reused automatically.
+                </td>
+              </tr>
+              <tr>
+                <td>VISION_PROVIDER</td>
+                <td>
+                  Vision grounding backend: <code>stark</code> (default — Gemini cloud, or a
+                  Gemini-family local model like Gemma) or <code>qwen</code> (native local
+                  Qwen2.5-VL). See <a href="#local-llm">Local LLM (Vision)</a>.
+                </td>
+              </tr>
+              <tr>
+                <td>STARK_VISION_BASE_URL</td>
+                <td>
+                  OpenAI-compatible local server URL for vision (e.g.
+                  <code>http://localhost:1234</code>; <code>/v1</code> appended automatically).
+                  Required for local models; setting it also bumps the screenshot resolution sent to
+                  the model.
+                </td>
+              </tr>
+              <tr>
+                <td>STARK_VISION_MODEL</td>
+                <td>
+                  Exact model id served by the local server (e.g.
+                  <code>qwen2.5-vl-7b-instruct</code>).
+                </td>
+              </tr>
+              <tr>
+                <td>STARK_VISION_COORDINATE_ORDER</td>
+                <td>
+                  <code>yx</code> (default) or <code>xy</code> — axis order for
+                  normalized-coordinate local models. Use <code>yx</code> for Gemma / Gemini-family
+                  models on the <code>stark</code> provider.
+                </td>
+              </tr>
+              <tr>
+                <td>QWEN_VISION_MAX_EDGE_PX</td>
+                <td>
+                  Max screenshot edge (px) sent to local vision models (default
+                  <code>1024</code>). Local models ground in pixel space, so accuracy scales with
+                  resolution; raise to <code>1280</code> for very dense UIs. Ignored for cloud
+                  Gemini.
                 </td>
               </tr>
             </tbody>

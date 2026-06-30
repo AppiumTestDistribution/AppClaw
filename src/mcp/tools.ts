@@ -11,11 +11,18 @@
 
 import type { MCPClient, LocatorStrategy, MCPToolResult } from './types.js';
 
-function logVisionLocate(phase: 'attempt' | 'success', description: string, detail?: string): void {
+function logVisionLocate(
+  phase: 'attempt' | 'success',
+  description: string,
+  detail?: string,
+  provider: 'stark' | 'qwen' = 'stark'
+): void {
   if (process.env.MCP_DEBUG !== '1' && process.env.MCP_DEBUG !== 'true') return;
   const short = description.length > 90 ? `${description.slice(0, 90)}…` : description;
   const extra = detail ? ` ${detail}` : '';
-  console.log(`[vision-locate] ${phase} | stark-vision (df-vision + Gemini) | "${short}"${extra}`);
+  const label =
+    provider === 'qwen' ? 'qwen-vision (Qwen2.5-VL native)' : 'stark-vision (df-vision + Gemini)';
+  console.log(`[vision-locate] ${phase} | ${label} | "${short}"${extra}`);
 }
 
 /** Extract text content from an MCP tool result */
@@ -105,17 +112,26 @@ export async function findElementByVision(
   description: string,
   existingScreenshot?: string | null
 ): Promise<string> {
-  logVisionLocate('attempt', description);
-  const { starkLocateTapTarget } = await import('../vision/stark-locate.js');
-  const located = await starkLocateTapTarget(client, description, existingScreenshot);
+  const { Config } = await import('../config.js');
+  const provider = Config.VISION_PROVIDER;
+  logVisionLocate('attempt', description, undefined, provider);
+  const located =
+    provider === 'qwen'
+      ? await (
+          await import('../vision/qwen-locate.js')
+        ).qwenLocateTapTarget(client, description, existingScreenshot)
+      : await (
+          await import('../vision/stark-locate.js')
+        ).starkLocateTapTarget(client, description, existingScreenshot);
   logVisionLocate(
     'success',
     description,
-    `→ (${Math.round(located.x)}, ${Math.round(located.y)}) ${located.syntheticUuid}`
+    `→ (${Math.round(located.x)}, ${Math.round(located.y)}) ${located.syntheticUuid}`,
+    provider
   );
   if (process.env.MCP_DEBUG === '1' || process.env.MCP_DEBUG === 'true') {
     console.log(
-      `        [vision-debug] stark: "${description.slice(0, 60)}" -> (${located.x}, ${located.y})`
+      `        [vision-debug] ${provider}: "${description.slice(0, 60)}" -> (${located.x}, ${located.y})`
     );
   }
   return located.syntheticUuid;

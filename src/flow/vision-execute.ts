@@ -69,6 +69,27 @@ export async function downscaleForVision(base64: string): Promise<string> {
   }
 }
 
+/**
+ * Provider-aware downscale.
+ *
+ * Cloud Gemini uses normalized coords with internal tiling, so 512px is plenty.
+ * But ANY *local* vision model (LM Studio) — whether the native Qwen path or a
+ * Gemini-format local model like Gemma served through the Stark path — grounds
+ * far better at higher resolution (Qwen returns pixels; Gemma/Gemma-format
+ * models lose small targets when the image is tiny). Empirically both need
+ * ≥768px (512px → missed targets; 768px → reliable). So we bump to
+ * QWEN_VISION_MAX_EDGE_PX whenever a local STARK_VISION_BASE_URL is configured,
+ * regardless of provider. Cloud Stark (no base URL) keeps the cheap 512px path.
+ */
+async function downscaleForProvider(base64: string): Promise<string> {
+  const isLocalServer = !!Config.STARK_VISION_BASE_URL.trim();
+  if (Config.VISION_PROVIDER === 'qwen' || isLocalServer) {
+    const { downscaleForVision: hiResDownscale } = await import('../vision/qwen-locate.js');
+    return (await hiResDownscale(base64)).base64;
+  }
+  return downscaleForVision(base64);
+}
+
 function logTiming(label: string, elapsed: number): void {
   if (!appclawDebug) return;
   console.log(`        ${theme.dim('vision')} ${theme.info(label)} ${theme.dim(`${elapsed}ms`)}`);
@@ -81,6 +102,42 @@ const {
   findSubstringWithBrackets,
   sanitizeOutput,
 } = starkVision;
+
+/**
+ * The subset of `StarkVisionClient` the vision executor uses. Both the df-vision
+ * Gemini client and the native Qwen client implement it, so the executor is
+ * provider-agnostic below the factory.
+ */
+interface VisionClient {
+  understandAndLocate(instruction: string, imageBase64: string): Promise<string>;
+  getBoundingBox(element: string, imageBase64: string): Promise<string>;
+  isElementVisible(imageBase64: string, query: string, json?: boolean): Promise<string>;
+  getElementInfo(imageBase64: string, query: string, json?: boolean): Promise<string>;
+}
+
+/**
+ * Build the vision client for the configured provider.
+ * `VISION_PROVIDER=qwen` → fully-local native Qwen2.5-VL (reasoning + grounding).
+ * Otherwise → df-vision + Gemini (cloud or forced-format local server).
+ */
+async function makeVisionClient(opts: {
+  apiKey: string;
+  baseUrl?: string;
+  coordinateOrder: 'yx' | 'xy';
+}): Promise<VisionClient> {
+  if (Config.VISION_PROVIDER === 'qwen') {
+    const { QwenVisionClient } = await import('../vision/qwen-vision-client.js');
+    return new QwenVisionClient({ baseUrl: opts.baseUrl, model: getStarkVisionModel() });
+  }
+  return new StarkVisionClient({
+    apiKey: opts.apiKey || 'local',
+    model: getStarkVisionModel(),
+    disableThinking: true,
+    ...(opts.baseUrl && { baseUrl: opts.baseUrl }),
+    ...(opts.baseUrl && { coordinateOrder: opts.coordinateOrder }),
+    onTokenUsage: trackVisionTokenUsage,
+  }) as unknown as VisionClient;
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -505,7 +562,7 @@ export async function visionExecute(
   if (pre?.getInfoQuery) {
     // getInfo — screenshot + getElementInfo (separate prompt, not combinedInstruction)
     const rawImage = await screenshot(mcp);
-    const imageBase64 = rawImage ? await downscaleForVision(rawImage) : rawImage;
+    const imageBase64 = rawImage ? await downscaleForProvider(rawImage) : rawImage;
     if (!imageBase64) {
       return {
         step: { kind: 'getInfo', query: pre.getInfoQuery, verbatim: instruction },
@@ -513,14 +570,7 @@ export async function visionExecute(
         isGetInfo: true,
       };
     }
-    const client = new StarkVisionClient({
-      apiKey: apiKey || 'local',
-      model: getStarkVisionModel(),
-      disableThinking: true,
-      ...(baseUrl && { baseUrl }),
-      ...(baseUrl && { coordinateOrder }),
-      onTokenUsage: trackVisionTokenUsage,
-    });
+    const client = await makeVisionClient({ apiKey, baseUrl, coordinateOrder });
     const t0 = performance.now();
     const response = await client.getElementInfo(imageBase64, pre.getInfoQuery, true);
     logTiming('getElementInfo', Math.round(performance.now() - t0));
@@ -546,21 +596,14 @@ export async function visionExecute(
     // Pass the user's full instruction to the vision model — let the LLM interpret
     // what to check instead of brittle text extraction.
     const rawImage = await screenshot(mcp);
-    const imageBase64 = rawImage ? await downscaleForVision(rawImage) : rawImage;
+    const imageBase64 = rawImage ? await downscaleForProvider(rawImage) : rawImage;
     if (!imageBase64) {
       return {
         step: { kind: 'assert', text: pre.assertQuery, verbatim: instruction },
         result: { success: false, message: 'Failed to capture screenshot' },
       };
     }
-    const client = new StarkVisionClient({
-      apiKey: apiKey || 'local',
-      model: getStarkVisionModel(),
-      disableThinking: true,
-      ...(baseUrl && { baseUrl }),
-      ...(baseUrl && { coordinateOrder }),
-      onTokenUsage: trackVisionTokenUsage,
-    });
+    const client = await makeVisionClient({ apiKey, baseUrl, coordinateOrder });
     const visQuery = pre.assertQuery;
     const t0 = performance.now();
     const visResponse = await client.isElementVisible(imageBase64, visQuery, true);
@@ -595,7 +638,7 @@ export async function visionExecute(
   if (!rawScreenshot) return null;
   lastVisionScreenshot = rawScreenshot; // Expose for artifact reporting (tap dot overlay)
   // Downscale for faster Gemini processing — coordinates are normalized 0-1000 so resolution doesn't matter
-  const imageBase64 = await downscaleForVision(rawScreenshot);
+  const imageBase64 = await downscaleForProvider(rawScreenshot);
   if (appclawDebug) {
     const rawKB = Math.round(rawScreenshot.length / 1024);
     const newKB = Math.round(imageBase64.length / 1024);
@@ -606,13 +649,7 @@ export async function visionExecute(
 
   // Use raw screenshot for screen size detection (need actual device pixels for tap coordinates)
   const screenSize = await getScreenSizeForStark(mcp, rawScreenshot);
-  const client = new StarkVisionClient({
-    apiKey: apiKey || 'local',
-    model: getStarkVisionModel(),
-    disableThinking: true,
-    ...(baseUrl && { baseUrl }),
-    onTokenUsage: trackVisionTokenUsage,
-  });
+  const client = await makeVisionClient({ apiKey, baseUrl, coordinateOrder });
 
   const t0 = performance.now();
   const rawResponse = await client.understandAndLocate(instruction, imageBase64);

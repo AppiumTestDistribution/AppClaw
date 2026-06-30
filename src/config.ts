@@ -111,6 +111,29 @@ const envSchema = z.object({
    */
   STARK_VISION_COORDINATE_ORDER: z.enum(['yx', 'xy']).default('yx'),
 
+  /**
+   * Vision grounding provider for AGENT_MODE=vision.
+   * 'stark' (default): df-vision + Gemini ([y,x] normalized 0–1000) — cloud or a
+   *   forced-format local server. Preserves all existing behavior.
+   * 'qwen': native Qwen2.5-VL bbox grounding via a local LM Studio server. Reuses
+   *   STARK_VISION_BASE_URL + STARK_VISION_MODEL for the endpoint/model.
+   */
+  VISION_PROVIDER: z.enum(['stark', 'qwen']).default('stark'),
+
+  /**
+   * Max edge (px) for screenshots sent to local vision models (Qwen native pixel
+   * path, or Gemma/Gemini-format models via the local Stark path). Local VLMs
+   * ground in image-pixel space, so accuracy scales with resolution.
+   *
+   * Latency is dominated by model inference (~fixed), NOT image size, so raising
+   * this is nearly free: on a dense 1440×3120 Play Store screen — 768px → 3/6
+   * (bell icon off 153px, 2.59s); 1024px → 5/6 (16px, 2.62s); 1280px → 6/6 (1px,
+   * 2.85s). And low-res misses trigger auto-wait retries (~3× the calls), so a
+   * too-small image is slower in practice. Default 1024 fixes small-icon/dense
+   * screens at ~no latency cost; raise to 1280 for the densest UIs.
+   */
+  QWEN_VISION_MAX_EDGE_PX: z.coerce.number().default(1024),
+
   /** Agent interaction mode: "dom" uses DOM locators, "vision" uses AI vision as primary strategy */
   AGENT_MODE: z.enum(['dom', 'vision']).default('dom'),
 
