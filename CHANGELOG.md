@@ -1,3 +1,9 @@
+## [1.9.1](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.9.0...v1.9.1) (2026-07-01)
+
+### Bug Fixes
+
+* add support for remote mcp ([#43](https://github.com/AppiumTestDistribution/AppClaw/issues/43)) ([f74ff8c](https://github.com/AppiumTestDistribution/AppClaw/commit/f74ff8c79178b146a7481c9bb6fd43510d994fa8))
+
 ## [1.9.0](https://github.com/AppiumTestDistribution/AppClaw/compare/v1.8.0...v1.9.0) (2026-06-29)
 
 ### Features
