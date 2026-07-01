@@ -30,7 +30,13 @@ vi.mock('../../src/device/session.js', () => ({
 
 const { acquireSharedMCPClient } = await import('../../src/mcp/client.js');
 const { createPlatformSession } = await import('../../src/device/session.js');
-const { McpSession } = await import('../../src/sdk/mcp-session.js');
+const { McpSession, isLocalNode } = await import('../../src/sdk/mcp-session.js');
+
+/** Extra caps passed to createPlatformSession on the most recent connect(). */
+function lastExtraCaps(): Record<string, unknown> {
+  const calls = vi.mocked(createPlatformSession).mock.calls;
+  return (calls[calls.length - 1]?.[4] ?? {}) as Record<string, unknown>;
+}
 
 function makeConfig(overrides = {}) {
   return {
@@ -172,6 +178,64 @@ describe('McpSession — release', () => {
 
     expect(after.tools).toHaveLength(1);
     expect(after.tools[0].name).toBe('appium_screenshot');
+  });
+});
+
+// ── Remote node detection ──────────────────────────────────────────────────
+
+describe('isLocalNode', () => {
+  test('stdio is always local', () => {
+    expect(isLocalNode(makeConfig({ MCP_TRANSPORT: 'stdio', MCP_HOST: '10.0.0.1' }))).toBe(true);
+  });
+
+  test.each(['localhost', '127.0.0.1', '::1', '0.0.0.0'])(
+    'sse on loopback host %s is local',
+    (host) => {
+      expect(isLocalNode(makeConfig({ MCP_TRANSPORT: 'sse', MCP_HOST: host }))).toBe(true);
+    }
+  );
+
+  test('sse on a remote host is not local', () => {
+    expect(isLocalNode(makeConfig({ MCP_TRANSPORT: 'sse', MCP_HOST: '10.0.0.1' }))).toBe(false);
+  });
+
+  test('host matching is case/whitespace insensitive', () => {
+    expect(isLocalNode(makeConfig({ MCP_TRANSPORT: 'sse', MCP_HOST: '  LocalHost ' }))).toBe(true);
+  });
+});
+
+// ── Port allocation: local vs remote node ──────────────────────────────────
+
+describe('McpSession — driver port allocation', () => {
+  test('local Android node allocates systemPort + mjpegServerPort caps', async () => {
+    const session = new McpSession(makeConfig({ PLATFORM: 'android' }));
+    await session.connect();
+    const caps = lastExtraCaps();
+    expect(typeof caps['appium:systemPort']).toBe('number');
+    expect(typeof caps['appium:mjpegServerPort']).toBe('number');
+  });
+
+  test('remote node omits driver ports so appium-mcp allocates them node-side', async () => {
+    const session = new McpSession(
+      makeConfig({ MCP_TRANSPORT: 'sse', MCP_HOST: '10.0.0.1', PLATFORM: 'android' })
+    );
+    await session.connect();
+    const caps = lastExtraCaps();
+    expect(caps).not.toHaveProperty('appium:systemPort');
+    expect(caps).not.toHaveProperty('appium:mjpegServerPort');
+  });
+
+  test('remote node still pins the device udid when set', async () => {
+    const session = new McpSession(
+      makeConfig({
+        MCP_TRANSPORT: 'sse',
+        MCP_HOST: '10.0.0.1',
+        PLATFORM: 'android',
+        DEVICE_UDID: 'remote-udid',
+      })
+    );
+    await session.connect();
+    expect(lastExtraCaps()['appium:udid']).toBe('remote-udid');
   });
 });
 

@@ -17,6 +17,27 @@ import type { AppClawConfig } from '../config.js';
 import type { Platform } from '../index.js';
 import { AppResolver } from '../agent/app-resolver.js';
 
+/** Hosts that mean "the appium-mcp node shares this machine". */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '']);
+
+/**
+ * Whether the appium-mcp node runs on this machine.
+ *
+ * Only a co-located node lets the control plane allocate driver ports locally
+ * and pass them per session (`buildParallelCaps`). For a *remote* SSE node the
+ * host owns its own ports — we can't probe them from here — so port allocation
+ * must happen node-side: appium-mcp auto-fills `systemPort` / `wdaLocalPort` /
+ * `mjpegServerPort` for embedded sessions when the caller omits them. See the
+ * node-side port-allocation change in appium-mcp.
+ *
+ * Stdio always runs as a local subprocess. For SSE we go by host: anything that
+ * isn't loopback is treated as remote.
+ */
+export function isLocalNode(config: AppClawConfig): boolean {
+  if (config.MCP_TRANSPORT === 'stdio') return true;
+  return LOCAL_HOSTS.has(config.MCP_HOST.trim().toLowerCase());
+}
+
 /**
  * Allocate platform-specific unique ports so parallel SDK instances don't
  * collide. Ports are reserved in the shared in-process allocator until session
@@ -79,7 +100,12 @@ export class McpSession {
       // Allocate unique ports per instance so parallel tests don't collide on
       // mjpegServerPort / systemPort / wdaLocalPort. Ports stay reserved in the
       // shared allocator until session creation settles, then are released.
-      const { caps: extraCaps, ports } = await buildParallelCaps(platform);
+      //
+      // Local node only: a remote SSE node owns its own ports, so we omit them
+      // and let appium-mcp allocate them node-side (auto-filled when unset).
+      const { caps: extraCaps, ports } = isLocalNode(this.config)
+        ? await buildParallelCaps(platform)
+        : { caps: {} as Record<string, unknown>, ports: [] as number[] };
       // Pin to a specific device when DEVICE_UDID is set — required for parallel runs
       // so concurrent instances don't race on appium-mcp's shared activeDevice global.
       const udid = this.config.DEVICE_UDID?.trim();
